@@ -31,6 +31,7 @@ class PomodoroConfig {
     required this.breakDurationMinutes,
     this.longBreakDurationMinutes = 15,
     this.longBreakEvery = 4,
+    this.sourceId,
   });
 
   final String subjectId;
@@ -40,6 +41,7 @@ class PomodoroConfig {
   final int breakDurationMinutes;
   final int longBreakDurationMinutes;
   final int longBreakEvery;
+  final String? sourceId;
 }
 
 @Riverpod(keepAlive: true)
@@ -181,6 +183,7 @@ class PomodoroNotifier extends _$PomodoroNotifier {
         chapterId: Value(config.chapterId),
         startedAt: Value(now),
         plannedDurationMinutes: config.plannedDurationMinutes,
+        sourceId: Value(config.sourceId),
       ),
     );
 
@@ -244,7 +247,6 @@ class PomodoroNotifier extends _$PomodoroNotifier {
         pomodorosCompleted: newPomodoros,
       );
 
-      // Show session complete notification
       final notifService = ref.read(notificationServiceProvider);
       try {
         await notifService.showSessionComplete(
@@ -252,29 +254,30 @@ class PomodoroNotifier extends _$PomodoroNotifier {
           pomodorosCompleted: newPomodoros,
         );
 
-        // Get subject and project for reminder
         final subject = await _subjectDao?.getById(state.subjectId);
         if (subject != null) {
-          // Get project to check if project-specific reminder is set
           final project = await _projectDao?.getById(subject.projectId);
-          int reminderMinutes = 30; // default
+          bool reminderEnabled = false;
+          int reminderMinutes = 30;
 
-          // Priority: project setting > global setting
           if (project != null) {
             reminderMinutes = project.studyReminderMinutes;
+            reminderEnabled = true;
           } else {
             final themeSettingsAsync = ref.read(themeSettingsProvider);
             final settings = themeSettingsAsync.value;
             if (settings != null) {
+              reminderEnabled = settings.studyReminderEnabled;
               reminderMinutes = settings.studyReminderMinutes;
             }
           }
 
-          // Always schedule reminder after session completes
-          await notifService.scheduleStudyReminder(
-            delay: Duration(minutes: reminderMinutes),
-            subjectName: subject.name,
-          );
+          if (reminderEnabled) {
+            await notifService.scheduleStudyReminder(
+              delay: Duration(minutes: reminderMinutes),
+              subjectName: subject.name,
+            );
+          }
         }
       } catch (e) {
         debugPrint('Error showing notification: $e');
@@ -426,6 +429,8 @@ class PomodoroNotifier extends _$PomodoroNotifier {
     required int actualDurationMinutes,
     required int pomodorosCompleted,
     DateTime? endedAt,
+    int? startPage,
+    int? endPage,
   }) async {
     final sessionId = state.activeSessionId;
     if (sessionId == null || _db == null) return;
@@ -450,7 +455,22 @@ class PomodoroNotifier extends _$PomodoroNotifier {
         confidenceRating: sessionRow.confidenceRating,
         notes: sessionRow.notes,
         xpEarned: sessionRow.xpEarned,
+        sourceId: sessionRow.sourceId,
+        startPage: startPage ?? sessionRow.startPage,
+        endPage: endPage ?? sessionRow.endPage,
       ),
+    );
+  }
+
+  Future<void> updateSessionPageRange({
+    required int startPage,
+    required int endPage,
+  }) async {
+    await _updateSessionInDb(
+      actualDurationMinutes: state.plannedDurationMinutes,
+      pomodorosCompleted: state.pomodorosCompleted,
+      startPage: startPage,
+      endPage: endPage,
     );
   }
 

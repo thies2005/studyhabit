@@ -36,6 +36,8 @@ class _EditProjectDialogState extends ConsumerState<EditProjectDialog> {
   int _selectedColorIndex = 0;
   late double _workDuration;
   late double _shortBreak;
+  late double _longBreakDuration;
+  late double _longBreakEvery;
   late double _studyReminderMinutes;
 
   @override
@@ -55,6 +57,8 @@ class _EditProjectDialogState extends ConsumerState<EditProjectDialog> {
 
     _workDuration = widget.project.defaultWorkDuration.toDouble();
     _shortBreak = widget.project.defaultBreakDuration.toDouble();
+    _longBreakDuration = widget.project.defaultLongBreakDuration.toDouble();
+    _longBreakEvery = widget.project.defaultLongBreakEvery.toDouble();
     _studyReminderMinutes = widget.project.studyReminderMinutes.toDouble();
   }
 
@@ -157,6 +161,27 @@ class _EditProjectDialogState extends ConsumerState<EditProjectDialog> {
               color: colorScheme.tertiary,
               onChanged: (v) => setState(() => _shortBreak = v),
             ),
+            const SizedBox(height: 16),
+            _SliderRow(
+              label: 'Long Break',
+              value: _longBreakDuration,
+              min: 5,
+              max: 60,
+              unit: 'min',
+              color: colorScheme.tertiary,
+              onChanged: (v) => setState(() => _longBreakDuration = v),
+            ),
+            const SizedBox(height: 16),
+            _SliderRow(
+              label: 'Long Break Every',
+              value: _longBreakEvery,
+              min: 2,
+              max: 8,
+              unit: '',
+              color: colorScheme.secondary,
+              onChanged: (v) => setState(() => _longBreakEvery = v),
+              isInt: true,
+            ),
             const SizedBox(height: 20),
             Text('Study Reminder', style: theme.textTheme.titleSmall),
             const SizedBox(height: 8),
@@ -196,6 +221,8 @@ class _EditProjectDialogState extends ConsumerState<EditProjectDialog> {
           colorValue: AppTheme.presetSeeds[_selectedColorIndex].toARGB32(),
           defaultWorkDuration: _workDuration.round(),
           defaultBreakDuration: _shortBreak.round(),
+          defaultLongBreakDuration: _longBreakDuration.round(),
+          defaultLongBreakEvery: _longBreakEvery.round(),
           studyReminderMinutes: _studyReminderMinutes.round(),
         );
 
@@ -245,6 +272,7 @@ class _SliderRow extends StatelessWidget {
     required this.unit,
     required this.color,
     required this.onChanged,
+    this.isInt = false,
   });
 
   final String label;
@@ -254,6 +282,7 @@ class _SliderRow extends StatelessWidget {
   final String unit;
   final Color color;
   final ValueChanged<double> onChanged;
+  final bool isInt;
 
   @override
   Widget build(BuildContext context) {

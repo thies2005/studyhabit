@@ -36,6 +36,7 @@ class _StartSessionSheetState extends ConsumerState<StartSessionSheet> {
   bool _chapterChoiceMade = false;
   double _workDuration = 25;
   double _shortBreak = 5;
+  double _longBreakDuration = 15;
   double _longBreakEvery = 4;
 
   @override
@@ -120,6 +121,7 @@ class _StartSessionSheetState extends ConsumerState<StartSessionSheet> {
                     _workDuration = s.defaultDurationMinutes.toDouble();
                     _shortBreak = s.defaultBreakMinutes.toDouble();
                   });
+                  _applyProjectDefaults(currentProject);
                 },
               ),
               1 => _TopicPicker(
@@ -142,10 +144,13 @@ class _StartSessionSheetState extends ConsumerState<StartSessionSheet> {
               3 => _DurationConfig(
                 workDuration: _workDuration,
                 shortBreak: _shortBreak,
+                longBreakDuration: _longBreakDuration,
                 longBreakEvery: _longBreakEvery,
                 projectDefaults: currentProject,
                 onWorkChanged: (v) => setState(() => _workDuration = v),
                 onBreakChanged: (v) => setState(() => _shortBreak = v),
+                onLongBreakDurationChanged: (v) =>
+                    setState(() => _longBreakDuration = v),
                 onLongBreakEveryChanged: (v) =>
                     setState(() => _longBreakEvery = v),
               ),
@@ -190,6 +195,15 @@ class _StartSessionSheetState extends ConsumerState<StartSessionSheet> {
     return 3;
   }
 
+  void _applyProjectDefaults(Project? project) {
+    if (project != null) {
+      setState(() {
+        _longBreakDuration = project.defaultLongBreakDuration.toDouble();
+        _longBreakEvery = project.defaultLongBreakEvery.toDouble();
+      });
+    }
+  }
+
   bool _canProceed() {
     return switch (_step) {
       0 => _selectedSubject != null,
@@ -209,6 +223,7 @@ class _StartSessionSheetState extends ConsumerState<StartSessionSheet> {
       chapterId: _selectedChapterId,
       plannedDurationMinutes: _workDuration.round(),
       breakDurationMinutes: _shortBreak.round(),
+      longBreakDurationMinutes: _longBreakDuration.round(),
       longBreakEvery: _longBreakEvery.round(),
     );
 
@@ -474,19 +489,23 @@ class _DurationConfig extends StatelessWidget {
   const _DurationConfig({
     required this.workDuration,
     required this.shortBreak,
+    required this.longBreakDuration,
     required this.longBreakEvery,
     required this.projectDefaults,
     required this.onWorkChanged,
     required this.onBreakChanged,
+    required this.onLongBreakDurationChanged,
     required this.onLongBreakEveryChanged,
   });
 
   final double workDuration;
   final double shortBreak;
+  final double longBreakDuration;
   final double longBreakEvery;
   final Project? projectDefaults;
   final ValueChanged<double> onWorkChanged;
   final ValueChanged<double> onBreakChanged;
+  final ValueChanged<double> onLongBreakDurationChanged;
   final ValueChanged<double> onLongBreakEveryChanged;
 
   @override
@@ -515,7 +534,7 @@ class _DurationConfig extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Project defaults: ${projectDefaults!.defaultWorkDuration}/${projectDefaults!.defaultBreakDuration} min',
+                    'Project defaults: ${projectDefaults!.defaultWorkDuration}/${projectDefaults!.defaultBreakDuration}/${projectDefaults!.defaultLongBreakDuration} min',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: colorScheme.onSecondaryContainer,
                         ),
@@ -577,6 +596,16 @@ class _DurationConfig extends StatelessWidget {
           unit: 'min',
           color: colorScheme.tertiary,
           onChanged: onBreakChanged,
+        ),
+        const SizedBox(height: 24),
+        _SliderRow(
+          label: 'Long Break Duration',
+          value: longBreakDuration,
+          min: 5,
+          max: 60,
+          unit: 'min',
+          color: colorScheme.tertiary,
+          onChanged: onLongBreakDurationChanged,
         ),
         const SizedBox(height: 24),
         _SliderRow(

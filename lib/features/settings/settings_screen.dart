@@ -350,6 +350,85 @@ class _SettingsContent extends ConsumerWidget {
                     ],
                   ),
                 ),
+              const Divider(height: 1),
+              SwitchListTile(
+                value: settings.notificationsEnabled,
+                onChanged: (value) {
+                  ref
+                      .read(themeSettingsProvider.notifier)
+                      .setNotificationsEnabled(value);
+                },
+                title: Text(
+                  'Daily Reminder',
+                  style: theme.textTheme.titleSmall,
+                ),
+                subtitle: Text(
+                  'Remind yourself to study at a set time every day',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              if (settings.notificationsEnabled)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Reminder time', style: theme.textTheme.bodyMedium),
+                          Text(
+                            '${settings.dailyReminderHour.toString().padLeft(2, '0')}:${settings.dailyReminderMinute.toString().padLeft(2, '0')}',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              color: colorScheme.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Slider(
+                              value: settings.dailyReminderHour.toDouble(),
+                              min: 0,
+                              max: 23,
+                              divisions: 23,
+                              label: '${settings.dailyReminderHour}:00',
+                              onChanged: (value) {
+                                ref
+                                    .read(themeSettingsProvider.notifier)
+                                    .setDailyReminderTime(
+                                      hour: value.round(),
+                                      minute: settings.dailyReminderMinute,
+                                    );
+                              },
+                            ),
+                          ),
+                          SizedBox(
+                            width: 60,
+                            child: Slider(
+                              value: settings.dailyReminderMinute.toDouble(),
+                              min: 0,
+                              max: 55,
+                              divisions: 11,
+                              label: ':${settings.dailyReminderMinute.toString().padLeft(2, '0')}',
+                              onChanged: (value) {
+                                ref
+                                    .read(themeSettingsProvider.notifier)
+                                    .setDailyReminderTime(
+                                      hour: settings.dailyReminderHour,
+                                      minute: value.round(),
+                                    );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
             ],
           ),
         ),

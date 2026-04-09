@@ -33,6 +33,8 @@ class _CreateProjectDialogState extends ConsumerState<CreateProjectDialog> {
   int _selectedColorIndex = 0;
   double _workDuration = 25;
   double _shortBreak = 5;
+  double _longBreakDuration = 15;
+  double _longBreakEvery = 4;
   double _studyReminderMinutes = 30;
 
   @override
@@ -135,6 +137,27 @@ class _CreateProjectDialogState extends ConsumerState<CreateProjectDialog> {
               color: colorScheme.tertiary,
               onChanged: (v) => setState(() => _shortBreak = v),
             ),
+            const SizedBox(height: 16),
+            _SliderRow(
+              label: 'Long Break',
+              value: _longBreakDuration,
+              min: 5,
+              max: 60,
+              unit: 'min',
+              color: colorScheme.tertiary,
+              onChanged: (v) => setState(() => _longBreakDuration = v),
+            ),
+            const SizedBox(height: 16),
+            _SliderRow(
+              label: 'Long Break Every',
+              value: _longBreakEvery,
+              min: 2,
+              max: 8,
+              unit: '',
+              color: colorScheme.secondary,
+              onChanged: (v) => setState(() => _longBreakEvery = v),
+              isInt: true,
+            ),
             const SizedBox(height: 20),
             Text('Study Reminder', style: theme.textTheme.titleSmall),
             const SizedBox(height: 8),
@@ -175,6 +198,8 @@ class _CreateProjectDialogState extends ConsumerState<CreateProjectDialog> {
           colorValue: AppTheme.presetSeeds[_selectedColorIndex].toARGB32(),
           defaultWorkDuration: _workDuration.round(),
           defaultBreakDuration: _shortBreak.round(),
+          defaultLongBreakDuration: _longBreakDuration.round(),
+          defaultLongBreakEvery: _longBreakEvery.round(),
           studyReminderMinutes: _studyReminderMinutes.round(),
         );
     if (!mounted) return;
@@ -237,6 +262,7 @@ class _SliderRow extends StatelessWidget {
     required this.unit,
     required this.color,
     required this.onChanged,
+    this.isInt = false,
   });
 
   final String label;
@@ -246,6 +272,7 @@ class _SliderRow extends StatelessWidget {
   final String unit;
   final Color color;
   final ValueChanged<double> onChanged;
+  final bool isInt;
 
   @override
   Widget build(BuildContext context) {

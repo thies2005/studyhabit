@@ -9,6 +9,7 @@ import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/providers/database_provider.dart';
 import '../subjects/detail/sources/source_providers.dart';
+import 'pomodorno_provider_import.dart';
 
 class PdfViewerScreen extends ConsumerStatefulWidget {
   const PdfViewerScreen({
@@ -57,10 +58,13 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> {
               progressPercent: null,
             );
 
-        // Update session page range if startPage was recorded
         if (_startPage != null && _startPage != endPage) {
-          // TODO: Update session with startPage and endPage when session tracking is implemented
-          debugPrint('Page range: $_startPage - $endPage');
+          ref
+              .read(pomodoroProvider.notifier)
+              .updateSessionPageRange(
+                startPage: _startPage!,
+                endPage: endPage,
+              );
         }
       }
     } catch (e) {
