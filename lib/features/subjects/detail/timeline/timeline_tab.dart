@@ -312,6 +312,8 @@ class _SessionCardState extends ConsumerState<SessionCard> {
               chapterId: chapterId,
               notes: notes,
               showHierarchy: showHierarchy,
+              session: session,
+              subjectId: widget.subjectId,
             ),
             crossFadeState: _expanded
                 ? CrossFadeState.showSecond
@@ -485,6 +487,8 @@ class _ExpandedView extends ConsumerWidget {
     required this.chapterId,
     required this.notes,
     required this.showHierarchy,
+    required this.session,
+    required this.subjectId,
   });
 
   final String durationText;
@@ -495,6 +499,8 @@ class _ExpandedView extends ConsumerWidget {
   final String? chapterId;
   final String? notes;
   final bool showHierarchy;
+  final StudySession session;
+  final String subjectId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -571,6 +577,39 @@ class _ExpandedView extends ConsumerWidget {
                   ),
                 ),
               ],
+            ),
+          ],
+          if (session.sourceId != null) ...[
+            const SizedBox(height: 8),
+            InkWell(
+              onTap: () {
+                context.pushNamed(
+                  'pdf-viewer',
+                  pathParameters: {
+                    'subjectId': subjectId,
+                    'sourceId': session.sourceId!,
+                  },
+                );
+              },
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.picture_as_pdf,
+                    size: 14,
+                    color: colorScheme.primary,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    session.startPage != null && session.endPage != null
+                        ? 'View pages ${session.startPage}-${session.endPage}'
+                        : 'View PDF source',
+                    style: textTheme.bodySmall?.copyWith(
+                      color: colorScheme.primary,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ],

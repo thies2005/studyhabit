@@ -20,6 +20,10 @@ class ThemeSettings extends _$ThemeSettings {
   static const _autoStartBreaksKey = 'pomodoro.autoStartBreaks';
   static const _vibrationKey = 'pomodoro.vibration';
   static const _notificationsKey = 'notifications.enabled';
+  static const _studyReminderEnabledKey = 'notifications.studyReminderEnabled';
+  static const _studyReminderMinutesKey = 'notifications.studyReminderMinutes';
+  static const _dailyReminderHourKey = 'notifications.dailyReminderHour';
+  static const _dailyReminderMinuteKey = 'notifications.dailyReminderMinute';
   static const _gracePeriodKey = 'streak.gracePeriod';
 
   late SharedPreferences _prefs;
@@ -56,6 +60,10 @@ class ThemeSettings extends _$ThemeSettings {
     final autoStartBreaks = _prefs.getBool(_autoStartBreaksKey) ?? false;
     final vibration = _prefs.getBool(_vibrationKey) ?? true;
     final notifications = _prefs.getBool(_notificationsKey) ?? true;
+    final studyReminderEnabled = _prefs.getBool(_studyReminderEnabledKey) ?? false;
+    final studyReminderMinutes = _prefs.getInt(_studyReminderMinutesKey) ?? 30;
+    final dailyReminderHour = _prefs.getInt(_dailyReminderHourKey) ?? 9;
+    final dailyReminderMinute = _prefs.getInt(_dailyReminderMinuteKey) ?? 0;
     final gracePeriod = _prefs.getDouble(_gracePeriodKey) ?? 2.0;
 
     return ThemeSettingsState(
@@ -71,6 +79,10 @@ class ThemeSettings extends _$ThemeSettings {
       autoStartBreaks: autoStartBreaks,
       vibration: vibration,
       notificationsEnabled: notifications,
+      studyReminderEnabled: studyReminderEnabled,
+      studyReminderMinutes: studyReminderMinutes,
+      dailyReminderHour: dailyReminderHour,
+      dailyReminderMinute: dailyReminderMinute,
       gracePeriodHours: gracePeriod,
     );
   }
@@ -217,6 +229,43 @@ class ThemeSettings extends _$ThemeSettings {
     state = AsyncValue.data(next);
     await _prefs.setDouble(_gracePeriodKey, hours);
   }
+
+  Future<void> setStudyReminderEnabled(bool enabled) async {
+    final current = state.asData?.value;
+    if (current == null) {
+      return;
+    }
+
+    final next = current.copyWith(studyReminderEnabled: enabled);
+    state = AsyncValue.data(next);
+    await _prefs.setBool(_studyReminderEnabledKey, enabled);
+  }
+
+  Future<void> setStudyReminderMinutes(int minutes) async {
+    final current = state.asData?.value;
+    if (current == null) {
+      return;
+    }
+
+    final next = current.copyWith(studyReminderMinutes: minutes);
+    state = AsyncValue.data(next);
+    await _prefs.setInt(_studyReminderMinutesKey, minutes);
+  }
+
+  Future<void> setDailyReminderTime({required int hour, required int minute}) async {
+    final current = state.asData?.value;
+    if (current == null) {
+      return;
+    }
+
+    final next = current.copyWith(
+      dailyReminderHour: hour,
+      dailyReminderMinute: minute,
+    );
+    state = AsyncValue.data(next);
+    await _prefs.setInt(_dailyReminderHourKey, hour);
+    await _prefs.setInt(_dailyReminderMinuteKey, minute);
+  }
 }
 
 class ThemeSettingsState {
@@ -233,6 +282,10 @@ class ThemeSettingsState {
     required this.autoStartBreaks,
     required this.vibration,
     required this.notificationsEnabled,
+    required this.studyReminderEnabled,
+    required this.studyReminderMinutes,
+    required this.dailyReminderHour,
+    required this.dailyReminderMinute,
     required this.gracePeriodHours,
   });
 
@@ -248,6 +301,10 @@ class ThemeSettingsState {
   final bool autoStartBreaks;
   final bool vibration;
   final bool notificationsEnabled;
+  final bool studyReminderEnabled;
+  final int studyReminderMinutes;
+  final int dailyReminderHour;
+  final int dailyReminderMinute;
   final double gracePeriodHours;
 
   ThemeSettingsState copyWith({
@@ -263,6 +320,10 @@ class ThemeSettingsState {
     bool? autoStartBreaks,
     bool? vibration,
     bool? notificationsEnabled,
+    bool? studyReminderEnabled,
+    int? studyReminderMinutes,
+    int? dailyReminderHour,
+    int? dailyReminderMinute,
     double? gracePeriodHours,
   }) {
     return ThemeSettingsState(
@@ -278,6 +339,10 @@ class ThemeSettingsState {
       autoStartBreaks: autoStartBreaks ?? this.autoStartBreaks,
       vibration: vibration ?? this.vibration,
       notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
+      studyReminderEnabled: studyReminderEnabled ?? this.studyReminderEnabled,
+      studyReminderMinutes: studyReminderMinutes ?? this.studyReminderMinutes,
+      dailyReminderHour: dailyReminderHour ?? this.dailyReminderHour,
+      dailyReminderMinute: dailyReminderMinute ?? this.dailyReminderMinute,
       gracePeriodHours: gracePeriodHours ?? this.gracePeriodHours,
     );
   }

@@ -7,10 +7,14 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/database/app_database.dart';
+import '../../core/database/daos/project_dao.dart';
 import '../../core/database/daos/session_dao.dart';
+import '../../core/database/daos/subject_dao.dart';
 import '../../core/models/enums.dart';
 import '../../core/providers/database_provider.dart';
+import '../../core/providers/theme_provider.dart';
 import '../../core/services/achievement_service.dart';
+import '../../core/services/notification_service.dart';
 import '../../core/services/streak_service.dart';
 import '../../core/services/xp_service.dart';
 import 'pomodoro_state.dart';
@@ -42,14 +46,21 @@ class PomodoroConfig {
 class PomodoroNotifier extends _$PomodoroNotifier {
   AppDatabase? _db;
   SessionDao? _sessionDao;
+  SubjectDao? _subjectDao;
+  ProjectDao? _projectDao;
   bool _listenerRegistered = false;
+  Timer? _localTimer;
 
   @override
   PomodoroState build() {
     _db = ref.watch(appDatabaseProvider);
     _sessionDao = SessionDao(_db!);
+    _subjectDao = SubjectDao(_db!);
+    _projectDao = ProjectDao(_db!);
 
     ref.onDispose(() {
+      _localTimer?.cancel();
+      _localTimer = null;
       if (_listenerRegistered) {
         FlutterForegroundTask.removeTaskDataCallback(_onReceiveTaskData);
         _listenerRegistered = false;
@@ -64,6 +75,87 @@ class PomodoroNotifier extends _$PomodoroNotifier {
       FlutterForegroundTask.addTaskDataCallback(_onReceiveTaskData);
       _listenerRegistered = true;
     }
+  }
+
+  void _startLocalTimer() {
+    _localTimer?.cancel();
+    _localTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (state.isRunning && state.remainingSeconds > 0) {
+        state = state.copyWith(remainingSeconds: state.remainingSeconds - 1);
+
+        final phaseLabel = state.phase == TimerPhase.work
+            ? 'Focus Time'
+            : state.phase == TimerPhase.shortBreak
+                ? 'Short Break'
+                : 'Long Break';
+
+        FlutterForegroundTask.updateService(
+          notificationTitle: phaseLabel,
+          notificationText: _formatTime(state.remainingSeconds),
+        );
+
+        if (state.remainingSeconds <= 0) {
+          _onPhaseComplete();
+        }
+      }
+    });
+  }
+
+  void _stopLocalTimer() {
+    _localTimer?.cancel();
+  }
+
+  void startTimer() {
+    if (state.phase == TimerPhase.idle && state.subjectId.isNotEmpty) {
+      final workSeconds = state.plannedDurationMinutes * 60;
+
+      state = state.copyWith(
+        phase: TimerPhase.work,
+        isRunning: true,
+        remainingSeconds: workSeconds,
+        totalSeconds: workSeconds,
+      );
+
+      _startLocalTimer();
+      _startForegroundService();
+    }
+  }
+
+  Future<void> _startForegroundService() async {
+    _ensureListener();
+
+    FlutterForegroundTask.init(
+      androidNotificationOptions: AndroidNotificationOptions(
+        channelId: 'study_timer',
+        channelName: 'Pomodoro Timer',
+        channelDescription: 'Ongoing study timer notification',
+        channelImportance: NotificationChannelImportance.LOW,
+        priority: NotificationPriority.LOW,
+      ),
+      iosNotificationOptions: const IOSNotificationOptions(
+        showNotification: true,
+        playSound: false,
+      ),
+      foregroundTaskOptions: ForegroundTaskOptions(
+        eventAction: ForegroundTaskEventAction.repeat(1000),
+        autoRunOnBoot: false,
+        allowWakeLock: true,
+        allowWifiLock: false,
+      ),
+    );
+
+    await FlutterForegroundTask.startService(
+      notificationTitle: 'Focus Time',
+      notificationText: '${state.plannedDurationMinutes} min session',
+      callback: startCallback,
+    );
+
+    await FlutterForegroundTask.updateService(
+      notificationTitle: 'Focus Time',
+      notificationText: _formatTime(state.remainingSeconds),
+    );
+
+    FlutterForegroundTask.sendDataToTask(state.remainingSeconds);
   }
 
   void _onReceiveTaskData(Object data) {
@@ -110,43 +202,9 @@ class PomodoroNotifier extends _$PomodoroNotifier {
       longBreakEvery: config.longBreakEvery,
     );
 
-    _ensureListener();
+    await _startForegroundService();
 
-    FlutterForegroundTask.init(
-      androidNotificationOptions: AndroidNotificationOptions(
-        channelId: 'study_timer',
-        channelName: 'Pomodoro Timer',
-        channelDescription: 'Ongoing study timer notification',
-        channelImportance: NotificationChannelImportance.LOW,
-        priority: NotificationPriority.LOW,
-      ),
-      iosNotificationOptions: const IOSNotificationOptions(
-        showNotification: true,
-        playSound: false,
-      ),
-      foregroundTaskOptions: ForegroundTaskOptions(
-        eventAction: ForegroundTaskEventAction.repeat(1000),
-        autoRunOnBoot: false,
-        allowWakeLock: true,
-        allowWifiLock: false,
-      ),
-    );
-
-    await FlutterForegroundTask.startService(
-      notificationTitle: 'Focus Time',
-      notificationText: '${config.plannedDurationMinutes} min session',
-      callback: startCallback,
-    );
-
-    await FlutterForegroundTask.updateService(
-      notificationTitle: 'Focus Time',
-      notificationText: _formatTime(workSeconds),
-    );
-
-    FlutterForegroundTask.sendDataToTask(workSeconds);
-
-    // Countdown is handled by foreground task via _onReceiveTaskData callback.
-    // No local timer needed when foreground service is active.
+    _startLocalTimer();
   }
 
   Future<void> _onPhaseComplete() async {
@@ -185,6 +243,42 @@ class PomodoroNotifier extends _$PomodoroNotifier {
         actualDurationMinutes: state.plannedDurationMinutes,
         pomodorosCompleted: newPomodoros,
       );
+
+      // Show session complete notification
+      final notifService = ref.read(notificationServiceProvider);
+      try {
+        await notifService.showSessionComplete(
+          durationMinutes: state.plannedDurationMinutes,
+          pomodorosCompleted: newPomodoros,
+        );
+
+        // Get subject and project for reminder
+        final subject = await _subjectDao?.getById(state.subjectId);
+        if (subject != null) {
+          // Get project to check if project-specific reminder is set
+          final project = await _projectDao?.getById(subject.projectId);
+          int reminderMinutes = 30; // default
+
+          // Priority: project setting > global setting
+          if (project != null) {
+            reminderMinutes = project.studyReminderMinutes;
+          } else {
+            final themeSettingsAsync = ref.read(themeSettingsProvider);
+            final settings = themeSettingsAsync.value;
+            if (settings != null) {
+              reminderMinutes = settings.studyReminderMinutes;
+            }
+          }
+
+          // Always schedule reminder after session completes
+          await notifService.scheduleStudyReminder(
+            delay: Duration(minutes: reminderMinutes),
+            subjectName: subject.name,
+          );
+        }
+      } catch (e) {
+        debugPrint('Error showing notification: $e');
+      }
     } else if (state.phase == TimerPhase.shortBreak ||
         state.phase == TimerPhase.longBreak) {
       final workSeconds = state.plannedDurationMinutes * 60;
@@ -201,14 +295,18 @@ class PomodoroNotifier extends _$PomodoroNotifier {
 
   void pause() {
     state = state.copyWith(isRunning: false);
+    _stopLocalTimer();
   }
 
   void resume() {
     state = state.copyWith(isRunning: true);
-    // Foreground task continues ticking — no local timer needed
+    _startLocalTimer();
   }
 
   Future<void> stop() async {
+    _stopLocalTimer();
+    _localTimer = null;
+
     final elapsed = state.totalSeconds - state.remainingSeconds;
     final actualMinutes = elapsed ~/ 60;
 
@@ -224,6 +322,13 @@ class PomodoroNotifier extends _$PomodoroNotifier {
 
     await ref.read(achievementServiceProvider).checkAndUnlock(ref);
     await FlutterForegroundTask.stopService();
+
+    // Cancel any pending reminder
+    try {
+      await ref.read(notificationServiceProvider).cancelReminder();
+    } catch (e) {
+      debugPrint('Error cancelling reminder: $e');
+    }
 
     state = PomodoroState.initial(subjectId: state.subjectId);
   }

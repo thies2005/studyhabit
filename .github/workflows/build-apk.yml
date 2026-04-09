@@ -1,0 +1,149 @@
+name: Build & Release Beta APK
+
+on:
+  push:
+    branches: [main, develop, master]
+  pull_request:
+    branches: [main, develop, master]
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+# ──────────────────────────────────────────────
+# Required GitHub Secrets:
+#   KEYSTORE_BASE64   — base64-encoded .jks keystore file
+#   KEYSTORE_PASSWORD — keystore password
+#   KEY_ALIAS         — key alias inside the keystore
+#   KEY_PASSWORD      — password for the specific key
+#
+# To generate a keystore and encode it:
+#   keytool -genkeypair -v -keystore release.keystore \
+#     -alias studytracker -keyalg RSA -keysize 2048 -validity 10000 \
+#     -storepass YOUR_STORE_PASS -keypass YOUR_KEY_PASS
+#
+#   base64 -w 0 release.keystore > keystore.b64
+#   → paste contents of keystore.b64 into KEYSTORE_BASE64 secret
+# ──────────────────────────────────────────────
+
+jobs:
+  build:
+    name: Build APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      # ── Setup ──────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "zulu"
+          java-version: "17"
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          cache: true
+
+      # ── Decode signing keystore ────────────
+      - name: Decode keystore from secrets
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/release.keystore
+          echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}"  >> android/key.properties
+          echo "keyPassword=${{ secrets.KEY_PASSWORD }}"          >> android/key.properties
+          echo "keyAlias=${{ secrets.KEY_ALIAS }}"                >> android/key.properties
+          echo "storeFile=release.keystore"                       >> android/key.properties
+
+      # ── Dependencies & codegen ─────────────
+      - name: Get Flutter dependencies
+        run: flutter pub get
+
+      - name: Generate code (build_runner)
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      # ── Analyze ────────────────────────────
+      - name: Run Flutter analyze
+        run: flutter analyze --no-fatal-infos
+
+      # ── Build ──────────────────────────────
+      - name: Build APK (debug)
+        run: flutter build apk --debug
+
+      - name: Build APK (release, signed)
+        run: flutter build apk --release
+
+      # ── Compute beta tag version ───────────
+      - name: Compute beta version tag
+        id: version
+        run: |
+          # Read version from pubspec.yaml (e.g. "1.0.0+1")
+          PUBSPEC_VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //')
+          VERSION_NAME=$(echo "$PUBSPEC_VERSION" | cut -d'+' -f1)
+          VERSION_CODE=$(echo "$PUBSPEC_VERSION" | cut -d'+' -f2)
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          BUILD_DATE=$(date +%Y%m%d)
+          BUILD_NUMBER=$GITHUB_RUN_NUMBER
+
+          TAG="beta-${VERSION_NAME}-build.${BUILD_NUMBER}+${BUILD_DATE}-${SHORT_SHA}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
+          echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "short_sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "## 🏷️ Beta Tag: \`${TAG}\`" >> "$GITHUB_STEP_SUMMARY"
+
+      # ── Upload artifacts ───────────────────
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: studytracker-debug
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 14
+
+      - name: Upload Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: studytracker-release
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 14
+
+      # ── Create beta GitHub Release ─────────
+      - name: Create Beta Release
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: "Beta ${{ steps.version.outputs.version_name }} (#${{ steps.version.outputs.build_number }})"
+          prerelease: true
+          body: |
+            ## 🧪 Beta Build
+
+            | Detail | Value |
+            |--------|-------|
+            | **Version** | `${{ steps.version.outputs.version_name }}` |
+            | **Build** | `#${{ steps.version.outputs.build_number }}` |
+            | **Commit** | `${{ steps.version.outputs.short_sha }}` |
+            | **Branch** | `${{ github.ref_name }}` |
+            | **Date** | $(date +%Y-%m-%d) |
+
+            ### Downloads
+            - `app-release.apk` — signed release build
+            - `app-debug.apk` — debug build with logs
+
+            > ⚠️ This is an automated **beta** build. Not intended for production use.
+          files: |
+            build/app/outputs/flutter-apk/app-release.apk
+            build/app/outputs/flutter-apk/app-debug.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Cleanup keystore ───────────────────
+      - name: Cleanup signing artifacts
+        if: always()
+        run: |
+          rm -f android/app/release.keystore
+          rm -f android/key.properties

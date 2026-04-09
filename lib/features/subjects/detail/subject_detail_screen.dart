@@ -52,7 +52,6 @@ class _SubjectDetailContent extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final colorScheme = Theme.of(context).colorScheme;
     final subjectColor = ColorScheme.fromSeed(
       seedColor: Color(subject.colorValue),
     );
@@ -64,45 +63,64 @@ class _SubjectDetailContent extends ConsumerWidget {
       if (showTopics) const Tab(text: 'Topics'),
     ];
 
-    return DefaultTabController(
-      length: tabs.length,
-      child: NestedScrollView(
-        headerSliverBuilder: (context, innerBoxIsScrolled) => [
-          SliverAppBar(
-            expandedHeight: 200,
-            pinned: true,
-            flexibleSpace: FlexibleSpaceBar(
-              title: Text(
-                subject.name,
-                style: TextStyle(
-                  color: colorScheme.onSurface,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              background: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      subjectColor.primaryContainer,
-                      subjectColor.surface,
-                    ],
+        return DefaultTabController(
+          length: tabs.length,
+          child: NestedScrollView(
+            headerSliverBuilder: (context, innerBoxIsScrolled) => [
+              SliverAppBar(
+                expandedHeight: 200,
+                pinned: true,
+                foregroundColor: subjectColor.onPrimaryContainer,
+                flexibleSpace: FlexibleSpaceBar(
+                  title: Text(
+                    subject.name,
+                    style: TextStyle(
+                      color: subjectColor.onPrimaryContainer,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  background: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          subjectColor.primaryContainer,
+                          subjectColor.surface,
+                        ],
+                      ),
+                    ),
+                    child: Align(
+                      alignment: Alignment.bottomCenter,
+                      child: Container(
+                        height: 80,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              subjectColor.primaryContainer.withValues(alpha: 0.5),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
+                bottom: TabBar(tabs: tabs),
               ),
+            ],
+            body: TabBarView(
+              children: [
+                TimelineTab(subjectId: subject.id),
+                SourcesTab(subjectId: subject.id),
+                if (showTopics) TopicsTab(subjectId: subject.id),
+              ],
             ),
-            bottom: TabBar(tabs: tabs),
           ),
-        ],
-        body: TabBarView(
-          children: [
-            TimelineTab(subjectId: subject.id),
-            SourcesTab(subjectId: subject.id),
-            if (showTopics) TopicsTab(subjectId: subject.id),
-          ],
-        ),
-      ),
-    );
+        );
   }
 }

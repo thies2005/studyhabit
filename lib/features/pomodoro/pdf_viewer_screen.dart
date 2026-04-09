@@ -28,6 +28,7 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> {
   late final PdfViewerController _controller;
   Timer? _debounce;
   bool _isLoading = true;
+  int? _startPage;
 
   @override
   void initState() {
@@ -47,6 +48,7 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> {
     try {
       final page = _controller.pageNumber;
       if (page > 0) {
+        final endPage = page;
         ref
             .read(sourceProvider(widget.subjectId).notifier)
             .updateProgress(
@@ -54,6 +56,12 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> {
               currentPage: page,
               progressPercent: null,
             );
+
+        // Update session page range if startPage was recorded
+        if (_startPage != null && _startPage != endPage) {
+          // TODO: Update session with startPage and endPage when session tracking is implemented
+          debugPrint('Page range: $_startPage - $endPage');
+        }
       }
     } catch (e) {
       debugPrint('Error saving page position: $e');
@@ -90,6 +98,19 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> {
       }
     } catch (e) {
       debugPrint('Error updating total pages: $e');
+    }
+  }
+
+  void _goToPreviousPage() {
+    final currentPage = _controller.pageNumber;
+    if (currentPage > 1) {
+      _controller.previousPage();
+    }
+  }
+
+  void _goToNextPage(int? totalPages) {
+    if (totalPages != null && _controller.pageNumber < totalPages) {
+      _controller.nextPage();
     }
   }
 
@@ -136,22 +157,12 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> {
         final currentPage = source.currentPage ?? 1;
         final totalPages = source.totalPages;
 
+        // Initialize startPage tracking
+        _startPage ??= currentPage;
+
         return Scaffold(
           appBar: AppBar(
             title: Text(source.title),
-            actions: [
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 16),
-                  child: Text(
-                    totalPages != null
-                        ? '$currentPage / $totalPages'
-                        : 'Page $currentPage',
-                    style: Theme.of(context).textTheme.labelMedium,
-                  ),
-                ),
-              ),
-            ],
           ),
           body: Stack(
             children: [
@@ -167,6 +178,29 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> {
                   child: Center(child: CircularProgressIndicator()),
                 ),
             ],
+          ),
+          bottomNavigationBar: BottomAppBar(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: _goToPreviousPage,
+                  tooltip: 'Previous page',
+                ),
+                Text(
+                  totalPages != null
+                      ? '$currentPage / $totalPages'
+                      : 'Page $currentPage',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.arrow_forward),
+                  onPressed: () => _goToNextPage(totalPages),
+                  tooltip: 'Next page',
+                ),
+              ],
+            ),
           ),
         );
       },

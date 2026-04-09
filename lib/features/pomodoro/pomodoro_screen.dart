@@ -248,11 +248,25 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
   }
 
   Widget _buildControls(PomodoroState pomodoroState) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     if (pomodoroState.phase == TimerPhase.idle) {
-      return const SizedBox.shrink();
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: () => ref.read(pomodoroProvider.notifier).startTimer(),
+            icon: const Icon(Icons.play_arrow),
+            label: const Text('Start Focus'),
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
+          ),
+        ),
+      );
     }
 
-    final colorScheme = Theme.of(context).colorScheme;
     final isBreak =
         pomodoroState.phase == TimerPhase.shortBreak ||
         pomodoroState.phase == TimerPhase.longBreak;

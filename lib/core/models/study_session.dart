@@ -18,6 +18,9 @@ abstract class StudySession with _$StudySession {
     int? confidenceRating,
     String? notes,
     required int xpEarned,
+    String? sourceId,
+    int? startPage,
+    int? endPage,
   }) = _StudySession;
 
   factory StudySession.fromJson(Map<String, dynamic> json) =>

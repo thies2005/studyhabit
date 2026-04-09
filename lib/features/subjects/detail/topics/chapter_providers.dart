@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:uuid/uuid.dart';
 
@@ -31,32 +32,57 @@ Stream<List<Chapter>> chapterList(Ref ref, String topicId) {
 @riverpod
 class ChapterNotifier extends _$ChapterNotifier {
   @override
-  bool build() => true;
+  void build() {
+    // No-op: this notifier is used only for its methods
+    // The actual chapter list is watched via chapterListProvider
+  }
 
-  Future<void> create(String topicId, String name, int order) async {
-    const uuid = Uuid();
-    final db = ref.read(appDatabaseProvider);
-    await db
-        .into(db.chapters)
-        .insert(
-          ChaptersCompanion.insert(
-            id: uuid.v4(),
-            topicId: topicId,
-            name: name,
-            order: order,
-          ),
-        );
+  Future<void> create(String topicId, String name) async {
+    try {
+      const uuid = Uuid();
+      final db = ref.read(appDatabaseProvider);
+
+      // Get the current max order for this topic's chapters
+      final existingChapters = await (db.select(db.chapters)
+        ..where((t) => t.topicId.equals(topicId)))
+        .get();
+      final maxOrder = existingChapters.isEmpty
+          ? 0
+          : existingChapters.map((t) => t.order).reduce((a, b) => a > b ? a : b);
+
+      await db.into(db.chapters).insert(
+        ChaptersCompanion.insert(
+          id: uuid.v4(),
+          topicId: topicId,
+          name: name,
+          order: maxOrder + 1,
+        ),
+      );
+    } catch (e, st) {
+      debugPrint('Error creating chapter: $e\n$st');
+      rethrow;
+    }
   }
 
   Future<void> rename(String id, String newName) async {
-    final db = ref.read(appDatabaseProvider);
-    await (db.update(db.chapters)..where((t) => t.id.equals(id))).write(
-      ChaptersCompanion(name: Value(newName)),
-    );
+    try {
+      final db = ref.read(appDatabaseProvider);
+      await (db.update(db.chapters)..where((t) => t.id.equals(id))).write(
+        ChaptersCompanion(name: Value(newName)),
+      );
+    } catch (e, st) {
+      debugPrint('Error renaming chapter: $e\n$st');
+      rethrow;
+    }
   }
 
   Future<void> delete(String id) async {
-    final db = ref.read(appDatabaseProvider);
-    await (db.delete(db.chapters)..where((t) => t.id.equals(id))).go();
+    try {
+      final db = ref.read(appDatabaseProvider);
+      await (db.delete(db.chapters)..where((t) => t.id.equals(id))).go();
+    } catch (e, st) {
+      debugPrint('Error deleting chapter: $e\n$st');
+      rethrow;
+    }
   }
 }

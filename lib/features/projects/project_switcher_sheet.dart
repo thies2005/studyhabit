@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/models/project.dart';
 import 'create_project_dialog.dart';
+import 'edit_project_dialog.dart';
 import 'project_providers.dart';
 
 class ProjectSwitcherSheet extends ConsumerWidget {
@@ -183,10 +184,29 @@ class _ProjectListTile extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                 )
               : null,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
-        trailing: isSelected
-            ? Icon(Icons.check_circle, color: colorScheme.primary)
-            : null,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isSelected)
+              Icon(Icons.check_circle, color: colorScheme.primary),
+            IconButton(
+              icon: const Icon(Icons.edit_outlined),
+              onPressed: () {
+                final rootContext =
+                    Navigator.of(context, rootNavigator: true).context;
+                Navigator.of(context).pop();
+                showDialog<void>(
+                  context: rootContext,
+                  builder: (_) => EditProjectDialog(project: project),
+                );
+              },
+              tooltip: 'Edit Project',
+            ),
+          ],
+        ),
         onTap: onTap,
       ),
     );

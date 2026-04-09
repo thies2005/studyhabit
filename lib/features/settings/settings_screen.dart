@@ -279,23 +279,78 @@ class _SettingsContent extends ConsumerWidget {
         ),
         const SizedBox(height: 8),
         Card(
-          child: SwitchListTile(
-            value: settings.notificationsEnabled,
-            onChanged: (value) {
-              ref
-                  .read(themeSettingsProvider.notifier)
-                  .setNotificationsEnabled(value);
-            },
-            title: Text(
-              'Push Notifications',
-              style: theme.textTheme.titleSmall,
-            ),
-            subtitle: Text(
-              'Daily goals and reminders',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
+          child: Column(
+            children: [
+              SwitchListTile(
+                value: settings.notificationsEnabled,
+                onChanged: (value) {
+                  ref
+                      .read(themeSettingsProvider.notifier)
+                      .setNotificationsEnabled(value);
+                },
+                title: Text(
+                  'Push Notifications',
+                  style: theme.textTheme.titleSmall,
+                ),
+                subtitle: Text(
+                  'Daily goals and reminders',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
               ),
-            ),
+              const Divider(height: 1),
+              SwitchListTile(
+                value: settings.studyReminderEnabled,
+                onChanged: (value) {
+                  ref
+                      .read(themeSettingsProvider.notifier)
+                      .setStudyReminderEnabled(value);
+                },
+                title: Text(
+                  'Study Reminders',
+                  style: theme.textTheme.titleSmall,
+                ),
+                subtitle: Text(
+                  'Get reminded to study again after a break',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              if (settings.studyReminderEnabled)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Remind after', style: theme.textTheme.bodyMedium),
+                          Text(
+                            '${settings.studyReminderMinutes} min',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              color: colorScheme.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Slider(
+                        value: settings.studyReminderMinutes.toDouble(),
+                        min: 5,
+                        max: 120,
+                        divisions: 23,
+                        onChanged: (value) {
+                          ref
+                              .read(themeSettingsProvider.notifier)
+                              .setStudyReminderMinutes(value.round());
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+            ],
           ),
         ),
         const SizedBox(height: 24),

@@ -40,7 +40,16 @@ class ProjectNotifier extends _$ProjectNotifier {
     return _dao.watchAll().map((rows) => rows.map(mapProject).toList());
   }
 
-  Future<Project?> create(String name, String icon, int colorValue) async {
+  Future<Project?> create({
+    required String name,
+    required String icon,
+    required int colorValue,
+    int? defaultWorkDuration,
+    int? defaultBreakDuration,
+    int? defaultLongBreakDuration,
+    int? defaultLongBreakEvery,
+    int? studyReminderMinutes,
+  }) async {
     try {
       AppLogger.i('ProjectNotifier', 'Creating project: $name');
       const uuid = Uuid();
@@ -54,6 +63,11 @@ class ProjectNotifier extends _$ProjectNotifier {
           colorValue: colorValue,
           createdAt: Value(now),
           lastOpenedAt: Value(now),
+          defaultWorkDuration: Value(defaultWorkDuration ?? 25),
+          defaultBreakDuration: Value(defaultBreakDuration ?? 5),
+          defaultLongBreakDuration: Value(defaultLongBreakDuration ?? 15),
+          defaultLongBreakEvery: Value(defaultLongBreakEvery ?? 4),
+          studyReminderMinutes: Value(studyReminderMinutes ?? 30),
         ),
       );
       final row = await _dao.getById(id);
@@ -62,15 +76,7 @@ class ProjectNotifier extends _$ProjectNotifier {
         return null;
       }
       AppLogger.i('ProjectNotifier', 'Project created successfully: ${row.id}');
-      return Project(
-        id: row.id,
-        name: row.name,
-        icon: row.icon,
-        colorValue: row.colorValue,
-        createdAt: row.createdAt,
-        lastOpenedAt: row.lastOpenedAt,
-        isArchived: row.isArchived,
-      );
+      return mapProject(row);
     } catch (e, stack) {
       AppLogger.e('ProjectNotifier', 'Failed to create project', e, stack);
       return null;
@@ -94,11 +100,56 @@ class ProjectNotifier extends _$ProjectNotifier {
           createdAt: Value(row.createdAt),
           lastOpenedAt: Value(DateTime.now()),
           isArchived: Value(row.isArchived),
+          defaultWorkDuration: Value(row.defaultWorkDuration),
+          defaultBreakDuration: Value(row.defaultBreakDuration),
+          defaultLongBreakDuration: Value(row.defaultLongBreakDuration),
+          defaultLongBreakEvery: Value(row.defaultLongBreakEvery),
+          studyReminderMinutes: Value(row.studyReminderMinutes),
         ),
       );
       AppLogger.i('ProjectNotifier', 'Project switch successful');
     } catch (e, stack) {
       AppLogger.e('ProjectNotifier', 'Failed to switch project', e, stack);
+    }
+  }
+
+  Future<void> updateProject({
+    required String id,
+    String? name,
+    String? icon,
+    int? colorValue,
+    int? defaultWorkDuration,
+    int? defaultBreakDuration,
+    int? defaultLongBreakDuration,
+    int? defaultLongBreakEvery,
+    int? studyReminderMinutes,
+  }) async {
+    try {
+      AppLogger.i('ProjectNotifier', 'Updating project: $id');
+      final row = await _dao.getById(id);
+      if (row == null) {
+        AppLogger.w('ProjectNotifier', 'Update target project not found: $id');
+        return;
+      }
+      await _dao.upsert(
+        ProjectsCompanion(
+          id: Value(id),
+          name: Value(name ?? row.name),
+          icon: Value(icon ?? row.icon),
+          colorValue: Value(colorValue ?? row.colorValue),
+          createdAt: Value(row.createdAt),
+          lastOpenedAt: Value(row.lastOpenedAt),
+          isArchived: Value(row.isArchived),
+          defaultWorkDuration: Value(defaultWorkDuration ?? row.defaultWorkDuration),
+          defaultBreakDuration: Value(defaultBreakDuration ?? row.defaultBreakDuration),
+          defaultLongBreakDuration: Value(defaultLongBreakDuration ?? row.defaultLongBreakDuration),
+          defaultLongBreakEvery: Value(defaultLongBreakEvery ?? row.defaultLongBreakEvery),
+          studyReminderMinutes: Value(studyReminderMinutes ?? row.studyReminderMinutes),
+        ),
+      );
+      AppLogger.i('ProjectNotifier', 'Project update successful');
+    } catch (e, stack) {
+      AppLogger.e('ProjectNotifier', 'Failed to update project', e, stack);
     }
   }
 

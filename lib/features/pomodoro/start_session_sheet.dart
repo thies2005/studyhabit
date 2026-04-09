@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/models/enums.dart';
+import '../../core/models/project.dart';
 import '../../core/models/subject.dart';
+import '../projects/project_providers.dart';
 import '../subjects/subject_providers.dart';
 import '../subjects/detail/topics/chapter_providers.dart';
 import '../subjects/detail/topics/topic_providers.dart';
@@ -78,6 +80,8 @@ class _StartSessionSheetState extends ConsumerState<StartSessionSheet> {
     List<Subject> subjects,
     ScrollController scrollController,
   ) {
+    final currentProjectAsync = ref.watch(lastOpenedProjectProvider);
+
     return Column(
       children: [
         Padding(
@@ -99,50 +103,55 @@ class _StartSessionSheetState extends ConsumerState<StartSessionSheet> {
         ),
         const Divider(height: 1),
         Expanded(
-          child: switch (_step) {
-            0 => _SubjectPicker(
-              subjects: subjects,
-              selected: _selectedSubject,
-              onSelected: (s) {
-                setState(() {
-                  _selectedSubject = s;
-                  _selectedTopicId = null;
-                  _selectedChapterId = null;
-                  _topicChoiceMade = false;
-                  _chapterChoiceMade = false;
-                  _workDuration = s.defaultDurationMinutes.toDouble();
-                  _shortBreak = s.defaultBreakMinutes.toDouble();
-                });
-              },
-            ),
-            1 => _TopicPicker(
-              subjectId: _selectedSubject!.id,
-              selectedTopicId: _selectedTopicId,
-              onSelected: (id) => setState(() {
-                _selectedTopicId = id;
-                _topicChoiceMade = true;
-              }),
-              hierarchyMode: _selectedSubject!.hierarchyMode,
-            ),
-            2 => _ChapterPicker(
-              topicId: _selectedTopicId ?? '',
-              selectedChapterId: _selectedChapterId,
-              onSelected: (id) => setState(() {
-                _selectedChapterId = id;
-                _chapterChoiceMade = true;
-              }),
-            ),
-            3 => _DurationConfig(
-              workDuration: _workDuration,
-              shortBreak: _shortBreak,
-              longBreakEvery: _longBreakEvery,
-              onWorkChanged: (v) => setState(() => _workDuration = v),
-              onBreakChanged: (v) => setState(() => _shortBreak = v),
-              onLongBreakEveryChanged: (v) =>
-                  setState(() => _longBreakEvery = v),
-            ),
-            _ => const SizedBox.shrink(),
-          },
+          child: currentProjectAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (_, __) => const Center(child: Text('Failed to load project')),
+            data: (currentProject) => switch (_step) {
+              0 => _SubjectPicker(
+                subjects: subjects,
+                selected: _selectedSubject,
+                onSelected: (s) {
+                  setState(() {
+                    _selectedSubject = s;
+                    _selectedTopicId = null;
+                    _selectedChapterId = null;
+                    _topicChoiceMade = false;
+                    _chapterChoiceMade = false;
+                    _workDuration = s.defaultDurationMinutes.toDouble();
+                    _shortBreak = s.defaultBreakMinutes.toDouble();
+                  });
+                },
+              ),
+              1 => _TopicPicker(
+                subjectId: _selectedSubject!.id,
+                selectedTopicId: _selectedTopicId,
+                onSelected: (id) => setState(() {
+                  _selectedTopicId = id;
+                  _topicChoiceMade = true;
+                }),
+                hierarchyMode: _selectedSubject!.hierarchyMode,
+              ),
+              2 => _ChapterPicker(
+                topicId: _selectedTopicId ?? '',
+                selectedChapterId: _selectedChapterId,
+                onSelected: (id) => setState(() {
+                  _selectedChapterId = id;
+                  _chapterChoiceMade = true;
+                }),
+              ),
+              3 => _DurationConfig(
+                workDuration: _workDuration,
+                shortBreak: _shortBreak,
+                longBreakEvery: _longBreakEvery,
+                projectDefaults: currentProject,
+                onWorkChanged: (v) => setState(() => _workDuration = v),
+                onBreakChanged: (v) => setState(() => _shortBreak = v),
+                onLongBreakEveryChanged: (v) =>
+                    setState(() => _longBreakEvery = v),
+              ),
+              _ => const SizedBox.shrink(),
+            },
+          ),
         ),
         Padding(
           padding: const EdgeInsets.all(16),
@@ -466,6 +475,7 @@ class _DurationConfig extends StatelessWidget {
     required this.workDuration,
     required this.shortBreak,
     required this.longBreakEvery,
+    required this.projectDefaults,
     required this.onWorkChanged,
     required this.onBreakChanged,
     required this.onLongBreakEveryChanged,
@@ -474,6 +484,7 @@ class _DurationConfig extends StatelessWidget {
   final double workDuration;
   final double shortBreak;
   final double longBreakEvery;
+  final Project? projectDefaults;
   final ValueChanged<double> onWorkChanged;
   final ValueChanged<double> onBreakChanged;
   final ValueChanged<double> onLongBreakEveryChanged;
@@ -489,7 +500,33 @@ class _DurationConfig extends StatelessWidget {
           'Session Settings',
           style: Theme.of(context).textTheme.titleMedium,
         ),
-        const SizedBox(height: 24),
+        if (projectDefaults != null) ...[
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: colorScheme.secondaryContainer.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: colorScheme.outlineVariant),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, size: 16, color: colorScheme.secondary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Project defaults: ${projectDefaults!.defaultWorkDuration}/${projectDefaults!.defaultBreakDuration} min',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSecondaryContainer,
+                        ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+        const SizedBox(height: 8),
         _SliderRow(
           label: 'Work Duration',
           value: workDuration,
@@ -498,6 +535,38 @@ class _DurationConfig extends StatelessWidget {
           unit: 'min',
           color: colorScheme.primary,
           onChanged: onWorkChanged,
+        ),
+        const SizedBox(height: 24),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Or set custom work duration:',
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+            ),
+            const SizedBox(width: 12),
+            SizedBox(
+              width: 80,
+              child: TextField(
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Min',
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                ),
+                onChanged: (value) {
+                  final parsed = int.tryParse(value);
+                  if (parsed != null && parsed >= 5 && parsed <= 90) {
+                    onWorkChanged(parsed.toDouble());
+                  }
+                },
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 24),
         _SliderRow(

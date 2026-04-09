@@ -117,7 +117,13 @@ class _TopicExpansionTile extends ConsumerWidget {
       child: ExpansionTile(
         title: Row(
           children: [
-            Expanded(child: Text(topicName)),
+            Expanded(
+              child: Text(
+                topicName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
             IconButton(
               icon: const Icon(Icons.label_outline, size: 20),
               onPressed: () => showModalBottomSheet<void>(

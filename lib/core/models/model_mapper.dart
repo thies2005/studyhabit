@@ -20,6 +20,11 @@ domain.Project mapProject(ProjectRow row) {
     createdAt: row.createdAt,
     lastOpenedAt: row.lastOpenedAt,
     isArchived: row.isArchived,
+    defaultWorkDuration: row.defaultWorkDuration,
+    defaultBreakDuration: row.defaultBreakDuration,
+    defaultLongBreakDuration: row.defaultLongBreakDuration,
+    defaultLongBreakEvery: row.defaultLongBreakEvery,
+    studyReminderMinutes: row.studyReminderMinutes,
   );
 }
 
@@ -70,6 +75,9 @@ domain.StudySession mapStudySession(StudySessionRow row) {
     confidenceRating: row.confidenceRating,
     notes: row.notes,
     xpEarned: row.xpEarned,
+    sourceId: row.sourceId,
+    startPage: row.startPage,
+    endPage: row.endPage,
   );
 }
 

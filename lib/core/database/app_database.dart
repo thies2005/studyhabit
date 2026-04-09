@@ -67,6 +67,17 @@ class Projects extends Table {
 
   BoolColumn get isArchived => boolean().withDefault(const Constant(false))();
 
+  IntColumn get defaultWorkDuration => integer().withDefault(const Constant(25))();
+
+  IntColumn get defaultBreakDuration => integer().withDefault(const Constant(5))();
+
+  IntColumn get defaultLongBreakDuration =>
+      integer().withDefault(const Constant(15))();
+
+  IntColumn get defaultLongBreakEvery => integer().withDefault(const Constant(4))();
+
+  IntColumn get studyReminderMinutes => integer().withDefault(const Constant(30))();
+
   @override
   Set<Column<Object>> get primaryKey => {id};
 }
@@ -156,6 +167,12 @@ class StudySessions extends Table {
   TextColumn get notes => text().nullable()();
 
   IntColumn get xpEarned => integer().withDefault(const Constant(0))();
+
+  TextColumn get sourceId => text().nullable()();
+
+  IntColumn get startPage => integer().nullable()();
+
+  IntColumn get endPage => integer().nullable()();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -285,7 +302,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration {
@@ -296,6 +313,18 @@ class AppDatabase extends _$AppDatabase {
       onUpgrade: (Migrator m, int from, int to) async {
         if (from < 2) {
           await m.createTable(pendingSyncOps);
+        }
+        if (from < 3) {
+          await m.addColumn(studySessions, studySessions.sourceId);
+          await m.addColumn(studySessions, studySessions.startPage);
+          await m.addColumn(studySessions, studySessions.endPage);
+        }
+        if (from < 4) {
+          await m.addColumn(projects, projects.defaultWorkDuration);
+          await m.addColumn(projects, projects.defaultBreakDuration);
+          await m.addColumn(projects, projects.defaultLongBreakDuration);
+          await m.addColumn(projects, projects.defaultLongBreakEvery);
+          await m.addColumn(projects, projects.studyReminderMinutes);
         }
       },
     );

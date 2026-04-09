@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/models/project.dart';
 import 'project_providers.dart';
 
 const _emojiOptions = [
@@ -19,21 +20,43 @@ const _emojiOptions = [
   '🏛️',
 ];
 
-class CreateProjectDialog extends ConsumerStatefulWidget {
-  const CreateProjectDialog({super.key});
+class EditProjectDialog extends ConsumerStatefulWidget {
+  const EditProjectDialog({required this.project, super.key});
+
+  final Project project;
 
   @override
-  ConsumerState<CreateProjectDialog> createState() =>
-      _CreateProjectDialogState();
+  ConsumerState<EditProjectDialog> createState() =>
+      _EditProjectDialogState();
 }
 
-class _CreateProjectDialogState extends ConsumerState<CreateProjectDialog> {
-  final _nameController = TextEditingController();
+class _EditProjectDialogState extends ConsumerState<EditProjectDialog> {
+  late final TextEditingController _nameController;
   int _selectedEmojiIndex = 0;
   int _selectedColorIndex = 0;
-  double _workDuration = 25;
-  double _shortBreak = 5;
-  double _studyReminderMinutes = 30;
+  late double _workDuration;
+  late double _shortBreak;
+  late double _studyReminderMinutes;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.project.name);
+    _selectedEmojiIndex = _emojiOptions.indexOf(widget.project.icon);
+    if (_selectedEmojiIndex < 0) _selectedEmojiIndex = 0;
+
+    // Find color index
+    for (var i = 0; i < AppTheme.presetSeeds.length; i++) {
+      if (AppTheme.presetSeeds[i].toARGB32() == widget.project.colorValue) {
+        _selectedColorIndex = i;
+        break;
+      }
+    }
+
+    _workDuration = widget.project.defaultWorkDuration.toDouble();
+    _shortBreak = widget.project.defaultBreakDuration.toDouble();
+    _studyReminderMinutes = widget.project.studyReminderMinutes.toDouble();
+  }
 
   @override
   void dispose() {
@@ -47,7 +70,7 @@ class _CreateProjectDialogState extends ConsumerState<CreateProjectDialog> {
     final theme = Theme.of(context);
 
     return AlertDialog(
-      title: const Text('New Project'),
+      title: const Text('Edit Project'),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -55,7 +78,6 @@ class _CreateProjectDialogState extends ConsumerState<CreateProjectDialog> {
           children: [
             TextField(
               controller: _nameController,
-              autofocus: true,
               decoration: const InputDecoration(
                 labelText: 'Project Name',
                 border: OutlineInputBorder(),
@@ -156,20 +178,19 @@ class _CreateProjectDialogState extends ConsumerState<CreateProjectDialog> {
           child: const Text('Cancel'),
         ),
         FilledButton(
-          onPressed: _nameController.text.trim().isEmpty ? null : _create,
-          child: const Text('Create'),
+          onPressed: _nameController.text.trim().isEmpty ? null : _update,
+          child: const Text('Save'),
         ),
       ],
     );
   }
 
-  Future<void> _create() async {
+  Future<void> _update() async {
     final name = _nameController.text.trim();
     if (name.isEmpty) return;
 
-    final project = await ref
-        .read(projectProvider.notifier)
-        .create(
+    await ref.read(projectProvider.notifier).updateProject(
+          id: widget.project.id,
           name: name,
           icon: _emojiOptions[_selectedEmojiIndex],
           colorValue: AppTheme.presetSeeds[_selectedColorIndex].toARGB32(),
@@ -177,19 +198,6 @@ class _CreateProjectDialogState extends ConsumerState<CreateProjectDialog> {
           defaultBreakDuration: _shortBreak.round(),
           studyReminderMinutes: _studyReminderMinutes.round(),
         );
-    if (!mounted) return;
-
-    if (project == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Failed to create project'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
-      return;
-    }
-
-    await ref.read(projectProvider.notifier).switchProject(project.id);
 
     if (mounted) Navigator.of(context).pop();
   }

@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:uuid/uuid.dart';
 
@@ -31,32 +32,57 @@ Stream<List<Topic>> topicList(Ref ref, String subjectId) {
 @riverpod
 class TopicNotifier extends _$TopicNotifier {
   @override
-  bool build() => true;
+  void build() {
+    // No-op: this notifier is used only for its methods
+    // The actual topic list is watched via topicListProvider
+  }
 
-  Future<void> create(String subjectId, String name, int order) async {
-    const uuid = Uuid();
-    final db = ref.read(appDatabaseProvider);
-    await db
-        .into(db.topics)
-        .insert(
-          TopicsCompanion.insert(
-            id: uuid.v4(),
-            subjectId: subjectId,
-            name: name,
-            order: order,
-          ),
-        );
+  Future<void> create(String subjectId, String name) async {
+    try {
+      const uuid = Uuid();
+      final db = ref.read(appDatabaseProvider);
+
+      // Get the current max order for this subject's topics
+      final existingTopics = await (db.select(db.topics)
+        ..where((t) => t.subjectId.equals(subjectId)))
+        .get();
+      final maxOrder = existingTopics.isEmpty
+          ? 0
+          : existingTopics.map((t) => t.order).reduce((a, b) => a > b ? a : b);
+
+      await db.into(db.topics).insert(
+        TopicsCompanion.insert(
+          id: uuid.v4(),
+          subjectId: subjectId,
+          name: name,
+          order: maxOrder + 1,
+        ),
+      );
+    } catch (e, st) {
+      debugPrint('Error creating topic: $e\n$st');
+      rethrow;
+    }
   }
 
   Future<void> rename(String id, String newName) async {
-    final db = ref.read(appDatabaseProvider);
-    await (db.update(db.topics)..where((t) => t.id.equals(id))).write(
-      TopicsCompanion(name: Value(newName)),
-    );
+    try {
+      final db = ref.read(appDatabaseProvider);
+      await (db.update(db.topics)..where((t) => t.id.equals(id))).write(
+        TopicsCompanion(name: Value(newName)),
+      );
+    } catch (e, st) {
+      debugPrint('Error renaming topic: $e\n$st');
+      rethrow;
+    }
   }
 
   Future<void> delete(String id) async {
-    final db = ref.read(appDatabaseProvider);
-    await (db.delete(db.topics)..where((t) => t.id.equals(id))).go();
+    try {
+      final db = ref.read(appDatabaseProvider);
+      await (db.delete(db.topics)..where((t) => t.id.equals(id))).go();
+    } catch (e, st) {
+      debugPrint('Error deleting topic: $e\n$st');
+      rethrow;
+    }
   }
 }

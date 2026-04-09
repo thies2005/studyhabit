@@ -13,6 +13,11 @@ abstract class Project with _$Project {
     required DateTime createdAt,
     required DateTime lastOpenedAt,
     required bool isArchived,
+    @Default(25) int defaultWorkDuration,
+    @Default(5) int defaultBreakDuration,
+    @Default(15) int defaultLongBreakDuration,
+    @Default(4) int defaultLongBreakEvery,
+    @Default(30) int studyReminderMinutes,
   }) = _Project;
 
   factory Project.fromJson(Map<String, dynamic> json) =>
