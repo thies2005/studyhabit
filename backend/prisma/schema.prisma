@@ -1,0 +1,147 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  projects     Project[]
+  achievements Achievement[]
+  userStats    UserStats?
+}
+
+model Project {
+  id           String    @id @default(uuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String
+  icon         String    @default("📚")
+  colorValue   Int
+  createdAt    DateTime  @default(now())
+  lastOpenedAt DateTime  @default(now())
+  isArchived   Boolean   @default(false)
+  updatedAt    DateTime  @updatedAt
+  subjects     Subject[]
+}
+
+model Subject {
+  id                     String        @id @default(uuid())
+  projectId              String
+  project                Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name                   String
+  description            String?
+  colorValue             Int
+  hierarchyMode          String        @default("flat")
+  defaultDurationMinutes Int           @default(25)
+  defaultBreakMinutes    Int           @default(5)
+  xpTotal                Int           @default(0)
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
+  topics                 Topic[]
+  sessions               StudySession[]
+  sources                Source[]
+  skillLabels            SkillLabel[]
+}
+
+model Topic {
+  id        String   @id @default(uuid())
+  subjectId String
+  subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  name      String
+  order     Int      @default(0)
+  chapters  Chapter[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Chapter {
+  id        String  @id @default(uuid())
+  topicId   String
+  topic     Topic   @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  name      String
+  order     Int     @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model StudySession {
+  id                       String     @id @default(uuid())
+  subjectId                String
+  subject                  Subject    @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  topicId                  String?
+  chapterId                String?
+  startedAt                DateTime
+  endedAt                  DateTime?
+  plannedDurationMinutes   Int        @default(25)
+  actualDurationMinutes    Int        @default(0)
+  pomodorosCompleted       Int        @default(0)
+  confidenceRating         Int?
+  notes                    String?
+  xpEarned                 Int        @default(0)
+  createdAt                DateTime   @default(now())
+  updatedAt                DateTime   @updatedAt
+}
+
+model Source {
+  id              String    @id @default(uuid())
+  subjectId       String
+  subject         Subject   @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  topicId         String?
+  chapterId       String?
+  type            String    @default("pdf")
+  title           String
+  filePath        String?
+  url             String?
+  currentPage     Int?
+  totalPages      Int?
+  progressPercent Float?
+  notes           String?
+  addedAt         DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model SkillLabel {
+  id        String   @id @default(uuid())
+  subjectId String
+  subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  topicId   String?
+  chapterId String?
+  label     String   @default("beginner")
+  updatedAt DateTime @updatedAt
+}
+
+model Achievement {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key         String
+  unlockedAt  DateTime?
+  progress    Float     @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([userId, key])
+}
+
+model UserStats {
+  id                String    @id @default(uuid())
+  userId            String    @unique
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  totalXp           Int       @default(0)
+  currentLevel      Int       @default(1)
+  currentStreak     Int       @default(0)
+  longestStreak     Int       @default(0)
+  lastStudyDate     DateTime?
+  totalStudyMinutes Int       @default(0)
+  freezeTokens      Int       @default(0)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}

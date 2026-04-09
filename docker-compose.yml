@@ -1,0 +1,45 @@
+version: '3.9'
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: studytracker
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 10s
+      retries: 5
+      timeout: 5s
+
+  api:
+    build: ./backend
+    restart: unless-stopped
+    ports:
+      - "${API_PORT:-3001}:3001"
+    environment:
+      DATABASE_URL: postgres://${DB_USER}:${DB_PASSWORD}@db:5432/studytracker
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      NODE_ENV: production
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "npx prisma migrate deploy && node dist/index.js"
+
+  web:
+    build: ./web
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-3000}:80"
+    environment:
+      VITE_API_URL: ${API_URL}
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
