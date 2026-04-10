@@ -69,9 +69,7 @@ class PomodoroNotifier extends _$PomodoroNotifier {
       }
     });
 
-    if (state.subjectId.isNotEmpty) {
-      return state;
-    }
+
 
     return PomodoroState.initial(subjectId: '');
   }

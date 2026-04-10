@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/models/enums.dart';
 import '../../../core/models/subject.dart';
+import '../list/edit_subject_dialog.dart';
 import '../subject_providers.dart';
 import 'sources/sources_tab.dart';
 import 'timeline/timeline_tab.dart';
@@ -52,9 +53,6 @@ class _SubjectDetailContent extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final subjectColor = ColorScheme.fromSeed(
-      seedColor: Color(subject.colorValue),
-    );
 
     final showTopics = subject.hierarchyMode != HierarchyMode.flat;
     final tabs = [
@@ -73,8 +71,15 @@ class _SubjectDetailContent extends ConsumerWidget {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
-          IconButton(icon: const Icon(Icons.share_outlined), onPressed: () {}),
-          IconButton(icon: const Icon(Icons.settings_outlined), onPressed: () {}),
+          IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (context) => EditSubjectDialog(subject: subject),
+              );
+            },
+          ),
         ],
       ),
       body: DefaultTabController(
@@ -87,23 +92,7 @@ class _SubjectDetailContent extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Chip
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: subjectColor.surfaceContainerHighest.withValues(alpha: 0.5),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Text(
-                        'LEVEL ${subject.hierarchyMode.name.toUpperCase()}', // Small stub
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          letterSpacing: 1.5,
-                          color: subjectColor.onSurfaceVariant,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
+
                     // Title
                     Text(
                       subject.name,
@@ -114,14 +103,16 @@ class _SubjectDetailContent extends ConsumerWidget {
                     ),
                     const SizedBox(height: 12),
                     // Description
-                    Text(
-                      subject.description ?? 'A subject in StudyTracker covering various focused study sessions and materials.',
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        height: 1.4,
+                    if (subject.description != null && subject.description!.isNotEmpty) ...[
+                      Text(
+                        subject.description!,
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          height: 1.4,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 24),
+                      const SizedBox(height: 24),
+                    ],
                     // 2x2 Grid stats
                     statsAsync.when(
                       loading: () => const CircularProgressIndicator(),
@@ -135,10 +126,8 @@ class _SubjectDetailContent extends ConsumerWidget {
                           mainAxisSpacing: 16,
                           childAspectRatio: 1.6,
                           children: [
-                            _buildStatCard(context, 'COMPLETION', '64%'), // Mock
                             _buildStatCard(context, 'TIME SPENT', '${stats.totalHours.toStringAsFixed(1)}h'),
                             _buildStatCard(context, 'SOURCES', '${stats.sessionCount}'), // Simplified to sessionCount for now
-                            _buildStatCard(context, 'RANKING', 'Top 5%'), // Mock
                           ],
                         );
                       },
