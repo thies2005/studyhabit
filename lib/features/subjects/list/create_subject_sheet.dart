@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/models/enums.dart';
+import '../../../core/providers/theme_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../projects/project_providers.dart';
 import '../subject_providers.dart';
@@ -21,6 +22,7 @@ class _CreateSubjectSheetState extends ConsumerState<CreateSubjectSheet> {
   HierarchyMode _hierarchyMode = HierarchyMode.flat;
   double _workDuration = 25;
   double _breakDuration = 5;
+  bool _useSettingsDefaults = true;
 
   static const _totalSteps = 4;
 
@@ -306,7 +308,64 @@ class _CreateSubjectSheetState extends ConsumerState<CreateSubjectSheet> {
 
   Widget _buildDurationStep() {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final themeSettingsAsync = ref.watch(themeSettingsProvider);
 
+    return themeSettingsAsync.when(
+      loading: () => _buildDurationSliders(theme),
+      error: (_, __) => _buildDurationSliders(theme),
+      data: (settings) {
+        if (_useSettingsDefaults) {
+          _workDuration = settings.workDuration.toDouble();
+          _breakDuration = settings.shortBreak.toDouble();
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 8),
+            Text('Durations', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 12),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: _useSettingsDefaults,
+              onChanged: (v) => setState(() => _useSettingsDefaults = v),
+              title: Text(
+                'Use default timing from Settings',
+                style: theme.textTheme.bodyLarge,
+              ),
+            ),
+            if (_useSettingsDefaults)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: colorScheme.secondaryContainer.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: colorScheme.outlineVariant),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, size: 16, color: colorScheme.secondary),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Work ${settings.workDuration} min / Break ${settings.shortBreak} min',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSecondaryContainer,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            if (!_useSettingsDefaults) ...[
+              const SizedBox(height: 12),
+              _buildDurationSliders(theme),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildDurationSliders(ThemeData theme) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

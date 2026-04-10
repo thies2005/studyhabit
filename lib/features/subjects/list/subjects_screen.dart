@@ -28,6 +28,7 @@ class SubjectsScreen extends ConsumerWidget {
           ),
         ),
         data: (subjects) => Scaffold(
+          backgroundColor: Theme.of(context).colorScheme.surface,
           floatingActionButton: FloatingActionButton.extended(
             onPressed: () => showModalBottomSheet<void>(
               context: context,

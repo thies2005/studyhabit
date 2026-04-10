@@ -65,7 +65,9 @@ class _SubjectDetailContent extends ConsumerWidget {
 
         return DefaultTabController(
           length: tabs.length,
-          child: NestedScrollView(
+          child: Scaffold(
+            backgroundColor: subjectColor.surface,
+            body: NestedScrollView(
             headerSliverBuilder: (context, innerBoxIsScrolled) => [
               SliverAppBar(
                 expandedHeight: 200,
@@ -119,6 +121,7 @@ class _SubjectDetailContent extends ConsumerWidget {
                 SourcesTab(subjectId: subject.id),
                 if (showTopics) TopicsTab(subjectId: subject.id),
               ],
+            ),
             ),
           ),
         );

@@ -218,10 +218,15 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
         ? TimerPhase.shortBreak
         : TimerPhase.work;
 
+    final breakMins = pomodoroState.phase == TimerPhase.work
+        ? pomodoroState.breakDurationMinutes
+        : null;
+    final workMins = pomodoroState.plannedDurationMinutes;
+
     final (label, icon) = switch (nextPhase) {
-      TimerPhase.work => ('Focus (25m)', Icons.center_focus_strong),
-      TimerPhase.shortBreak => ('Short Break (5m)', Icons.coffee),
-      TimerPhase.longBreak => ('Long Break (15m)', Icons.free_breakfast),
+      TimerPhase.work => ('Focus ($workMins m)', Icons.center_focus_strong),
+      TimerPhase.shortBreak => ('Short Break ($breakMins m)', Icons.coffee),
+      TimerPhase.longBreak => ('Long Break ($breakMins m)', Icons.free_breakfast),
       TimerPhase.idle => ('Ready', Icons.check_circle),
     };
 

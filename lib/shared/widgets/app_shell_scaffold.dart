@@ -36,15 +36,6 @@ class AppShellScaffold extends StatelessWidget {
         ),
         actions: [
           IconButton(
-            onPressed: () {
-              // Stub notification handler
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Notifications coming soon')),
-              );
-            },
-            icon: const Icon(Icons.notifications_none),
-          ),
-          IconButton(
             onPressed: () => context.pushNamed('settings'),
             icon: const Icon(Icons.settings),
           ),

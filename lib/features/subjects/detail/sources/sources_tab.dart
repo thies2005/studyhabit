@@ -646,9 +646,10 @@ class _AddSourceBottomSheetState extends ConsumerState<AddSourceBottomSheet> {
     } catch (e) {
       debugPrint('Error adding source: $e');
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to add source: $e')));
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Source added (XP award failed: $e)')),
+        );
       }
     }
   }
