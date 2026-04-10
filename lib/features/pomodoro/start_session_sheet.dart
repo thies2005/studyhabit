@@ -546,53 +546,22 @@ class _DurationConfig extends StatelessWidget {
           const SizedBox(height: 16),
         ],
         const SizedBox(height: 8),
+        const SizedBox(height: 8),
         _SliderRow(
           label: 'Work Duration',
           value: workDuration,
           min: 5,
-          max: 90,
+          max: 180,
           unit: 'min',
           color: colorScheme.primary,
           onChanged: onWorkChanged,
-        ),
-        const SizedBox(height: 24),
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                'Or set custom work duration:',
-                style: Theme.of(context).textTheme.bodyLarge,
-              ),
-            ),
-            const SizedBox(width: 12),
-            SizedBox(
-              width: 80,
-              child: TextField(
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Min',
-                  border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                ),
-                onChanged: (value) {
-                  final parsed = int.tryParse(value);
-                  if (parsed != null && parsed >= 5 && parsed <= 90) {
-                    onWorkChanged(parsed.toDouble());
-                  }
-                },
-              ),
-            ),
-          ],
         ),
         const SizedBox(height: 24),
         _SliderRow(
           label: 'Short Break',
           value: shortBreak,
           min: 1,
-          max: 30,
+          max: 60,
           unit: 'min',
           color: colorScheme.tertiary,
           onChanged: onBreakChanged,
@@ -602,7 +571,7 @@ class _DurationConfig extends StatelessWidget {
           label: 'Long Break Duration',
           value: longBreakDuration,
           min: 5,
-          max: 60,
+          max: 90,
           unit: 'min',
           color: colorScheme.tertiary,
           onChanged: onLongBreakDurationChanged,
@@ -611,8 +580,8 @@ class _DurationConfig extends StatelessWidget {
         _SliderRow(
           label: 'Long Break Every',
           value: longBreakEvery,
-          min: 2,
-          max: 8,
+          min: 1,
+          max: 10,
           unit: '',
           color: colorScheme.secondary,
           onChanged: onLongBreakEveryChanged,
@@ -623,7 +592,7 @@ class _DurationConfig extends StatelessWidget {
   }
 }
 
-class _SliderRow extends StatelessWidget {
+class _SliderRow extends StatefulWidget {
   const _SliderRow({
     required this.label,
     required this.value,
@@ -645,32 +614,71 @@ class _SliderRow extends StatelessWidget {
   final bool isInt;
 
   @override
-  Widget build(BuildContext context) {
-    final displayValue = isInt
-        ? value.round().toString()
-        : value.round().toString();
+  State<_SliderRow> createState() => _SliderRowState();
+}
 
+class _SliderRowState extends State<_SliderRow> {
+  late TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.value.round().toString());
+  }
+
+  @override
+  void didUpdateWidget(covariant _SliderRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.value != widget.value) {
+      if (_controller.text != widget.value.round().toString()) {
+        _controller.text = widget.value.round().toString();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(label, style: Theme.of(context).textTheme.bodyLarge),
-            Text(
-              '$displayValue $unit',
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(color: color),
+            Text(widget.label, style: Theme.of(context).textTheme.bodyLarge),
+            SizedBox(
+              width: 80,
+              child: TextField(
+                controller: _controller,
+                keyboardType: TextInputType.number,
+                textAlign: TextAlign.center,
+                decoration: InputDecoration(
+                  suffixText: widget.unit,
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onChanged: (val) {
+                  final parsed = int.tryParse(val);
+                  if (parsed != null && parsed >= widget.min && parsed <= widget.max) {
+                    widget.onChanged(parsed.toDouble());
+                  }
+                },
+              ),
             ),
           ],
         ),
         Slider(
-          value: value,
-          min: min,
-          max: max,
-          divisions: (max - min).toInt(),
-          onChanged: onChanged,
+          value: widget.value,
+          min: widget.min,
+          max: widget.max,
+          divisions: (widget.max - widget.min).toInt(),
+          onChanged: widget.onChanged,
         ),
       ],
     );

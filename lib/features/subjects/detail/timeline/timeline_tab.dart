@@ -200,48 +200,45 @@ class _EncouragementCard extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: Card(
-        color: colorScheme.surfaceContainerLow,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: colorScheme.tertiaryContainer,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  Icons.visibility,
-                  color: colorScheme.onTertiaryContainer,
-                ),
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+      child: Container(
+        decoration: BoxDecoration(
+          color: colorScheme.onSurface.withValues(alpha: 0.65), // Dark grey appearance
+          borderRadius: BorderRadius.circular(16),
+        ),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Mastery in Sight',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: colorScheme.surface,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Mastery in Sight',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Keep pushing forward! Every session brings you closer to excellence.',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'You are 3 milestones away from completing the core curriculum. Keep up the consistent pace.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: colorScheme.surface.withValues(alpha: 0.8),
+                height: 1.5,
               ),
-              Icon(Icons.trending_up, color: colorScheme.tertiary),
-            ],
-          ),
+            ),
+            const SizedBox(height: 24),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: colorScheme.surface,
+                foregroundColor: colorScheme.onSurface,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+              onPressed: () {
+                // Action to next lesson or pop up study session.
+              },
+              child: const Text('Next Lesson', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
         ),
       ),
     );
