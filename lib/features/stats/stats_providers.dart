@@ -4,6 +4,7 @@ import '../../core/database/daos/session_dao.dart';
 import '../../core/database/daos/subject_dao.dart';
 import '../../core/models/enums.dart';
 import '../../core/models/model_mapper.dart';
+import '../../core/models/study_session.dart';
 import '../../core/providers/database_provider.dart';
 import '../../core/providers/user_stats_provider.dart';
 import '../../core/services/xp_service.dart';
@@ -12,15 +13,21 @@ import 'stats_models.dart';
 
 part 'stats_providers.g.dart';
 
+// Helper function to get all sessions once (cached per provider instance)
+Future<List<StudySession>> _getAllSessions(Ref ref) async {
+  final db = ref.watch(appDatabaseProvider);
+  final rows = await db.select(db.studySessions).get();
+  return rows.map((r) => mapStudySession(r)).toList();
+}
+
 @riverpod
 Future<StatsOverview> statsOverview(Ref ref) async {
-  final db = ref.watch(appDatabaseProvider);
   final stats = await ref.watch(userStatsProvider.future);
-  final allSessions = await db.select(db.studySessions).get();
+  final allSessions = await _getAllSessions(ref);
 
   final totalMinutes = allSessions.fold<int>(
     0,
-    (sum, s) => sum + s.actualDurationMinutes,
+    (int sum, StudySession s) => sum + s.actualDurationMinutes,
   );
   final totalHours = totalMinutes / 60.0;
 
@@ -29,7 +36,7 @@ Future<StatsOverview> statsOverview(Ref ref) async {
   final weekSessions = allSessions.where((s) => s.startedAt.isAfter(weekAgo));
   final weekMinutes = weekSessions.fold<int>(
     0,
-    (sum, s) => sum + s.actualDurationMinutes,
+    (int sum, StudySession s) => sum + s.actualDurationMinutes,
   );
   final weekHours = weekMinutes / 60.0;
 
@@ -48,8 +55,7 @@ Future<StatsOverview> statsOverview(Ref ref) async {
 
 @riverpod
 Future<List<DailyActivity>> weeklyActivity(Ref ref) async {
-  final db = ref.watch(appDatabaseProvider);
-  final allSessions = await db.select(db.studySessions).get();
+  final allSessions = await _getAllSessions(ref);
 
   final now = DateTime.now();
   final weekStart = now.subtract(Duration(days: now.weekday - 1));
@@ -97,7 +103,7 @@ Future<List<SubjectTime>> subjectDistribution(Ref ref, int days) async {
   if (currentProject == null) return [];
 
   final subjects = await dao.watchByProject(currentProject.id).first;
-  final allSessions = await db.select(db.studySessions).get();
+  final allSessions = await _getAllSessions(ref);
 
   final cutoff = DateTime.now().subtract(Duration(days: days));
   final filteredSessions = allSessions
@@ -111,7 +117,7 @@ Future<List<SubjectTime>> subjectDistribution(Ref ref, int days) async {
         session.actualDurationMinutes;
   }
 
-  final totalMinutes = minutesBySubject.values.fold<int>(0, (a, b) => a + b);
+  final totalMinutes = minutesBySubject.values.fold<int>(0, (int a, int b) => a + b);
 
   final result = <SubjectTime>[];
   for (final row in subjects) {
@@ -134,8 +140,7 @@ Future<List<SubjectTime>> subjectDistribution(Ref ref, int days) async {
 
 @riverpod
 Future<List<HeatmapDay>> heatmapData(Ref ref) async {
-  final db = ref.watch(appDatabaseProvider);
-  final allSessions = await db.select(db.studySessions).get();
+  final allSessions = await _getAllSessions(ref);
 
   final now = DateTime.now();
   final startDay = DateTime(
@@ -218,9 +223,8 @@ Future<List<SubjectBreakdown>> subjectBreakdown(Ref ref) async {
 
 @riverpod
 Future<List<XpDayData>> xpLineChartData(Ref ref) async {
-  final db = ref.watch(appDatabaseProvider);
   final stats = await ref.watch(userStatsProvider.future);
-  final allSessions = await db.select(db.studySessions).get();
+  final allSessions = await _getAllSessions(ref);
 
   final now = DateTime.now();
   final startDay = DateTime(

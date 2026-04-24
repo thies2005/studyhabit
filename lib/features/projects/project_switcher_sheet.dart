@@ -35,13 +35,19 @@ class ProjectSwitcherSheet extends ConsumerWidget {
                   ),
                   IconButton(
                     onPressed: () {
-                      final rootContext =
-                          Navigator.of(context, rootNavigator: true).context;
+                      final rootContext = Navigator.of(
+                        context,
+                        rootNavigator: true,
+                      ).context;
                       Navigator.of(context).pop();
-                      showDialog<void>(
-                        context: rootContext,
-                        builder: (_) => const CreateProjectDialog(),
-                      );
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (rootContext.mounted) {
+                          showDialog<void>(
+                            context: rootContext,
+                            builder: (_) => const CreateProjectDialog(),
+                          );
+                        }
+                      });
                     },
                     icon: const Icon(Icons.add),
                   ),
@@ -51,8 +57,7 @@ class ProjectSwitcherSheet extends ConsumerWidget {
             const Divider(),
             Expanded(
               child: projectsAsync.when(
-                loading: () =>
-                    const Center(child: CircularProgressIndicator()),
+                loading: () => const Center(child: CircularProgressIndicator()),
                 error: (error, stackTrace) => Center(
                   child: Text(
                     'Failed to load projects',
@@ -60,8 +65,9 @@ class ProjectSwitcherSheet extends ConsumerWidget {
                   ),
                 ),
                 data: (projects) {
-                  final activeProjects =
-                      projects.where((p) => !p.isArchived).toList();
+                  final activeProjects = projects
+                      .where((p) => !p.isArchived)
+                      .toList();
 
                   return currentProjectAsync.when(
                     loading: () =>
@@ -195,13 +201,19 @@ class _ProjectListTile extends StatelessWidget {
             IconButton(
               icon: const Icon(Icons.edit_outlined),
               onPressed: () {
-                final rootContext =
-                    Navigator.of(context, rootNavigator: true).context;
+                final rootContext = Navigator.of(
+                  context,
+                  rootNavigator: true,
+                ).context;
                 Navigator.of(context).pop();
-                showDialog<void>(
-                  context: rootContext,
-                  builder: (_) => EditProjectDialog(project: project),
-                );
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (rootContext.mounted) {
+                    showDialog<void>(
+                      context: rootContext,
+                      builder: (_) => EditProjectDialog(project: project),
+                    );
+                  }
+                });
               },
               tooltip: 'Edit Project',
             ),

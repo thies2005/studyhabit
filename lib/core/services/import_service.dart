@@ -232,6 +232,21 @@ class ImportService {
                   ),
                 );
           }
+
+          for (final milestone in exportSubject.milestones) {
+            await _db
+                .into(_db.subjectMilestones)
+                .insertOnConflictUpdate(
+                  SubjectMilestonesCompanion(
+                    id: Value(milestone.id),
+                    subjectId: Value(milestone.subjectId),
+                    title: Value(milestone.title),
+                    isCompleted: Value(milestone.isCompleted),
+                    sortOrder: Value(milestone.sortOrder),
+                    completedAt: Value(milestone.completedAt),
+                  ),
+                );
+          }
         }
       }
 
@@ -281,6 +296,7 @@ class ImportService {
   Future<void> _clearAllData() async {
     // Delete in FK order
     await _db.delete(_db.skillLabels).go();
+    await _db.delete(_db.subjectMilestones).go();
     await _db.delete(_db.sources).go();
     await _db.delete(_db.studySessions).go();
     await _db.delete(_db.chapters).go();

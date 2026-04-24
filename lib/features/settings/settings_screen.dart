@@ -256,6 +256,19 @@ class _SettingsContent extends ConsumerWidget {
                   style: theme.textTheme.titleSmall,
                 ),
               ),
+              const Divider(height: 1),
+              SwitchListTile(
+                value: settings.autoStartWork,
+                onChanged: (value) {
+                  ref
+                      .read(themeSettingsProvider.notifier)
+                      .setAutoStartWork(value);
+                },
+                title: Text(
+                  'Auto-start Focus',
+                  style: theme.textTheme.titleSmall,
+                ),
+              ),
               SwitchListTile(
                 value: settings.vibration,
                 onChanged: (value) {
@@ -264,6 +277,25 @@ class _SettingsContent extends ConsumerWidget {
                 title: Text('Vibration', style: theme.textTheme.titleSmall),
                 subtitle: Text(
                   'Haptic feedback on completion',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              const Divider(height: 1),
+              SwitchListTile(
+                value: settings.continuousFocus,
+                onChanged: (value) {
+                  ref
+                      .read(themeSettingsProvider.notifier)
+                      .setContinuousFocus(value);
+                },
+                title: Text(
+                  'Continuous Focus',
+                  style: theme.textTheme.titleSmall,
+                ),
+                subtitle: Text(
+                  'Timer keeps running past preset time until you stop manually',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                   ),
@@ -352,11 +384,11 @@ class _SettingsContent extends ConsumerWidget {
                 ),
               const Divider(height: 1),
               SwitchListTile(
-                value: settings.notificationsEnabled,
+                value: settings.dailyReminderEnabled,
                 onChanged: (value) {
                   ref
                       .read(themeSettingsProvider.notifier)
-                      .setNotificationsEnabled(value);
+                      .setDailyReminderEnabled(value);
                 },
                 title: Text(
                   'Daily Reminder',
@@ -369,7 +401,7 @@ class _SettingsContent extends ConsumerWidget {
                   ),
                 ),
               ),
-              if (settings.notificationsEnabled)
+              if (settings.dailyReminderEnabled)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                   child: Column(
@@ -522,6 +554,17 @@ class _SettingsContent extends ConsumerWidget {
                 ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.pushNamed('diagnostic-logs'),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(Icons.battery_alert_outlined),
+                title: const Text('Battery Tips'),
+                subtitle: Text(
+                  'Fix timer issues on some devices',
+                  style: TextStyle(color: colorScheme.onSurfaceVariant),
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.pushNamed('battery-tips'),
               ),
               const Divider(height: 1),
               ListTile(
@@ -880,7 +923,7 @@ class _SliderSetting extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final displayValue = isInt ? value.round() : value.round();
+    final displayValue = isInt ? value.round() : double.parse(value.toStringAsFixed(1));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

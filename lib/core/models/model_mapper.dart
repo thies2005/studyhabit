@@ -8,6 +8,7 @@ import 'skill_label.dart' as domain;
 import 'source.dart' as domain;
 import 'study_session.dart' as domain;
 import 'subject.dart' as domain;
+import 'subject_milestone.dart' as domain;
 import 'topic.dart' as domain;
 import 'user_stats.dart' as domain;
 
@@ -40,6 +41,9 @@ domain.Subject mapSubject(SubjectRow row) {
     defaultBreakMinutes: row.defaultBreakMinutes,
     xpTotal: row.xpTotal,
     createdAt: row.createdAt,
+    completenessMode: row.completenessMode,
+    targetHours: row.targetHours,
+    targetWeeklyHours: row.targetWeeklyHours,
   );
 }
 
@@ -151,5 +155,16 @@ UserStatsTableCompanion toUserStatsCompanion(domain.UserStats stats) {
     lastStudyDate: Value(stats.lastStudyDate),
     totalStudyMinutes: Value(stats.totalStudyMinutes),
     freezeTokens: Value(stats.freezeTokens),
+  );
+}
+
+domain.SubjectMilestone mapSubjectMilestone(SubjectMilestoneRow row) {
+  return domain.SubjectMilestone(
+    id: row.id,
+    subjectId: row.subjectId,
+    title: row.title,
+    isCompleted: row.isCompleted,
+    sortOrder: row.sortOrder,
+    completedAt: row.completedAt,
   );
 }

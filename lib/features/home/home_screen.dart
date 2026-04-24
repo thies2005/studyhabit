@@ -304,7 +304,7 @@ class _SessionCard extends ConsumerWidget {
         final subjectIcon = _subjectIcons[iconIndex.abs()];
 
         final dateText = _formatRelativeDate(session.startedAt);
-        final xpEarned = (minutes ~/ 25) * 50; // 50 XP per pomodoro
+        final xpEarned = session.xpEarned;
 
         return Card(
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -443,6 +443,7 @@ Stream<List<StudySessionData>> allSessions(Ref ref) {
                 actualDurationMinutes: row.actualDurationMinutes,
                 confidenceRating: row.confidenceRating,
                 startedAt: row.startedAt,
+                xpEarned: row.xpEarned,
               ),
             )
             .toList(),
@@ -473,6 +474,7 @@ class StudySessionData {
     required this.actualDurationMinutes,
     required this.confidenceRating,
     required this.startedAt,
+    required this.xpEarned,
   });
 
   final String id;
@@ -480,4 +482,5 @@ class StudySessionData {
   final int actualDurationMinutes;
   final int? confidenceRating;
   final DateTime startedAt;
+  final int xpEarned;
 }

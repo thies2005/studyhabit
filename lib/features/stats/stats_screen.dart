@@ -423,6 +423,14 @@ class _SubjectPieChart extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
+    // Cache subject colors to avoid repeated ColorScheme.fromSeed() calls
+    final subjectColors = <int, Color>{};
+    for (final item in data) {
+      subjectColors[item.subject.colorValue] ??= ColorScheme.fromSeed(
+        seedColor: Color(item.subject.colorValue),
+      ).primary;
+    }
+
     return PieChart(
       PieChartData(
         pieTouchData: PieTouchData(
@@ -431,9 +439,6 @@ class _SubjectPieChart extends StatelessWidget {
         sectionsSpace: 2,
         centerSpaceRadius: 40,
         sections: data.map((item) {
-          final subjectColor = ColorScheme.fromSeed(
-            seedColor: Color(item.subject.colorValue),
-          ).primary;
           return PieChartSectionData(
             value: item.percentage,
             title: '${item.percentage.toStringAsFixed(0)}%',
@@ -442,7 +447,7 @@ class _SubjectPieChart extends StatelessWidget {
               fontWeight: FontWeight.w600,
               color: Colors.white,
             ),
-            color: subjectColor,
+            color: subjectColors[item.subject.colorValue]!,
             radius: 60,
             borderSide: BorderSide(color: colorScheme.surface, width: 2),
           );
@@ -459,13 +464,18 @@ class _SubjectLegend extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Cache subject colors to avoid repeated ColorScheme.fromSeed() calls
+    final subjectColors = <int, Color>{};
+    for (final item in data) {
+      subjectColors[item.subject.colorValue] ??= ColorScheme.fromSeed(
+        seedColor: Color(item.subject.colorValue),
+      ).primary;
+    }
+
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
         children: data.map((item) {
-          final subjectColor = ColorScheme.fromSeed(
-            seedColor: Color(item.subject.colorValue),
-          ).primary;
           return Padding(
             padding: const EdgeInsets.only(right: 12),
             child: Row(
@@ -475,7 +485,7 @@ class _SubjectLegend extends StatelessWidget {
                   width: 10,
                   height: 10,
                   decoration: BoxDecoration(
-                    color: subjectColor,
+                    color: subjectColors[item.subject.colorValue]!,
                     borderRadius: BorderRadius.circular(3),
                   ),
                 ),
@@ -503,6 +513,14 @@ class _SubjectBreakdownTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+
+    // Cache subject colors to avoid repeated ColorScheme.fromSeed() calls
+    final subjectColors = <int, Color>{};
+    for (final item in data) {
+      subjectColors[item.subject.colorValue] ??= ColorScheme.fromSeed(
+        seedColor: Color(item.subject.colorValue),
+      ).primary;
+    }
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -545,10 +563,6 @@ class _SubjectBreakdownTable extends StatelessWidget {
           ),
         ],
         rows: data.map((row) {
-          final subjectColor = ColorScheme.fromSeed(
-            seedColor: Color(row.subject.colorValue),
-          ).primary;
-
           return DataRow(
             cells: [
               DataCell(
@@ -559,7 +573,7 @@ class _SubjectBreakdownTable extends StatelessWidget {
                       width: 8,
                       height: 8,
                       decoration: BoxDecoration(
-                        color: subjectColor,
+                        color: subjectColors[row.subject.colorValue]!,
                         borderRadius: BorderRadius.circular(4),
                       ),
                     ),

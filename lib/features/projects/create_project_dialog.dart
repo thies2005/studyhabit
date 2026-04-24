@@ -49,129 +49,128 @@ class _CreateProjectDialogState extends ConsumerState<CreateProjectDialog> {
     final theme = Theme.of(context);
 
     return AlertDialog(
+      scrollable: true,
       title: const Text('New Project'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TextField(
-              controller: _nameController,
-              autofocus: true,
-              decoration: const InputDecoration(
-                labelText: 'Project Name',
-                border: OutlineInputBorder(),
-              ),
-              onChanged: (_) => setState(() {}),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: _nameController,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: 'Project Name',
+              border: OutlineInputBorder(),
             ),
-            const SizedBox(height: 20),
-            Text('Icon', style: theme.textTheme.titleSmall),
-            const SizedBox(height: 8),
-            SizedBox(
-              height: 48,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: _emojiOptions.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (context, index) {
-                  final isSelected = index == _selectedEmojiIndex;
-                  return InkWell(
-                    onTap: () => setState(() => _selectedEmojiIndex = index),
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        color: isSelected
-                            ? colorScheme.primaryContainer
-                            : colorScheme.surfaceContainerHighest,
-                        border: isSelected
-                            ? Border.all(color: colorScheme.primary, width: 2)
-                            : null,
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        _emojiOptions[index],
-                        style: const TextStyle(fontSize: 24),
-                      ),
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 20),
+          Text('Icon', style: theme.textTheme.titleSmall),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 48,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _emojiOptions.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (context, index) {
+                final isSelected = index == _selectedEmojiIndex;
+                return InkWell(
+                  onTap: () => setState(() => _selectedEmojiIndex = index),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      color: isSelected
+                          ? colorScheme.primaryContainer
+                          : colorScheme.surfaceContainerHighest,
+                      border: isSelected
+                          ? Border.all(color: colorScheme.primary, width: 2)
+                          : null,
                     ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text('Color', style: theme.textTheme.titleSmall),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                for (var i = 0; i < AppTheme.presetSeeds.length; i++)
-                  _ColorDot(
-                    color: AppTheme.presetSeeds[i],
-                    selected: _selectedColorIndex == i,
-                    onTap: () => setState(() => _selectedColorIndex = i),
+                    alignment: Alignment.center,
+                    child: Text(
+                      _emojiOptions[index],
+                      style: const TextStyle(fontSize: 24),
+                    ),
                   ),
-              ],
+                );
+              },
             ),
-            const SizedBox(height: 20),
-            Text('Default Timing', style: theme.textTheme.titleSmall),
-            const SizedBox(height: 8),
-            _SliderRow(
-              label: 'Work Duration',
-              value: _workDuration,
-              min: 5,
-              max: 90,
-              unit: 'min',
-              color: colorScheme.primary,
-              onChanged: (v) => setState(() => _workDuration = v),
-            ),
-            const SizedBox(height: 16),
-            _SliderRow(
-              label: 'Short Break',
-              value: _shortBreak,
-              min: 1,
-              max: 30,
-              unit: 'min',
-              color: colorScheme.tertiary,
-              onChanged: (v) => setState(() => _shortBreak = v),
-            ),
-            const SizedBox(height: 16),
-            _SliderRow(
-              label: 'Long Break',
-              value: _longBreakDuration,
-              min: 5,
-              max: 60,
-              unit: 'min',
-              color: colorScheme.tertiary,
-              onChanged: (v) => setState(() => _longBreakDuration = v),
-            ),
-            const SizedBox(height: 16),
-            _SliderRow(
-              label: 'Long Break Every',
-              value: _longBreakEvery,
-              min: 2,
-              max: 8,
-              unit: '',
-              color: colorScheme.secondary,
-              onChanged: (v) => setState(() => _longBreakEvery = v),
-              isInt: true,
-            ),
-            const SizedBox(height: 20),
-            Text('Study Reminder', style: theme.textTheme.titleSmall),
-            const SizedBox(height: 8),
-            _SliderRow(
-              label: 'Remind after',
-              value: _studyReminderMinutes,
-              min: 5,
-              max: 180,
-              unit: 'min',
-              color: colorScheme.secondary,
-              onChanged: (v) => setState(() => _studyReminderMinutes = v),
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 20),
+          Text('Color', style: theme.textTheme.titleSmall),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              for (var i = 0; i < AppTheme.presetSeeds.length; i++)
+                _ColorDot(
+                  color: AppTheme.presetSeeds[i],
+                  selected: _selectedColorIndex == i,
+                  onTap: () => setState(() => _selectedColorIndex = i),
+                ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Text('Default Timing', style: theme.textTheme.titleSmall),
+          const SizedBox(height: 8),
+          _SliderRow(
+            label: 'Work Duration',
+            value: _workDuration,
+            min: 5,
+            max: 90,
+            unit: 'min',
+            color: colorScheme.primary,
+            onChanged: (v) => setState(() => _workDuration = v),
+          ),
+          const SizedBox(height: 16),
+          _SliderRow(
+            label: 'Short Break',
+            value: _shortBreak,
+            min: 1,
+            max: 30,
+            unit: 'min',
+            color: colorScheme.tertiary,
+            onChanged: (v) => setState(() => _shortBreak = v),
+          ),
+          const SizedBox(height: 16),
+          _SliderRow(
+            label: 'Long Break',
+            value: _longBreakDuration,
+            min: 5,
+            max: 60,
+            unit: 'min',
+            color: colorScheme.tertiary,
+            onChanged: (v) => setState(() => _longBreakDuration = v),
+          ),
+          const SizedBox(height: 16),
+          _SliderRow(
+            label: 'Long Break Every',
+            value: _longBreakEvery,
+            min: 2,
+            max: 8,
+            unit: '',
+            color: colorScheme.secondary,
+            onChanged: (v) => setState(() => _longBreakEvery = v),
+            isInt: true,
+          ),
+          const SizedBox(height: 20),
+          Text('Study Reminder', style: theme.textTheme.titleSmall),
+          const SizedBox(height: 8),
+          _SliderRow(
+            label: 'Remind after',
+            value: _studyReminderMinutes,
+            min: 5,
+            max: 180,
+            unit: 'min',
+            color: colorScheme.secondary,
+            onChanged: (v) => setState(() => _studyReminderMinutes = v),
+          ),
+        ],
       ),
       actions: [
         TextButton(

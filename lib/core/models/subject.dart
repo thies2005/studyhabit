@@ -18,6 +18,9 @@ abstract class Subject with _$Subject {
     required int defaultBreakMinutes,
     required int xpTotal,
     required DateTime createdAt,
+    @Default(CompletenessMode.none) CompletenessMode completenessMode,
+    @Default(null) int? targetHours,
+    @Default(null) int? targetWeeklyHours,
   }) = _Subject;
 
   factory Subject.fromJson(Map<String, dynamic> json) =>

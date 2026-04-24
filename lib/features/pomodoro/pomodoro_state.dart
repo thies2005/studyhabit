@@ -3,6 +3,8 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 import '../../core/models/enums.dart';
 
 part 'pomodoro_state.freezed.dart';
+part 'pomodoro_state.g.dart';
+
 
 @freezed
 abstract class PomodoroState with _$PomodoroState {
@@ -12,6 +14,9 @@ abstract class PomodoroState with _$PomodoroState {
     required int totalSeconds,
     required int pomodorosCompleted,
     required bool isRunning,
+    DateTime? startTimestamp,
+    @Default(0) int pausedDurationSeconds,
+    DateTime? lastPausedAt,
     String? activeSessionId,
     required String subjectId,
     String? topicId,
@@ -20,7 +25,14 @@ abstract class PomodoroState with _$PomodoroState {
     @Default(5) int breakDurationMinutes,
     @Default(15) int longBreakDurationMinutes,
     @Default(4) int longBreakEvery,
+    @Default(0) int lastActualWorkMinutes,   // actual minutes of the last completed work phase
+    @Default(0) int lastSessionXpEarned,     // XP earned (pre-confidence) for review display
+    @Default(false) bool isOvertime,
+    @Default(0) int overtimeSeconds,
   }) = _PomodoroState;
+
+  factory PomodoroState.fromJson(Map<String, dynamic> json) =>
+      _$PomodoroStateFromJson(json);
 
   factory PomodoroState.initial({
     required String subjectId,

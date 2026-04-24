@@ -65,7 +65,7 @@ class XpService {
       final next = ((threshold * 1.5) / 100).round() * 100;
       threshold = next;
       level++;
-      if (totalXp < threshold) return level;
+      if (totalXp <= threshold) return level;
     }
     return level;
   }

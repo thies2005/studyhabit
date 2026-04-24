@@ -18,13 +18,17 @@ class ThemeSettings extends _$ThemeSettings {
   static const _longBreakKey = 'pomodoro.longBreak';
   static const _longBreakEveryKey = 'pomodoro.longBreakEvery';
   static const _autoStartBreaksKey = 'pomodoro.autoStartBreaks';
+  static const _autoStartWorkKey = 'pomodoro.autoStartWork';
   static const _vibrationKey = 'pomodoro.vibration';
   static const _notificationsKey = 'notifications.enabled';
   static const _studyReminderEnabledKey = 'notifications.studyReminderEnabled';
   static const _studyReminderMinutesKey = 'notifications.studyReminderMinutes';
   static const _dailyReminderHourKey = 'notifications.dailyReminderHour';
   static const _dailyReminderMinuteKey = 'notifications.dailyReminderMinute';
+  static const _dailyReminderEnabledKey = 'notifications.dailyReminderEnabled';
   static const _gracePeriodKey = 'streak.gracePeriod';
+  static const _continuousFocusKey = 'pomodoro.continuousFocus';
+
 
   late SharedPreferences _prefs;
 
@@ -58,13 +62,16 @@ class ThemeSettings extends _$ThemeSettings {
     final longBreak = _prefs.getInt(_longBreakKey) ?? 15;
     final longBreakEvery = _prefs.getInt(_longBreakEveryKey) ?? 4;
     final autoStartBreaks = _prefs.getBool(_autoStartBreaksKey) ?? false;
+    final autoStartWork = _prefs.getBool(_autoStartWorkKey) ?? false;
     final vibration = _prefs.getBool(_vibrationKey) ?? true;
     final notifications = _prefs.getBool(_notificationsKey) ?? true;
     final studyReminderEnabled = _prefs.getBool(_studyReminderEnabledKey) ?? false;
     final studyReminderMinutes = _prefs.getInt(_studyReminderMinutesKey) ?? 30;
     final dailyReminderHour = _prefs.getInt(_dailyReminderHourKey) ?? 9;
     final dailyReminderMinute = _prefs.getInt(_dailyReminderMinuteKey) ?? 0;
+    final dailyReminderEnabled = _prefs.getBool(_dailyReminderEnabledKey) ?? false;
     final gracePeriod = _prefs.getDouble(_gracePeriodKey) ?? 2.0;
+    final continuousFocus = _prefs.getBool(_continuousFocusKey) ?? true;
 
     return ThemeSettingsState(
       seedColorIndex: seedColorIndex,
@@ -77,13 +84,16 @@ class ThemeSettings extends _$ThemeSettings {
       longBreak: longBreak,
       longBreakEvery: longBreakEvery,
       autoStartBreaks: autoStartBreaks,
+      autoStartWork: autoStartWork,
       vibration: vibration,
       notificationsEnabled: notifications,
       studyReminderEnabled: studyReminderEnabled,
       studyReminderMinutes: studyReminderMinutes,
       dailyReminderHour: dailyReminderHour,
       dailyReminderMinute: dailyReminderMinute,
+      dailyReminderEnabled: dailyReminderEnabled,
       gracePeriodHours: gracePeriod,
+      continuousFocus: continuousFocus,
     );
   }
 
@@ -197,6 +207,17 @@ class ThemeSettings extends _$ThemeSettings {
     await _prefs.setBool(_autoStartBreaksKey, enabled);
   }
 
+  Future<void> setAutoStartWork(bool enabled) async {
+    final current = state.asData?.value;
+    if (current == null) {
+      return;
+    }
+
+    final next = current.copyWith(autoStartWork: enabled);
+    state = AsyncValue.data(next);
+    await _prefs.setBool(_autoStartWorkKey, enabled);
+  }
+
   Future<void> setVibration(bool enabled) async {
     final current = state.asData?.value;
     if (current == null) {
@@ -266,6 +287,28 @@ class ThemeSettings extends _$ThemeSettings {
     await _prefs.setInt(_dailyReminderHourKey, hour);
     await _prefs.setInt(_dailyReminderMinuteKey, minute);
   }
+
+  Future<void> setDailyReminderEnabled(bool enabled) async {
+    final current = state.asData?.value;
+    if (current == null) {
+      return;
+    }
+
+    final next = current.copyWith(dailyReminderEnabled: enabled);
+    state = AsyncValue.data(next);
+    await _prefs.setBool(_dailyReminderEnabledKey, enabled);
+  }
+
+  Future<void> setContinuousFocus(bool enabled) async {
+    final current = state.asData?.value;
+    if (current == null) {
+      return;
+    }
+
+    final next = current.copyWith(continuousFocus: enabled);
+    state = AsyncValue.data(next);
+    await _prefs.setBool(_continuousFocusKey, enabled);
+  }
 }
 
 class ThemeSettingsState {
@@ -280,13 +323,16 @@ class ThemeSettingsState {
     required this.longBreak,
     required this.longBreakEvery,
     required this.autoStartBreaks,
+    required this.autoStartWork,
     required this.vibration,
     required this.notificationsEnabled,
     required this.studyReminderEnabled,
     required this.studyReminderMinutes,
     required this.dailyReminderHour,
     required this.dailyReminderMinute,
+    required this.dailyReminderEnabled,
     required this.gracePeriodHours,
+    required this.continuousFocus,
   });
 
   final int seedColorIndex;
@@ -299,13 +345,16 @@ class ThemeSettingsState {
   final int longBreak;
   final int longBreakEvery;
   final bool autoStartBreaks;
+  final bool autoStartWork;
   final bool vibration;
   final bool notificationsEnabled;
   final bool studyReminderEnabled;
   final int studyReminderMinutes;
   final int dailyReminderHour;
   final int dailyReminderMinute;
+  final bool dailyReminderEnabled;
   final double gracePeriodHours;
+  final bool continuousFocus;
 
   ThemeSettingsState copyWith({
     int? seedColorIndex,
@@ -318,13 +367,16 @@ class ThemeSettingsState {
     int? longBreak,
     int? longBreakEvery,
     bool? autoStartBreaks,
+    bool? autoStartWork,
     bool? vibration,
     bool? notificationsEnabled,
     bool? studyReminderEnabled,
     int? studyReminderMinutes,
     int? dailyReminderHour,
     int? dailyReminderMinute,
+    bool? dailyReminderEnabled,
     double? gracePeriodHours,
+    bool? continuousFocus,
   }) {
     return ThemeSettingsState(
       seedColorIndex: seedColorIndex ?? this.seedColorIndex,
@@ -337,13 +389,16 @@ class ThemeSettingsState {
       longBreak: longBreak ?? this.longBreak,
       longBreakEvery: longBreakEvery ?? this.longBreakEvery,
       autoStartBreaks: autoStartBreaks ?? this.autoStartBreaks,
+      autoStartWork: autoStartWork ?? this.autoStartWork,
       vibration: vibration ?? this.vibration,
       notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
       studyReminderEnabled: studyReminderEnabled ?? this.studyReminderEnabled,
       studyReminderMinutes: studyReminderMinutes ?? this.studyReminderMinutes,
       dailyReminderHour: dailyReminderHour ?? this.dailyReminderHour,
       dailyReminderMinute: dailyReminderMinute ?? this.dailyReminderMinute,
+      dailyReminderEnabled: dailyReminderEnabled ?? this.dailyReminderEnabled,
       gracePeriodHours: gracePeriodHours ?? this.gracePeriodHours,
+      continuousFocus: continuousFocus ?? this.continuousFocus,
     );
   }
 }

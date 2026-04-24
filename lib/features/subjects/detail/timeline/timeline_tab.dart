@@ -9,6 +9,7 @@ import '../../../../core/models/study_session.dart';
 import '../../../../core/providers/database_provider.dart';
 import '../../subject_providers.dart';
 import 'timeline_providers.dart';
+import 'edit_session_sheet.dart';
 
 class TimelineTab extends ConsumerWidget {
   const TimelineTab({super.key, required this.subjectId});
@@ -128,7 +129,6 @@ class _TimelineList extends StatelessWidget {
             },
           ),
         ),
-        const SliverToBoxAdapter(child: _EncouragementCard()),
         const SliverToBoxAdapter(child: SizedBox(height: 80)),
       ],
     );
@@ -192,58 +192,6 @@ class _DateSection extends StatelessWidget {
   }
 }
 
-class _EncouragementCard extends StatelessWidget {
-  const _EncouragementCard();
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
-      child: Container(
-        decoration: BoxDecoration(
-          color: colorScheme.onSurface.withValues(alpha: 0.65), // Dark grey appearance
-          borderRadius: BorderRadius.circular(16),
-        ),
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'Mastery in Sight',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: colorScheme.surface,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'You are 3 milestones away from completing the core curriculum. Keep up the consistent pace.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: colorScheme.surface.withValues(alpha: 0.8),
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 24),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: colorScheme.surface,
-                foregroundColor: colorScheme.onSurface,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                padding: const EdgeInsets.symmetric(vertical: 16),
-              ),
-              onPressed: () {
-                // Action to next lesson or pop up study session.
-              },
-              child: const Text('Next Lesson', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 class SessionCard extends ConsumerStatefulWidget {
   const SessionCard({
@@ -288,7 +236,7 @@ class _SessionCardState extends ConsumerState<SessionCard> {
         : '0m';
 
     return GestureDetector(
-      onLongPress: () => _showDeleteDialog(context, session.id),
+      onLongPress: () => _showActionMenu(context),
       child: Card(
         margin: EdgeInsets.zero,
         child: InkWell(
@@ -321,6 +269,39 @@ class _SessionCardState extends ConsumerState<SessionCard> {
         ),
       ),
     );
+  }
+
+  void _showActionMenu(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit),
+              title: const Text('Edit Session'),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                _showEditSheet(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete, color: Colors.red),
+              title: const Text('Delete Session', style: TextStyle(color: Colors.red)),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                _showDeleteDialog(context, widget.session.id);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showEditSheet(BuildContext context) {
+    EditSessionSheet.show(context, session: widget.session);
   }
 
   void _showDeleteDialog(BuildContext context, String sessionId) {

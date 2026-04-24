@@ -20,7 +20,6 @@ Stream<List<Project>> projectList(Ref ref) {
 
 @riverpod
 Future<Project?> lastOpenedProject(Ref ref) async {
-  await ref.watch(projectListProvider.future);
   final projects = ref.watch(projectListProvider).value ?? [];
   final active = projects.where((p) => !p.isArchived).toList();
   if (active.isEmpty) return null;

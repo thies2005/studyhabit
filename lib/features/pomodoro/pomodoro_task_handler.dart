@@ -8,44 +8,75 @@ void startCallback() {
 }
 
 class PomodoroTaskHandler extends TaskHandler {
-  int _remaining = 0;
+  DateTime? _startTimestamp;
+  int _pausedDurationSeconds = 0;
+  int _totalSeconds = 0;
+  bool _isRunning = false;
+  int _lastRemaining = 0;
+  bool _phaseCompleteSent = false;
 
   @override
   Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
-    // Use FlutterForegroundTask.getData for cross-isolate data
-    final savedData = await FlutterForegroundTask.getData(key: 'remaining');
-    if (savedData is int) {
-      _remaining = savedData;
+    final startTime = await FlutterForegroundTask.getData<int>(key: 'startTimestamp');
+    if (startTime != null) {
+      _startTimestamp = DateTime.fromMillisecondsSinceEpoch(startTime);
     }
-    if (_remaining <= 0) _remaining = 0;
+    _pausedDurationSeconds = await FlutterForegroundTask.getData<int>(key: 'pausedDurationSeconds') ?? 0;
+    _totalSeconds = await FlutterForegroundTask.getData<int>(key: 'totalSeconds') ?? 0;
+    _isRunning = await FlutterForegroundTask.getData<bool>(key: 'isRunning') ?? false;
   }
 
   @override
   void onRepeatEvent(DateTime timestamp) {
-    if (_remaining > 0) {
-      _remaining--;
-      FlutterForegroundTask.updateService(
-        notificationTitle: _formatNotifTitle(),
-        notificationText: '${_formatTime(_remaining)} remaining',
-      );
-      FlutterForegroundTask.sendDataToMain(_remaining);
-      // Persist remaining time for isolate recovery
-      FlutterForegroundTask.saveData(key: 'remaining', value: _remaining);
+    if (_isRunning && _startTimestamp != null) {
+      final now = DateTime.now();
+      final actualElapsedSeconds = now.difference(_startTimestamp!).inSeconds - _pausedDurationSeconds;
+      final remaining = (_totalSeconds - actualElapsedSeconds).clamp(0, _totalSeconds);
+
+      if (remaining != _lastRemaining) {
+        _lastRemaining = remaining;
+        FlutterForegroundTask.updateService(
+          notificationTitle: _formatNotifTitle(remaining),
+          notificationText: '${_formatTime(remaining)} remaining',
+        );
+        FlutterForegroundTask.sendDataToMain(remaining);
+      }
+
+      if (remaining <= 0 && !_phaseCompleteSent) {
+        _phaseCompleteSent = true;
+        FlutterForegroundTask.sendDataToMain('PHASE_COMPLETE');
+      }
     }
-    if (_remaining <= 0) {
-      FlutterForegroundTask.sendDataToMain('PHASE_COMPLETE');
+  }
+
+  @override
+  void onReceiveData(Object data) {
+    if (data is Map<String, dynamic>) {
+      // Reset phase complete flag when receiving new state (phase changed)
+      _phaseCompleteSent = false;
+      
+      if (data.containsKey('startTimestamp')) {
+        final val = data['startTimestamp'];
+        _startTimestamp = val != null ? DateTime.fromMillisecondsSinceEpoch(val as int) : null;
+        FlutterForegroundTask.saveData(key: 'startTimestamp', value: val);
+      }
+      if (data.containsKey('pausedDurationSeconds')) {
+        _pausedDurationSeconds = data['pausedDurationSeconds'] as int;
+        FlutterForegroundTask.saveData(key: 'pausedDurationSeconds', value: _pausedDurationSeconds);
+      }
+      if (data.containsKey('totalSeconds')) {
+        _totalSeconds = data['totalSeconds'] as int;
+        FlutterForegroundTask.saveData(key: 'totalSeconds', value: _totalSeconds);
+      }
+      if (data.containsKey('isRunning')) {
+        _isRunning = data['isRunning'] as bool;
+        FlutterForegroundTask.saveData(key: 'isRunning', value: _isRunning);
+      }
     }
   }
 
   @override
   Future<void> onDestroy(DateTime timestamp) async {}
-
-  @override
-  void onReceiveData(Object data) {
-    if (data is int) {
-      _remaining = data;
-    }
-  }
 
   @override
   void onNotificationButtonPressed(String id) {}
@@ -56,8 +87,8 @@ class PomodoroTaskHandler extends TaskHandler {
   @override
   void onNotificationDismissed() {}
 
-  String _formatNotifTitle() {
-    if (_remaining <= 0) return 'Session complete!';
+  String _formatNotifTitle(int remaining) {
+    if (remaining <= 0) return 'Session complete!';
     return 'Study Timer';
   }
 

@@ -7,7 +7,7 @@ import 'xp_service.dart';
 part 'streak_service.g.dart';
 
 class StreakService {
-  static const _graceWindowKey = 'streak.graceWindowHours';
+  static const _graceWindowKey = 'streak.gracePeriod';
   static const _lastFreezeUseKey = 'streak.lastFreezeUseDate';
 
   Future<void> recordStudyDay(Ref ref) async {
@@ -38,8 +38,20 @@ class StreakService {
         // Already studied today — no change
         newStreak = stats.currentStreak;
       } else if (daysDiff == 1) {
-        // Consecutive day — increment streak
-        newStreak = stats.currentStreak + 1;
+        // Check grace window: if still within grace hours past midnight, treat as same day
+        final lastStudyDayEnd = DateTime(
+          lastStudyDate.year,
+          lastStudyDate.month,
+          lastStudyDate.day,
+        ).add(const Duration(hours: 24)).add(Duration(hours: graceWindowHours.toInt()));
+
+        if (now.isBefore(lastStudyDayEnd)) {
+          // Still in grace window — treat as consecutive study day
+          newStreak = stats.currentStreak;
+        } else {
+          // Past grace window — new consecutive day
+          newStreak = stats.currentStreak + 1;
+        }
       } else if (daysDiff == 2 && stats.freezeTokens > 0) {
         // Check freeze token
         final lastFreezeUseStr = prefs.getString(_lastFreezeUseKey);
@@ -64,18 +76,8 @@ class StreakService {
           newStreak = 1;
         }
       } else {
-        // Grace window check: if lastStudyDate was yesterday and we're within
-        // graceWindowHours past midnight, treat as consecutive
-        final lastStudyWithGrace = stats.lastStudyDate!.add(
-          Duration(hours: graceWindowHours.toInt()),
-        );
-        final nowIsInGraceWindow = now.isBefore(lastStudyWithGrace);
-
-        if (nowIsInGraceWindow) {
-          newStreak = stats.currentStreak + 1;
-        } else {
-          newStreak = 1;
-        }
+        // Streak broken
+        newStreak = 1;
       }
     }
 

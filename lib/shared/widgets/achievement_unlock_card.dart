@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/models/achievement.dart';
 
+import '../../features/achievements/achievements_metadata.dart';
+
 class AchievementUnlockCard extends StatefulWidget {
   const AchievementUnlockCard({
     super.key,
@@ -72,10 +74,10 @@ class _AchievementUnlockCardState extends State<AchievementUnlockCard>
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final icon = achievementIcons[widget.achievement.key] ?? Icons.emoji_events;
-    final name =
-        achievementNames[widget.achievement.key] ?? widget.achievement.key;
-    final description = achievementDescriptions[widget.achievement.key] ?? '';
+    final meta = achievementMetadataMap[widget.achievement.key];
+    final icon = meta?.icon ?? Icons.emoji_events;
+    final name = meta?.name ?? widget.achievement.key;
+    final description = meta?.description ?? '';
 
     return Stack(
       children: [
@@ -161,57 +163,3 @@ class _AchievementUnlockCardState extends State<AchievementUnlockCard>
     );
   }
 }
-
-const achievementIcons = <String, IconData>{
-  'streak_3': Icons.local_fire_department,
-  'streak_7': Icons.whatshot,
-  'streak_30': Icons.bolt,
-  'streak_100': Icons.military_tech,
-  'pomodoro_10': Icons.timer,
-  'pomodoro_100': Icons.alarm_on,
-  'pomodoro_500': Icons.av_timer,
-  'hours_10': Icons.schedule,
-  'hours_100': Icons.history_edu,
-  'subject_5h': Icons.auto_stories,
-  'subject_10h': Icons.menu_book,
-  'first_pdf': Icons.picture_as_pdf,
-  'confidence_5': Icons.star,
-  'skill_advanced': Icons.trending_up,
-  'all_badges': Icons.emoji_events,
-};
-
-const achievementNames = <String, String>{
-  'streak_3': '3-Day Streak',
-  'streak_7': '7-Day Streak',
-  'streak_30': '30-Day Streak',
-  'streak_100': '100-Day Streak',
-  'pomodoro_10': '10 Pomodoros',
-  'pomodoro_100': '100 Pomodoros',
-  'pomodoro_500': '500 Pomodoros',
-  'hours_10': '10 Hours',
-  'hours_100': '100 Hours',
-  'subject_5h': '5h Subject',
-  'subject_10h': '10h Subject',
-  'first_pdf': 'First PDF',
-  'confidence_5': 'Confident',
-  'skill_advanced': 'Advanced Skill',
-  'all_badges': 'All Badges',
-};
-
-const achievementDescriptions = <String, String>{
-  'streak_3': 'Study for 3 days in a row',
-  'streak_7': 'Maintain a 7-day study streak',
-  'streak_30': 'Keep studying for 30 days straight',
-  'streak_100': 'An incredible 100-day streak',
-  'pomodoro_10': 'Complete 10 Pomodoro sessions',
-  'pomodoro_100': 'Complete 100 Pomodoro sessions',
-  'pomodoro_500': 'Complete 500 Pomodoro sessions',
-  'hours_10': 'Accumulate 10 hours of study time',
-  'hours_100': 'Accumulate 100 hours of study time',
-  'subject_5h': 'Study a subject for 5+ hours',
-  'subject_10h': 'Study a subject for 10+ hours',
-  'first_pdf': 'Add your first PDF source',
-  'confidence_5': 'Rate a session with 5 stars',
-  'skill_advanced': 'Reach Advanced skill level',
-  'all_badges': 'Unlock all other achievements',
-};

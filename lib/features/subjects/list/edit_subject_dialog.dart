@@ -28,7 +28,7 @@ class _EditSubjectDialogState extends ConsumerState<EditSubjectDialog> {
     _descController = TextEditingController(text: widget.subject.description ?? '');
     
     _selectedColorIndex = AppTheme.presetSeeds.indexWhere(
-      (c) => c.value == widget.subject.colorValue,
+      (c) => c.toARGB32() == widget.subject.colorValue,
     );
     if (_selectedColorIndex < 0) _selectedColorIndex = 0;
 
@@ -52,7 +52,7 @@ class _EditSubjectDialogState extends ConsumerState<EditSubjectDialog> {
     final updated = widget.subject.copyWith(
       name: name,
       description: desc.isEmpty ? null : desc,
-      colorValue: AppTheme.presetSeeds[_selectedColorIndex].value,
+      colorValue: AppTheme.presetSeeds[_selectedColorIndex].toARGB32(),
       defaultDurationMinutes: _workDuration.toInt(),
       defaultBreakMinutes: _breakDuration.toInt(),
     );

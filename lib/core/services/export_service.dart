@@ -13,6 +13,7 @@ import '../models/skill_label.dart';
 import '../models/source.dart';
 import '../models/study_session.dart' as session;
 import '../models/subject.dart';
+import '../models/subject_milestone.dart';
 import '../models/topic.dart';
 import '../models/user_stats.dart';
 
@@ -87,6 +88,7 @@ class ExportSubject {
     required this.sessions,
     required this.sources,
     required this.skillLabels,
+    required this.milestones,
   });
 
   final Subject subject;
@@ -95,6 +97,7 @@ class ExportSubject {
   final List<session.StudySession> sessions;
   final List<Source> sources;
   final List<SkillLabel> skillLabels;
+  final List<SubjectMilestone> milestones;
 
   Map<String, dynamic> toJson() {
     return {
@@ -104,6 +107,7 @@ class ExportSubject {
       'sessions': sessions.map((s) => s.toJson()).toList(),
       'sources': sources.map((s) => s.toJson()).toList(),
       'skillLabels': skillLabels.map((l) => l.toJson()).toList(),
+      'milestones': milestones.map((m) => m.toJson()).toList(),
     };
   }
 
@@ -125,6 +129,9 @@ class ExportSubject {
       skillLabels: (json['skillLabels'] as List)
           .map((l) => SkillLabel.fromJson(l as Map<String, dynamic>))
           .toList(),
+      milestones: (json['milestones'] as List?)
+          ?.map((m) => SubjectMilestone.fromJson(m as Map<String, dynamic>))
+          .toList() ?? [],
     );
   }
 }
@@ -147,6 +154,7 @@ class ExportService {
       final sessionRows = await _db.select(_db.studySessions).get();
       final sourceRows = await _db.select(_db.sources).get();
       final skillLabelRows = await _db.select(_db.skillLabels).get();
+      final milestoneRows = await _db.select(_db.subjectMilestones).get();
       final achievementRows = await _db.select(_db.achievements).get();
       final statsRow = await _db.select(_db.userStatsTable).getSingleOrNull();
 
@@ -161,6 +169,9 @@ class ExportService {
       final sourceModels = sourceRows.map((row) => mapSource(row)).toList();
       final skillLabelModels = skillLabelRows
           .map((row) => mapSkillLabel(row))
+          .toList();
+      final milestoneModels = milestoneRows
+          .map((row) => mapSubjectMilestone(row))
           .toList();
       final achievementModels = achievementRows
           .map((row) => mapAchievement(row))
@@ -191,6 +202,9 @@ class ExportService {
           final subjectSkillLabels = skillLabelModels
               .where((l) => l.subjectId == subject.id)
               .toList();
+          final subjectMilestones = milestoneModels
+              .where((m) => m.subjectId == subject.id)
+              .toList();
 
           exportSubjects.add(
             ExportSubject(
@@ -200,6 +214,7 @@ class ExportService {
               sessions: subjectSessions,
               sources: subjectSources,
               skillLabels: subjectSkillLabels,
+              milestones: subjectMilestones,
             ),
           );
         }

@@ -50,6 +50,21 @@ class SourceTypeConverter extends TypeConverter<SourceType, String> {
   String toSql(SourceType value) => value.name;
 }
 
+class CompletenessModeConverter extends TypeConverter<CompletenessMode, String> {
+  const CompletenessModeConverter();
+
+  @override
+  CompletenessMode fromSql(String fromDb) {
+    return CompletenessMode.values.firstWhere(
+      (value) => value.name == fromDb,
+      orElse: () => CompletenessMode.none,
+    );
+  }
+
+  @override
+  String toSql(CompletenessMode value) => value.name;
+}
+
 @DataClassName('ProjectRow')
 class Projects extends Table {
   TextColumn get id => text()();
@@ -107,6 +122,14 @@ class Subjects extends Table {
   IntColumn get xpTotal => integer().withDefault(const Constant(0))();
 
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+
+  TextColumn get completenessMode => text()
+      .map(const CompletenessModeConverter())
+      .withDefault(const Constant('none'))();
+
+  IntColumn get targetHours => integer().nullable()();
+
+  IntColumn get targetWeeklyHours => integer().nullable()();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -173,6 +196,8 @@ class StudySessions extends Table {
   IntColumn get startPage => integer().nullable()();
 
   IntColumn get endPage => integer().nullable()();
+
+  BoolColumn get isFreeTimer => boolean().withDefault(const Constant(false))();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -280,6 +305,24 @@ class PendingSyncOps extends Table {
   Set<Column<Object>> get primaryKey => {id};
 }
 
+@DataClassName('SubjectMilestoneRow')
+class SubjectMilestones extends Table {
+  TextColumn get id => text()();
+
+  TextColumn get subjectId => text().references(Subjects, #id)();
+
+  TextColumn get title => text()();
+
+  BoolColumn get isCompleted => boolean().withDefault(const Constant(false))();
+
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+
+  DateTimeColumn get completedAt => dateTime().nullable()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
 @DriftDatabase(
   tables: [
     Projects,
@@ -292,6 +335,7 @@ class PendingSyncOps extends Table {
     Achievements,
     UserStatsTable,
     PendingSyncOps,
+    SubjectMilestones,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -302,7 +346,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration {
@@ -325,6 +369,17 @@ class AppDatabase extends _$AppDatabase {
           await m.addColumn(projects, projects.defaultLongBreakDuration);
           await m.addColumn(projects, projects.defaultLongBreakEvery);
           await m.addColumn(projects, projects.studyReminderMinutes);
+        }
+        if (from < 5) {
+          await m.addColumn(studySessions, studySessions.isFreeTimer);
+        }
+        if (from < 6) {
+          await m.addColumn(subjects, subjects.completenessMode);
+          await m.addColumn(subjects, subjects.targetHours);
+          await m.createTable(subjectMilestones);
+        }
+        if (from < 7) {
+          await m.addColumn(subjects, subjects.targetWeeklyHours);
         }
       },
     );

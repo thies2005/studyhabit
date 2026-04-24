@@ -14,3 +14,6 @@ enum TimerPhase { idle, work, shortBreak, longBreak }
 
 @JsonEnum(fieldRename: FieldRename.snake)
 enum ImportMode { merge, replace }
+
+@JsonEnum(fieldRename: FieldRename.snake)
+enum CompletenessMode { none, hoursGoal, milestones, weeklyHoursGoal }

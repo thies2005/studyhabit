@@ -18,6 +18,11 @@ class SessionDao {
     return _db.into(_db.studySessions).insert(companion);
   }
 
+  Future<StudySessionRow?> getById(String id) {
+    return (_db.select(_db.studySessions)..where((table) => table.id.equals(id)))
+        .getSingleOrNull();
+  }
+
   Future<void> update(StudySessionRow row) {
     return _db.update(_db.studySessions).replace(row);
   }

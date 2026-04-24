@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/achievement.dart';
 import 'achievements_providers.dart';
-import '../../shared/widgets/achievement_unlock_card.dart';
+
+import 'achievements_metadata.dart';
 
 class AchievementsScreen extends ConsumerWidget {
   const AchievementsScreen({super.key});
@@ -11,7 +12,7 @@ class AchievementsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final overview = ref.watch(achievementsOverviewProvider);
-    final achievements = ref.watch(achievementListProvider);
+    final achievementsAsync = ref.watch(achievementListProvider);
 
     return overview.when(
       loading: () =>
@@ -27,22 +28,62 @@ class AchievementsScreen extends ConsumerWidget {
                 child: _LevelCard(overview: overviewData),
               ),
             ),
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              sliver: SliverToBoxAdapter(
-                child: achievements.when(
-                  loading: () => const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(32),
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
+            achievementsAsync.when(
+              loading: () => const SliverToBoxAdapter(
+                child: Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(32),
+                    child: CircularProgressIndicator(strokeWidth: 2),
                   ),
-                  error: (e, _) => Center(child: Text('Error: $e')),
-                  data: (data) => _BadgeGrid(achievements: data),
                 ),
               ),
+              error: (e, _) => SliverToBoxAdapter(child: Center(child: Text('Error: $e'))),
+              data: (achievements) {
+                // Group achievements by category
+                final categories = achievementMetadataMap.values
+                    .map((m) => m.category)
+                    .toSet()
+                    .toList()
+                  ..sort();
+
+                return SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final category = categories[index];
+                      final categoryAchievements = achievements.where((a) {
+                        final meta = achievementMetadataMap[a.key];
+                        return meta?.category == category;
+                      }).toList();
+
+                      if (categoryAchievements.isEmpty) return const SizedBox.shrink();
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
+                            child: Text(
+                              category.toUpperCase(),
+                              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                                color: Theme.of(context).colorScheme.primary,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1.2,
+                              ),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: _BadgeGrid(achievements: categoryAchievements),
+                          ),
+                        ],
+                      );
+                    },
+                    childCount: categories.length,
+                  ),
+                );
+              },
             ),
-            const SliverPadding(padding: EdgeInsets.only(bottom: 32)),
+            const SliverPadding(padding: EdgeInsets.only(bottom: 48)),
           ],
         ),
       ),
@@ -60,16 +101,18 @@ class _LevelCard extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Card(
+      elevation: 0,
+      color: colorScheme.surfaceContainer,
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              colorScheme.primaryContainer,
-              colorScheme.secondaryContainer,
+              colorScheme.primaryContainer.withValues(alpha: 0.5),
+              colorScheme.secondaryContainer.withValues(alpha: 0.5),
             ],
           ),
         ),
@@ -151,15 +194,25 @@ class _BadgeGrid extends StatelessWidget {
       itemCount: achievements.length,
       itemBuilder: (context, index) {
         final achievement = achievements[index];
-        final icon = achievementIcons[achievement.key] ?? Icons.emoji_events;
-        final name = achievementNames[achievement.key] ?? achievement.key;
+        final meta = achievementMetadataMap[achievement.key];
+        final icon = meta?.icon ?? Icons.emoji_events;
+        final name = meta?.name ?? achievement.key;
         final isUnlocked = achievement.unlockedAt != null;
 
         return GestureDetector(
           onTap: () => _showDetailSheet(context, achievement),
           child: Card(
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(
+                color: isUnlocked
+                    ? colorScheme.primary.withValues(alpha: 0.2)
+                    : Colors.transparent,
+              ),
+            ),
             color: isUnlocked
-                ? colorScheme.surfaceContainerLow
+                ? colorScheme.primaryContainer.withValues(alpha: 0.2)
                 : colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
             child: Padding(
               padding: const EdgeInsets.all(12),
@@ -167,59 +220,37 @@ class _BadgeGrid extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Expanded(
-                    child: isUnlocked
-                        ? Icon(icon, size: 36, color: colorScheme.primary)
-                        : ColorFiltered(
-                            colorFilter: const ColorFilter.matrix(<double>[
-                              0.2126,
-                              0.7152,
-                              0.0722,
-                              0,
-                              0,
-                              0.2126,
-                              0.7152,
-                              0.0722,
-                              0,
-                              0,
-                              0.2126,
-                              0.7152,
-                              0.0722,
-                              0,
-                              0,
-                              0,
-                              0,
-                              0,
-                              1,
-                              0,
-                            ]),
-                            child: Icon(
-                              icon,
-                              size: 36,
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                          ),
+                    child: Icon(
+                      icon,
+                      size: 32,
+                      color: isUnlocked
+                          ? colorScheme.primary
+                          : colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     name,
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
                       fontWeight: FontWeight.w600,
+                      fontSize: 10,
                       color: isUnlocked
                           ? colorScheme.onSurface
                           : colorScheme.onSurfaceVariant,
                     ),
                     textAlign: TextAlign.center,
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
                   if (!isUnlocked)
                     ClipRRect(
                       borderRadius: BorderRadius.circular(4),
                       child: LinearProgressIndicator(
                         value: achievement.progress.clamp(0.0, 1.0),
-                        minHeight: 4,
+                        minHeight: 3,
                         backgroundColor: colorScheme.surfaceContainerHighest,
+                        valueColor: AlwaysStoppedAnimation(colorScheme.primary.withValues(alpha: 0.5)),
                       ),
                     ),
                 ],
@@ -231,91 +262,102 @@ class _BadgeGrid extends StatelessWidget {
     );
   }
 
-  void _showDetailSheet(BuildContext context, dynamic achievement) {
+  void _showDetailSheet(BuildContext context, Achievement achievement) {
     final colorScheme = Theme.of(context).colorScheme;
-    final icon = achievementIcons[achievement.key] ?? Icons.emoji_events;
-    final name = achievementNames[achievement.key] ?? achievement.key;
-    final description = achievementDescriptions[achievement.key] ?? '';
+    final meta = achievementMetadataMap[achievement.key];
+    final icon = meta?.icon ?? Icons.emoji_events;
+    final name = meta?.name ?? achievement.key;
+    final description = meta?.description ?? '';
     final isUnlocked = achievement.unlockedAt != null;
 
     showModalBottomSheet(
       context: context,
+      showDragHandle: true,
       builder: (context) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const SizedBox(height: 8),
               Container(
-                width: 64,
-                height: 64,
+                width: 72,
+                height: 72,
                 decoration: BoxDecoration(
                   color: isUnlocked
                       ? colorScheme.primaryContainer
                       : colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(20),
                 ),
                 child: Icon(
                   icon,
-                  size: 36,
+                  size: 40,
                   color: isUnlocked
                       ? colorScheme.primary
                       : colorScheme.onSurfaceVariant,
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
               Text(
                 name,
                 style: Theme.of(
                   context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
               ),
-              if (description.isNotEmpty) ...[
-                const SizedBox(height: 4),
+              const SizedBox(height: 8),
+              if (description.isNotEmpty)
                 Text(
                   description,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                   ),
                   textAlign: TextAlign.center,
                 ),
-              ],
-              const SizedBox(height: 16),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: LinearProgressIndicator(
-                  value: achievement.progress.clamp(0.0, 1.0),
-                  minHeight: 8,
-                  backgroundColor: colorScheme.surfaceContainerHighest,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '${(achievement.progress * 100).toInt()}%',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-              if (isUnlocked) ...[
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.check_circle,
-                      size: 16,
-                      color: colorScheme.primary,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Unlocked',
-                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: colorScheme.primary,
-                        fontWeight: FontWeight.w600,
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: LinearProgressIndicator(
+                        value: achievement.progress.clamp(0.0, 1.0),
+                        minHeight: 10,
+                        backgroundColor: colorScheme.surfaceContainerHighest,
                       ),
                     ),
-                  ],
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    '${(achievement.progress * 100).toInt()}%',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              if (isUnlocked) ...[
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: colorScheme.primary.withValues(alpha: 0.2)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.check_circle, size: 16, color: colorScheme.primary),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Unlocked',
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          color: colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
               const SizedBox(height: 16),

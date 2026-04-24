@@ -1,44 +1,36 @@
 import 'package:flutter/material.dart';
 
-class SessionReviewSheet extends StatefulWidget {
-  const SessionReviewSheet({
+class FreeTimerReviewSheet extends StatefulWidget {
+  const FreeTimerReviewSheet({
     super.key,
     required this.durationMinutes,
-    required this.pomodorosCompleted,
-    required this.baseXpEarned,
     required this.onSave,
   });
 
   final int durationMinutes;
-  final int pomodorosCompleted;
-  final int baseXpEarned;
   final Future<void> Function(int? confidence, String? notes) onSave;
 
   static Future<void> show(
     BuildContext context, {
     required int durationMinutes,
-    required int pomodorosCompleted,
-    required int baseXpEarned,
     required Future<void> Function(int? confidence, String? notes) onSave,
   }) {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       isDismissible: false,
-      builder: (_) => SessionReviewSheet(
+      builder: (_) => FreeTimerReviewSheet(
         durationMinutes: durationMinutes,
-        pomodorosCompleted: pomodorosCompleted,
-        baseXpEarned: baseXpEarned,
         onSave: onSave,
       ),
     );
   }
 
   @override
-  State<SessionReviewSheet> createState() => _SessionReviewSheetState();
+  State<FreeTimerReviewSheet> createState() => _FreeTimerReviewSheetState();
 }
 
-class _SessionReviewSheetState extends State<SessionReviewSheet> {
+class _FreeTimerReviewSheetState extends State<FreeTimerReviewSheet> {
   int? _confidence;
   final _notesController = TextEditingController();
   bool _saved = false;
@@ -52,10 +44,7 @@ class _SessionReviewSheetState extends State<SessionReviewSheet> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    // Use the actual XP earned (gated by 80% rule) passed from the notifier.
-    // Confidence XP (+10) is shown conditionally if a rating is set.
-    final confidenceXp = _confidence != null ? 10 : 0;
-    final xpEarned = widget.baseXpEarned + confidenceXp;
+    final xpEarned = _confidence != null ? 10 : 0;
 
     return Padding(
       padding: EdgeInsets.only(
@@ -74,16 +63,13 @@ class _SessionReviewSheetState extends State<SessionReviewSheet> {
             ),
             const SizedBox(height: 24),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                _StatChip(
-                  icon: Icons.timer,
-                  label: '${widget.durationMinutes} min',
-                ),
-                _StatChip(
-                  icon: Icons.circle,
-                  label:
-                      '${widget.pomodorosCompleted} pomodoro${widget.pomodorosCompleted != 1 ? 's' : ''}',
+                Icon(Icons.timer, size: 20, color: colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  '${widget.durationMinutes} minutes logged',
+                  style: Theme.of(context).textTheme.bodyLarge,
                 ),
               ],
             ),
@@ -126,7 +112,7 @@ class _SessionReviewSheetState extends State<SessionReviewSheet> {
               maxLines: 3,
             ),
             const SizedBox(height: 24),
-            AnimatedCounter(
+            _AnimatedCounter(
               value: xpEarned,
               prefix: '+',
               suffix: ' XP',
@@ -161,46 +147,24 @@ class _SessionReviewSheetState extends State<SessionReviewSheet> {
   }
 }
 
-class _StatChip extends StatelessWidget {
-  const _StatChip({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
-        const SizedBox(width: 6),
-        Text(label, style: Theme.of(context).textTheme.bodyLarge),
-      ],
-    );
-  }
-}
-
-class AnimatedCounter extends StatelessWidget {
-  const AnimatedCounter({
-    super.key,
+class _AnimatedCounter extends StatelessWidget {
+  const _AnimatedCounter({
     required this.value,
     this.prefix = '',
     this.suffix = '',
     this.style,
-    this.duration = const Duration(milliseconds: 800),
   });
 
   final int value;
   final String prefix;
   final String suffix;
   final TextStyle? style;
-  final Duration duration;
 
   @override
   Widget build(BuildContext context) {
     return TweenAnimationBuilder<int>(
       tween: IntTween(begin: 0, end: value),
-      duration: duration,
+      duration: const Duration(milliseconds: 800),
       curve: Curves.easeOut,
       builder: (context, animatedValue, child) {
         return Text('$prefix$animatedValue$suffix', style: style);

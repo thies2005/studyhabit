@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/models/enums.dart';
 import '../../../core/models/project.dart';
 import '../../../core/models/subject.dart';
 import '../subject_providers.dart';
 import '../../projects/project_providers.dart';
 import 'create_subject_sheet.dart';
+import 'completeness_mode_dialog.dart';
+import '../detail/milestones/milestone_editor_sheet.dart';
 
 class SubjectsScreen extends ConsumerWidget {
   const SubjectsScreen({super.key});
@@ -218,6 +221,9 @@ class SubjectCard extends ConsumerWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                  _PopupMenu(
+                    subject: subject,
+                  ),
                 ],
               ),
               const SizedBox(height: 8),
@@ -236,33 +242,34 @@ class SubjectCard extends ConsumerWidget {
                 loading: () => const SizedBox.shrink(),
                 error: (_, __) => const SizedBox.shrink(),
                 data: (stats) {
-                  final completionPercent = stats.totalHours > 0
-                      ? ((stats.totalHours / 100) * 100).clamp(0.0, 100.0)
-                      : 0.0;
-
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            '${completionPercent.toStringAsFixed(0)}% COMPLETE',
-                            style: Theme.of(context).textTheme.labelSmall
-                                ?.copyWith(
-                                  color: colorScheme.primary,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      LinearProgressIndicator(
-                        value: completionPercent / 100,
-                        minHeight: 4,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                      const SizedBox(height: 12),
+                      if (stats.completenessPercent != null) ...[
+                        Row(
+                          children: [
+                            Text(
+                              '${stats.completenessLabel} — '
+                              '${(stats.completenessPercent! * 100).toStringAsFixed(0)}%',
+                              style: Theme.of(context).textTheme.labelSmall
+                                  ?.copyWith(
+                                    color: stats.completenessPercent! >= 1.0
+                                        ? colorScheme.tertiary
+                                        : colorScheme.primary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        LinearProgressIndicator(
+                          value: stats.completenessPercent!.clamp(0.0, 1.0),
+                          minHeight: 4,
+                          borderRadius: BorderRadius.circular(2),
+                          backgroundColor: colorScheme.surfaceContainerHighest,
+                        ),
+                        const SizedBox(height: 12),
+                      ],
                       Row(
                         children: [
                           Icon(
@@ -272,7 +279,7 @@ class SubjectCard extends ConsumerWidget {
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            '${stats.totalHours.toStringAsFixed(1)}h/week',
+                            '${stats.totalHours.toStringAsFixed(1)}h total',
                             style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(color: colorScheme.onSurfaceVariant),
                           ),
@@ -284,7 +291,7 @@ class SubjectCard extends ConsumerWidget {
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            '${stats.sessionCount} tasks',
+                            '${stats.sessionCount} sessions',
                             style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(color: colorScheme.onSurfaceVariant),
                           ),
@@ -297,6 +304,207 @@ class SubjectCard extends ConsumerWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _PopupMenu extends ConsumerWidget {
+  const _PopupMenu({required this.subject});
+
+  final Subject subject;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return PopupMenuButton<String>(
+      onSelected: (value) => _onSelect(context, ref, value),
+      itemBuilder: (context) => [
+        const PopupMenuItem(
+          value: 'set_mode',
+          child: Row(
+            children: [
+              Icon(Icons.track_changes, size: 20),
+              SizedBox(width: 12),
+              Text('Set Completeness Mode'),
+            ],
+          ),
+        ),
+        if (subject.completenessMode == CompletenessMode.milestones)
+          const PopupMenuItem(
+            value: 'edit_milestones',
+            child: Row(
+              children: [
+                Icon(Icons.checklist, size: 20),
+                SizedBox(width: 12),
+                Text('Edit Milestones'),
+              ],
+            ),
+          ),
+        if (subject.completenessMode == CompletenessMode.hoursGoal)
+          const PopupMenuItem(
+            value: 'set_hours',
+            child: Row(
+              children: [
+                Icon(Icons.hourglass_bottom, size: 20),
+                SizedBox(width: 12),
+                Text('Set Hours Target'),
+              ],
+            ),
+          ),
+        if (subject.completenessMode == CompletenessMode.weeklyHoursGoal)
+          const PopupMenuItem(
+            value: 'set_weekly_hours',
+            child: Row(
+              children: [
+                Icon(Icons.date_range, size: 20),
+                SizedBox(width: 12),
+                Text('Set Weekly Hours Target'),
+              ],
+            ),
+          ),
+        const PopupMenuItem(
+          value: 'delete',
+          child: Row(
+            children: [
+              Icon(Icons.delete_outline, size: 20),
+              SizedBox(width: 12),
+              Text('Delete Subject'),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _onSelect(BuildContext context, WidgetRef ref, String value) {
+    switch (value) {
+      case 'set_mode':
+        showDialog<void>(
+          context: context,
+          builder: (_) => CompletenessModeDialog(subject: subject),
+        );
+      case 'edit_milestones':
+        showModalBottomSheet<void>(
+          context: context,
+          isScrollControlled: true,
+          builder: (_) => MilestoneEditorSheet(subjectId: subject.id),
+        );
+      case 'set_hours':
+        _showSetHoursDialog(context, ref);
+      case 'set_weekly_hours':
+        _showSetWeeklyHoursDialog(context, ref);
+      case 'delete':
+        _confirmDelete(context, ref);
+    }
+  }
+
+  void _showSetHoursDialog(BuildContext context, WidgetRef ref) {
+    final controller = TextEditingController(
+      text: subject.targetHours?.toString() ?? '50',
+    );
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Set Hours Target'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: 'Target hours',
+            suffixText: 'h',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final hours = int.tryParse(controller.text);
+              if (hours != null && hours > 0) {
+                ref.read(subjectProvider.notifier).updateSubject(
+                      subject.copyWith(
+                        completenessMode: CompletenessMode.hoursGoal,
+                        targetHours: hours,
+                      ),
+                    );
+              }
+              Navigator.of(ctx).pop();
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSetWeeklyHoursDialog(BuildContext context, WidgetRef ref) {
+    final controller = TextEditingController(
+      text: subject.targetWeeklyHours?.toString() ?? '10',
+    );
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Set Weekly Hours Target'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: 'Hours per week',
+            suffixText: 'h/week',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final hours = int.tryParse(controller.text);
+              if (hours != null && hours > 0) {
+                ref.read(subjectProvider.notifier).updateSubject(
+                      subject.copyWith(
+                        completenessMode: CompletenessMode.weeklyHoursGoal,
+                        targetWeeklyHours: hours,
+                      ),
+                    );
+              }
+              Navigator.of(ctx).pop();
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDelete(BuildContext context, WidgetRef ref) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Subject'),
+        content: Text('Are you sure you want to delete "${subject.name}"? '
+            'This will also delete all sessions, milestones, and data for this subject.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            onPressed: () {
+              ref.read(subjectProvider.notifier).delete(subject.id);
+              Navigator.of(ctx).pop();
+            },
+            child: const Text('Delete'),
+          ),
+        ],
       ),
     );
   }

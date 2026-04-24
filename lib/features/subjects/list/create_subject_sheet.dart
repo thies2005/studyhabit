@@ -6,6 +6,7 @@ import '../../../core/providers/theme_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../projects/project_providers.dart';
 import '../subject_providers.dart';
+import '../detail/milestones/milestone_editor_sheet.dart';
 
 class CreateSubjectSheet extends ConsumerStatefulWidget {
   const CreateSubjectSheet({super.key});
@@ -17,19 +18,26 @@ class CreateSubjectSheet extends ConsumerStatefulWidget {
 class _CreateSubjectSheetState extends ConsumerState<CreateSubjectSheet> {
   final _nameController = TextEditingController();
   final _descController = TextEditingController();
+  final _hoursController = TextEditingController(text: '50');
+  final _weeklyHoursController = TextEditingController(text: '10');
   int _currentStep = 0;
   int _selectedColorIndex = 0;
   HierarchyMode _hierarchyMode = HierarchyMode.flat;
   double _workDuration = 25;
   double _breakDuration = 5;
   bool _useSettingsDefaults = true;
+  CompletenessMode _completenessMode = CompletenessMode.none;
+  double _targetHours = 50;
+  double _targetWeeklyHours = 10;
 
-  static const _totalSteps = 4;
+  static const _totalSteps = 5;
 
   @override
   void dispose() {
     _nameController.dispose();
     _descController.dispose();
+    _hoursController.dispose();
+    _weeklyHoursController.dispose();
     super.dispose();
   }
 
@@ -153,6 +161,7 @@ class _CreateSubjectSheetState extends ConsumerState<CreateSubjectSheet> {
       1 => true,
       2 => true,
       3 => true,
+      4 => true,
       _ => false,
     };
   }
@@ -163,6 +172,7 @@ class _CreateSubjectSheetState extends ConsumerState<CreateSubjectSheet> {
       1 => _buildColorStep(),
       2 => _buildHierarchyStep(),
       3 => _buildDurationStep(),
+      4 => _buildCompletenessStep(),
       _ => const SizedBox.shrink(),
     };
   }
@@ -395,18 +405,247 @@ class _CreateSubjectSheetState extends ConsumerState<CreateSubjectSheet> {
     );
   }
 
+  Widget _buildCompletenessStep() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 8),
+        Text('Completeness Tracking', style: theme.textTheme.titleMedium),
+        const SizedBox(height: 4),
+        Text(
+          'Choose how to track progress for this subject',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 16),
+        RadioGroup<CompletenessMode>(
+          groupValue: _completenessMode,
+          onChanged: (v) =>
+              setState(() => _completenessMode = v ?? _completenessMode),
+          child: Column(
+            children: CompletenessMode.values.map((mode) {
+              final isSelected = _completenessMode == mode;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: InkWell(
+                  onTap: () => setState(() => _completenessMode = mode),
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isSelected
+                            ? colorScheme.primary
+                            : colorScheme.outlineVariant.withValues(alpha: 0.5),
+                        width: isSelected ? 2 : 1,
+                      ),
+                      color: isSelected
+                          ? colorScheme.primaryContainer.withValues(alpha: 0.3)
+                          : null,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Radio<CompletenessMode>(value: mode),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _completenessLabel(mode),
+                                style: theme.textTheme.titleSmall,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 48),
+                          child: Text(
+                            _completenessDescription(mode),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        // Hours goal input when hoursGoal selected
+        if (_completenessMode == CompletenessMode.hoursGoal) ...[
+          const SizedBox(height: 16),
+          Text('Target Hours', style: theme.textTheme.titleSmall),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _hoursController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Hours',
+                    suffixText: 'h',
+                    border: OutlineInputBorder(),
+                  ),
+                  onChanged: (v) {
+                    final parsed = int.tryParse(v);
+                    if (parsed != null && parsed >= 5 && parsed <= 500) {
+                      setState(() => _targetHours = parsed.toDouble());
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${_targetHours.round()}h',
+                      style: theme.textTheme.labelMedium,
+                    ),
+                    Slider(
+                      value: _targetHours,
+                      min: 5,
+                      max: 500,
+                      divisions: 99,
+                      label: '${_targetHours.round()}h',
+                      onChanged: (v) {
+                        setState(() {
+                          _targetHours = v;
+                          _hoursController.text = v.round().toString();
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+        // Weekly hours goal input when weeklyHoursGoal selected
+        if (_completenessMode == CompletenessMode.weeklyHoursGoal) ...[
+          const SizedBox(height: 16),
+          Text('Weekly Hours Goal', style: theme.textTheme.titleSmall),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _weeklyHoursController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Hours / week',
+                    suffixText: 'h',
+                    border: OutlineInputBorder(),
+                  ),
+                  onChanged: (v) {
+                    final parsed = int.tryParse(v);
+                    if (parsed != null && parsed >= 1 && parsed <= 80) {
+                      setState(() => _targetWeeklyHours = parsed.toDouble());
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${_targetWeeklyHours.round()}h/week',
+                      style: theme.textTheme.labelMedium,
+                    ),
+                    Slider(
+                      value: _targetWeeklyHours,
+                      min: 1,
+                      max: 80,
+                      divisions: 79,
+                      label: '${_targetWeeklyHours.round()}h',
+                      onChanged: (v) {
+                        setState(() {
+                          _targetWeeklyHours = v;
+                          _weeklyHoursController.text = v.round().toString();
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+        // Milestones hint
+        if (_completenessMode == CompletenessMode.milestones)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: colorScheme.secondaryContainer.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: colorScheme.outlineVariant),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, size: 16, color: colorScheme.secondary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      "You'll add milestones after creating the subject.",
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSecondaryContainer,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  String _completenessLabel(CompletenessMode mode) => switch (mode) {
+        CompletenessMode.none => 'None',
+        CompletenessMode.hoursGoal => 'Hours Goal',
+        CompletenessMode.milestones => 'Milestones',
+        CompletenessMode.weeklyHoursGoal => 'Weekly Hours Goal',
+      };
+
+  String _completenessDescription(CompletenessMode mode) => switch (mode) {
+        CompletenessMode.none =>
+          'Just track hours and sessions normally',
+        CompletenessMode.hoursGoal =>
+          'Set a target hours and see progress toward it',
+        CompletenessMode.milestones =>
+          'Check off goals as you complete them',
+        CompletenessMode.weeklyHoursGoal =>
+          'Set a weekly study hours target to hit each week',
+      };
+
   String _hierarchyLabel(HierarchyMode mode) => switch (mode) {
-    HierarchyMode.flat => 'Flat',
-    HierarchyMode.twoLevel => 'Two-Level',
-    HierarchyMode.threeLevel => 'Three-Level',
-  };
+        HierarchyMode.flat => 'Flat',
+        HierarchyMode.twoLevel => 'Two-Level',
+        HierarchyMode.threeLevel => 'Three-Level',
+      };
 
   String _hierarchyDiagram(HierarchyMode mode) => switch (mode) {
-    HierarchyMode.flat => 'Subject \u2192 Sessions',
-    HierarchyMode.twoLevel => 'Subject \u2192 Topic \u2192 Sessions',
-    HierarchyMode.threeLevel =>
-      'Subject \u2192 Topic \u2192 Chapter \u2192 Sessions',
-  };
+        HierarchyMode.flat => 'Subject \u2192 Sessions',
+        HierarchyMode.twoLevel => 'Subject \u2192 Topic \u2192 Sessions',
+        HierarchyMode.threeLevel =>
+          'Subject \u2192 Topic \u2192 Chapter \u2192 Sessions',
+      };
 
   void _back() => setState(() => _currentStep--);
 
@@ -417,29 +656,53 @@ class _CreateSubjectSheetState extends ConsumerState<CreateSubjectSheet> {
   }
 
   Future<void> _createSubject() async {
-    final created = await ref.read(subjectProvider.notifier).create(
-      name: _nameController.text.trim(),
-      description: _descController.text.trim().isEmpty
-          ? null
-          : _descController.text.trim(),
-      colorValue: AppTheme.presetSeeds[_selectedColorIndex].toARGB32(),
-      mode: _hierarchyMode,
-      defaultDuration: _workDuration.round(),
-      defaultBreak: _breakDuration.round(),
-    );
+    // Capture navigator and messenger before async gap
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final errorColor = Theme.of(context).colorScheme.error;
+    final shouldOpenMilestones =
+        _completenessMode == CompletenessMode.milestones;
 
-    if (!mounted) return;
+    final newSubjectId = await ref.read(subjectProvider.notifier).create(
+          name: _nameController.text.trim(),
+          description: _descController.text.trim().isEmpty
+              ? null
+              : _descController.text.trim(),
+          colorValue: AppTheme.presetSeeds[_selectedColorIndex].toARGB32(),
+          mode: _hierarchyMode,
+          defaultDuration: _workDuration.round(),
+          defaultBreak: _breakDuration.round(),
+          completenessMode: _completenessMode,
+          targetHours: _completenessMode == CompletenessMode.hoursGoal
+              ? _targetHours.round()
+              : null,
+          targetWeeklyHours: _completenessMode == CompletenessMode.weeklyHoursGoal
+              ? _targetWeeklyHours.round()
+              : null,
+        );
 
-    if (!created) {
-      ScaffoldMessenger.of(context).showSnackBar(
+    if (newSubjectId == null) {
+      messenger.showSnackBar(
         SnackBar(
           content: const Text('Create or switch to a project first'),
-          backgroundColor: Theme.of(context).colorScheme.error,
+          backgroundColor: errorColor,
         ),
       );
       return;
     }
 
-    Navigator.of(context).pop();
+    navigator.pop();
+
+    // After pop, this widget is unmounted — use the navigator's context
+    // via a post-frame callback to open the milestone editor.
+    if (shouldOpenMilestones) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        showModalBottomSheet<void>(
+          context: navigator.context,
+          isScrollControlled: true,
+          builder: (_) => MilestoneEditorSheet(subjectId: newSubjectId),
+        );
+      });
+    }
   }
 }
