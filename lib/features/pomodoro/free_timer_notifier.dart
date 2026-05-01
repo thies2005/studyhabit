@@ -160,7 +160,7 @@ class FreeTimerNotifier extends _$FreeTimerNotifier {
     // Note: XP is handled by review sheet if confidence is given
     // We keep the state so the review sheet can access activeSessionId
     _persistence?.clearFreeTimer();
-    state = state.copyWith(isRunning: false);
+    state = state.copyWith(isRunning: false, activeSessionId: null);
     _stopForegroundService();
   }
 

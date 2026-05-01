@@ -23,7 +23,7 @@ class AchievementUnlockCard extends StatefulWidget {
     return showGeneralDialog<void>(
       context: context,
       barrierDismissible: false,
-      barrierColor: Colors.black.withValues(alpha: 0.3),
+      barrierColor: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.3),
       pageBuilder: (context, animation, secondaryAnimation) {
         return AchievementUnlockCard(achievement: achievement);
       },

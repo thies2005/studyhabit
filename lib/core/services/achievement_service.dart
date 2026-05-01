@@ -182,7 +182,7 @@ class AchievementService {
       for (final progress in checks.values) {
         if (progress >= 1.0) earnedCount++;
       }
-      checks['all_badges'] = (earnedCount / 65.0).clamp(0.0, 1.0);
+      checks['all_badges'] = (earnedCount / (checks.length - 1).toDouble()).clamp(0.0, 1.0);
 
       final newlyUnlocked = <AchievementUnlock>[];
 

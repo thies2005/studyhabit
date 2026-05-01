@@ -287,8 +287,8 @@ class _SessionCardState extends ConsumerState<SessionCard> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.delete, color: Colors.red),
-              title: const Text('Delete Session', style: TextStyle(color: Colors.red)),
+              leading: Icon(Icons.delete, color: Theme.of(context).colorScheme.error),
+              title: Text('Delete Session', style: TextStyle(color: Theme.of(context).colorScheme.error)),
               onTap: () {
                 Navigator.of(ctx).pop();
                 _showDeleteDialog(context, widget.session.id);

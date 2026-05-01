@@ -63,13 +63,13 @@ class _FreeTimerScreenState extends ConsumerState<FreeTimerScreen>
           child: Column(
             children: [
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'FREE TIMER SESSION',
                 style: TextStyle(
                   fontSize: 10,
                   letterSpacing: 2.0,
                   fontWeight: FontWeight.w600,
-                  color: Colors.grey,
+                  color: colorScheme.onSurfaceVariant,
                 ),
               ),
               const SizedBox(height: 8),
@@ -109,13 +109,13 @@ class _FreeTimerScreenState extends ConsumerState<FreeTimerScreen>
                               ),
                             ),
                             const SizedBox(height: 8),
-                            const Text(
+                            Text(
                               'ELAPSED',
                               style: TextStyle(
                                 fontSize: 10,
                                 letterSpacing: 3.0,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.grey,
+                                color: colorScheme.onSurfaceVariant,
                               ),
                             ),
                           ],
@@ -180,13 +180,13 @@ class _FreeTimerScreenState extends ConsumerState<FreeTimerScreen>
                 ),
               ),
               const SizedBox(height: 12),
-              const Text(
+              Text(
                 'STOP',
                 style: TextStyle(
                   fontSize: 10,
                   letterSpacing: 2.0,
                   fontWeight: FontWeight.w600,
-                  color: Colors.grey,
+                  color: colorScheme.onSurfaceVariant,
                 ),
               ),
             ],

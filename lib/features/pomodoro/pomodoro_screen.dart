@@ -108,13 +108,13 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
           child: Column(
             children: [
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'CURRENT SESSION',
                 style: TextStyle(
                   fontSize: 10,
                   letterSpacing: 2.0,
                   fontWeight: FontWeight.w600,
-                  color: Colors.grey,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
               const SizedBox(height: 8),
@@ -159,7 +159,7 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
                                 fontSize: 10,
                                 letterSpacing: 3.0,
                                 fontWeight: FontWeight.w600,
-                                color: pomodoroState.isOvertime ? colorScheme.secondary : Colors.grey,
+                                 color: pomodoroState.isOvertime ? colorScheme.secondary : colorScheme.onSurfaceVariant,
                               ),
                             ),
                           ],
@@ -238,13 +238,13 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'UP NEXT',
                 style: TextStyle(
                   fontSize: 10,
                   letterSpacing: 1.5,
                   fontWeight: FontWeight.w600,
-                  color: Colors.grey,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
               const SizedBox(height: 2),
@@ -327,13 +327,13 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
                 ),
               ),
               const SizedBox(height: 12),
-              const Text(
+              Text(
                 'STOP',
                 style: TextStyle(
                   fontSize: 10,
                   letterSpacing: 2.0,
                   fontWeight: FontWeight.w600,
-                  color: Colors.grey,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
             ],
@@ -387,13 +387,13 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
                 ),
               ),
               const SizedBox(height: 12),
-              const Text(
+              Text(
                 'SKIP',
                 style: TextStyle(
                   fontSize: 10,
                   letterSpacing: 2.0,
                   fontWeight: FontWeight.w600,
-                  color: Colors.grey,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
             ],
@@ -438,6 +438,7 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
     //   that was stored when the work phase completed.
     final int actualWorkMinutes;
     final int displayXp;
+    final bool canAwardConfidenceXp;
 
     if (pomodoroState.phase == TimerPhase.work) {
       final int elapsedSeconds;
@@ -452,6 +453,7 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
           ? (pomodoroState.isOvertime ? 1.0 : elapsedSeconds / pomodoroState.totalSeconds)
           : 0.0;
       final isEligible = completionRatio >= 0.8;
+      canAwardConfidenceXp = isEligible;
       displayXp = isEligible
           ? 50 + (pomodoroState.plannedDurationMinutes >= 50 ? 120 : 0)
           : 0;
@@ -461,6 +463,7 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
           ? pomodoroState.lastActualWorkMinutes
           : pomodoroState.plannedDurationMinutes;
       displayXp = pomodoroState.lastSessionXpEarned;
+      canAwardConfidenceXp = displayXp > 0;
     }
 
     final hasProgress = pomodoroState.pomodorosCompleted > 0 || actualWorkMinutes > 0;
@@ -471,6 +474,7 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
         durationMinutes: actualWorkMinutes,
         pomodorosCompleted: pomodoroState.pomodorosCompleted,
         baseXpEarned: displayXp,
+        canAwardConfidenceXp: canAwardConfidenceXp,
         onSave: (confidence, notes) async {
           await notifier.awardConfidenceXpAndNotes(
             confidenceRating: confidence,
@@ -543,7 +547,7 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
   String _formatTime(int seconds) {
     final m = seconds ~/ 60;
     final s = seconds % 60;
-    return '${m.toString().padLeft(2, '0')} : ${s.toString().padLeft(2, '0')}';
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 }
 

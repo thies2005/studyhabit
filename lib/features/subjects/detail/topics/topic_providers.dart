@@ -32,10 +32,7 @@ Stream<List<Topic>> topicList(Ref ref, String subjectId) {
 @riverpod
 class TopicNotifier extends _$TopicNotifier {
   @override
-  void build() {
-    // No-op: this notifier is used only for its methods
-    // The actual topic list is watched via topicListProvider
-  }
+  int build() => 0;
 
   Future<void> create(String subjectId, String name) async {
     try {

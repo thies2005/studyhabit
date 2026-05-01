@@ -54,9 +54,7 @@ class _CompletenessModeDialogState
           children: [
             RadioGroup<CompletenessMode>(
               groupValue: _selectedMode,
-              onChanged: (v) {
-                if (v != null) setState(() => _selectedMode = v);
-              },
+              onChanged: (v) { if (v != null) setState(() => _selectedMode = v); },
               child: Column(
                 children: [
                   ...CompletenessMode.values.map((mode) {
@@ -82,31 +80,33 @@ class _CompletenessModeDialogState
                           ),
                           child: Row(
                             children: [
-                              Radio<CompletenessMode>(value: mode),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      _label(mode),
-                                      style: theme.textTheme.titleSmall,
-                                    ),
-                                    Text(
-                                      _description(mode),
-                                      style: theme.textTheme.bodySmall?.copyWith(
-                                        color: colorScheme.onSurfaceVariant,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                              Radio<CompletenessMode>(
+                                value: mode,
                               ),
-                            ],
-                          ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _label(mode),
+                                    style: theme.textTheme.titleSmall,
+                                  ),
+                                  Text(
+                                    _description(mode),
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    );
-                  }),
+                    ),
+                  );
+                }),
                 ],
               ),
             ),

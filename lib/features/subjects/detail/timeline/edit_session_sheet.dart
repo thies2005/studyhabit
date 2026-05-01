@@ -193,7 +193,7 @@ class _EditSessionSheetState extends ConsumerState<EditSessionSheet> {
               child: FilledButton(
                 onPressed: _isSaving ? null : _save,
                 child: _isSaving
-                    ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: colorScheme.onPrimary))
                     : const Text('Save Changes'),
               ),
             ),

@@ -23,6 +23,7 @@ class _BatteryOptimizationGuideState extends State<BatteryOptimizationGuide> {
     if (Platform.isAndroid) {
       final deviceInfo = DeviceInfoPlugin();
       final androidInfo = await deviceInfo.androidInfo;
+      if (!mounted) return;
       setState(() {
         _manufacturer = androidInfo.manufacturer.toLowerCase();
       });
@@ -41,7 +42,7 @@ class _BatteryOptimizationGuideState extends State<BatteryOptimizationGuide> {
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          const Icon(Icons.battery_saver, size: 64, color: Colors.amber),
+          Icon(Icons.battery_saver, size: 64, color: colorScheme.tertiary),
           const SizedBox(height: 24),
           Text(
             'Keep your timer running',

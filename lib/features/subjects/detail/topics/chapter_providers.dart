@@ -32,10 +32,7 @@ Stream<List<Chapter>> chapterList(Ref ref, String topicId) {
 @riverpod
 class ChapterNotifier extends _$ChapterNotifier {
   @override
-  void build() {
-    // No-op: this notifier is used only for its methods
-    // The actual chapter list is watched via chapterListProvider
-  }
+  int build() => 0;
 
   Future<void> create(String topicId, String name) async {
     try {

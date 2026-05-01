@@ -21,6 +21,7 @@ abstract class StudySession with _$StudySession {
     String? sourceId,
     int? startPage,
     int? endPage,
+    @Default(false) bool isFreeTimer,
   }) = _StudySession;
 
   factory StudySession.fromJson(Map<String, dynamic> json) =>

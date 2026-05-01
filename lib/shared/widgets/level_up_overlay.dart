@@ -19,7 +19,7 @@ class LevelUpOverlay extends StatefulWidget {
     return showGeneralDialog<void>(
       context: context,
       barrierDismissible: false,
-      barrierColor: Colors.black.withValues(alpha: 0.5),
+      barrierColor: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.5),
       pageBuilder: (context, animation, secondaryAnimation) {
         return LevelUpOverlay(levelName: levelName, level: level);
       },

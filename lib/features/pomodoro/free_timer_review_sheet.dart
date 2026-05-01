@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:studytracker/shared/widgets/animated_counter.dart';
 
 class FreeTimerReviewSheet extends StatefulWidget {
   const FreeTimerReviewSheet({
@@ -19,6 +20,7 @@ class FreeTimerReviewSheet extends StatefulWidget {
       context: context,
       isScrollControlled: true,
       isDismissible: false,
+      enableDrag: false,
       builder: (_) => FreeTimerReviewSheet(
         durationMinutes: durationMinutes,
         onSave: onSave,
@@ -112,7 +114,7 @@ class _FreeTimerReviewSheetState extends State<FreeTimerReviewSheet> {
               maxLines: 3,
             ),
             const SizedBox(height: 24),
-            _AnimatedCounter(
+            AnimatedCounter(
               value: xpEarned,
               prefix: '+',
               suffix: ' XP',
@@ -147,28 +149,3 @@ class _FreeTimerReviewSheetState extends State<FreeTimerReviewSheet> {
   }
 }
 
-class _AnimatedCounter extends StatelessWidget {
-  const _AnimatedCounter({
-    required this.value,
-    this.prefix = '',
-    this.suffix = '',
-    this.style,
-  });
-
-  final int value;
-  final String prefix;
-  final String suffix;
-  final TextStyle? style;
-
-  @override
-  Widget build(BuildContext context) {
-    return TweenAnimationBuilder<int>(
-      tween: IntTween(begin: 0, end: value),
-      duration: const Duration(milliseconds: 800),
-      curve: Curves.easeOut,
-      builder: (context, animatedValue, child) {
-        return Text('$prefix$animatedValue$suffix', style: style);
-      },
-    );
-  }
-}

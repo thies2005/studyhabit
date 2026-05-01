@@ -109,7 +109,7 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
     final remaining = (state.totalSeconds - actualElapsedSeconds).clamp(0, state.totalSeconds);
     
     if (state.isOvertime) {
-      final overtime = (actualElapsedSeconds - state.totalSeconds).clamp(0, double.maxFinite.toInt());
+      final overtime = (actualElapsedSeconds - state.totalSeconds).clamp(0, 86400);
       if (state.overtimeSeconds != overtime) {
         state = state.copyWith(overtimeSeconds: overtime);
         _persistState();
@@ -296,21 +296,23 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
     _startLocalTimer();
     _checkOemBatteryIssues();
 
-    // DB insert + foreground service in background (non-blocking)
-    _sessionDao?.insert(
-      StudySessionsCompanion.insert(
-        id: sessionId,
-        subjectId: config.subjectId,
-        topicId: Value(config.topicId),
-        chapterId: Value(config.chapterId),
-        startedAt: Value(now),
-        plannedDurationMinutes: config.plannedDurationMinutes,
-        isFreeTimer: const Value(false),
-        sourceId: Value(config.sourceId),
-      ),
-    ).catchError((e) {
+    try {
+      await _sessionDao?.insert(
+        StudySessionsCompanion.insert(
+          id: sessionId,
+          subjectId: config.subjectId,
+          topicId: Value(config.topicId),
+          chapterId: Value(config.chapterId),
+          startedAt: Value(now),
+          plannedDurationMinutes: config.plannedDurationMinutes,
+          isFreeTimer: const Value(false),
+          sourceId: Value(config.sourceId),
+        ),
+      );
+    } catch (e) {
       debugPrint('Error inserting session: $e');
-    });
+      return;
+    }
 
     _startForegroundService().catchError((e) {
       debugPrint('Error starting foreground service: $e');
@@ -362,7 +364,9 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
         }
       }
 
-      await ref.read(streakServiceProvider).recordStudyDay(ref);
+      if (isEligible) {
+        await ref.read(streakServiceProvider).recordStudyDay(ref);
+      }
       await ref.read(achievementServiceProvider).checkAndUnlock(ref);
 
       if (continuousFocus) {
@@ -373,6 +377,10 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
           pomodorosCompleted: state.pomodorosCompleted + 1,
         );
         _persistState();
+        await _updateSessionInDb(
+          actualDurationMinutes: actualMinutes,
+          pomodorosCompleted: state.pomodorosCompleted,
+        );
         _syncForegroundTaskData();
         return;
       }
@@ -489,7 +497,6 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
     );
     _stopLocalTimer();
     _syncForegroundTaskData();
-    _persistState();
   }
 
   void resume() {
@@ -520,7 +527,7 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
         : state.totalSeconds - state.remainingSeconds;
     final actualMinutes = elapsed ~/ 60;
 
-    if (state.pomodorosCompleted > 0 || actualMinutes >= 1) {
+    if (state.pomodorosCompleted > 0) {
       await ref.read(streakServiceProvider).recordStudyDay(ref);
     }
 
@@ -624,7 +631,11 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
 
     // Award confidence XP (only if rating is set and hasn't been awarded yet)
     if (confidenceRating != null && sessionRow.confidenceRating == null) {
-      final actual = sessionRow.actualDurationMinutes;
+      final actual = sessionRow.actualDurationMinutes > 0
+          ? sessionRow.actualDurationMinutes
+          : (state.isOvertime
+                ? (state.totalSeconds + state.overtimeSeconds) ~/ 60
+                : (state.totalSeconds - state.remainingSeconds) ~/ 60);
       final planned = sessionRow.plannedDurationMinutes;
       final isEligible = planned > 0 && (actual / planned) >= 0.8;
 

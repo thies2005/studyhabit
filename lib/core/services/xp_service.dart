@@ -63,9 +63,9 @@ class XpService {
     int level = 5;
     while (level < 100) {
       final next = ((threshold * 1.5) / 100).round() * 100;
+      if (totalXp < next) return level;
       threshold = next;
       level++;
-      if (totalXp <= threshold) return level;
     }
     return level;
   }
@@ -77,14 +77,12 @@ class XpService {
 
   int currentLevelXp(int totalXp) {
     final current = calculateLevel(totalXp);
-    final prevThreshold = current <= 1 ? 0 : levelThreshold(current - 1);
-    return totalXp - prevThreshold;
+    return totalXp - levelThreshold(current);
   }
 
   int currentLevelXpNeeded(int totalXp) {
     final current = calculateLevel(totalXp);
-    final prevThreshold = current <= 1 ? 0 : levelThreshold(current - 1);
-    return levelThreshold(current) - prevThreshold;
+    return levelThreshold(current + 1) - levelThreshold(current);
   }
 
   int levelThreshold(int level) {

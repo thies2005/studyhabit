@@ -256,8 +256,7 @@ class _CreateSubjectSheetState extends ConsumerState<CreateSubjectSheet> {
         const SizedBox(height: 16),
         RadioGroup<HierarchyMode>(
           groupValue: _hierarchyMode,
-          onChanged: (v) =>
-              setState(() => _hierarchyMode = v ?? _hierarchyMode),
+          onChanged: (v) { if (v != null) setState(() => _hierarchyMode = v); },
           child: Column(
             children: HierarchyMode.values.map((mode) {
               final isSelected = _hierarchyMode == mode;
@@ -285,31 +284,33 @@ class _CreateSubjectSheetState extends ConsumerState<CreateSubjectSheet> {
                       children: [
                         Row(
                           children: [
-                            Radio<HierarchyMode>(value: mode),
-                            const SizedBox(width: 8),
-                            Text(
-                              _hierarchyLabel(mode),
-                              style: theme.textTheme.titleSmall,
+                            Radio<HierarchyMode>(
+                              value: mode,
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Padding(
-                          padding: const EdgeInsets.only(left: 48),
-                          child: Text(
-                            _hierarchyDiagram(mode),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
-                              fontFamily: 'monospace',
-                            ),
+                          const SizedBox(width: 8),
+                          Text(
+                            _hierarchyLabel(mode),
+                            style: theme.textTheme.titleSmall,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Padding(
+                        padding: const EdgeInsets.only(left: 48),
+                        child: Text(
+                          _hierarchyDiagram(mode),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                            fontFamily: 'monospace',
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
-              );
-            }).toList(),
+              ),
+            );
+          }).toList(),
           ),
         ),
       ],
@@ -424,8 +425,7 @@ class _CreateSubjectSheetState extends ConsumerState<CreateSubjectSheet> {
         const SizedBox(height: 16),
         RadioGroup<CompletenessMode>(
           groupValue: _completenessMode,
-          onChanged: (v) =>
-              setState(() => _completenessMode = v ?? _completenessMode),
+          onChanged: (v) { if (v != null) setState(() => _completenessMode = v); },
           child: Column(
             children: CompletenessMode.values.map((mode) {
               final isSelected = _completenessMode == mode;
@@ -453,35 +453,36 @@ class _CreateSubjectSheetState extends ConsumerState<CreateSubjectSheet> {
                       children: [
                         Row(
                           children: [
-                            Radio<CompletenessMode>(value: mode),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                _completenessLabel(mode),
-                                style: theme.textTheme.titleSmall,
-                              ),
+                            Radio<CompletenessMode>(
+                              value: mode,
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Padding(
-                          padding: const EdgeInsets.only(left: 48),
-                          child: Text(
-                            _completenessDescription(mode),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _completenessLabel(mode),
+                              style: theme.textTheme.titleSmall,
                             ),
                           ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Padding(
+                        padding: const EdgeInsets.only(left: 48),
+                        child: Text(
+                          _completenessDescription(mode),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
-              );
-            }).toList(),
+              ),
+            );
+          }).toList(),
           ),
         ),
-        // Hours goal input when hoursGoal selected
         if (_completenessMode == CompletenessMode.hoursGoal) ...[
           const SizedBox(height: 16),
           Text('Target Hours', style: theme.textTheme.titleSmall),

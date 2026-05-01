@@ -15,7 +15,14 @@ class StreakService {
     final graceWindowHours = prefs.getDouble(_graceWindowKey) ?? 2.0;
     final stats = await ref.read(userStatsProvider.future);
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+    final effectiveNow = now.subtract(
+      Duration(minutes: (graceWindowHours * 60).round()),
+    );
+    final today = DateTime(
+      effectiveNow.year,
+      effectiveNow.month,
+      effectiveNow.day,
+    );
 
     DateTime? lastStudyDate;
     if (stats.lastStudyDate != null) {
@@ -35,33 +42,15 @@ class StreakService {
       final daysDiff = today.difference(lastStudyDate).inDays;
 
       if (daysDiff == 0) {
-        // Already studied today — no change
         newStreak = stats.currentStreak;
       } else if (daysDiff == 1) {
-        // Check grace window: if still within grace hours past midnight, treat as same day
-        final lastStudyDayEnd = DateTime(
-          lastStudyDate.year,
-          lastStudyDate.month,
-          lastStudyDate.day,
-        ).add(const Duration(hours: 24)).add(Duration(hours: graceWindowHours.toInt()));
-
-        if (now.isBefore(lastStudyDayEnd)) {
-          // Still in grace window — treat as consecutive study day
-          newStreak = stats.currentStreak;
-        } else {
-          // Past grace window — new consecutive day
-          newStreak = stats.currentStreak + 1;
-        }
+        newStreak = stats.currentStreak + 1;
       } else if (daysDiff == 2 && stats.freezeTokens > 0) {
-        // Check freeze token
         final lastFreezeUseStr = prefs.getString(_lastFreezeUseKey);
         DateTime? lastFreezeUse;
         if (lastFreezeUseStr != null) {
-          lastFreezeUse = DateTime(
-            DateTime.parse(lastFreezeUseStr).year,
-            DateTime.parse(lastFreezeUseStr).month,
-            DateTime.parse(lastFreezeUseStr).day,
-          );
+          final parsed = DateTime.parse(lastFreezeUseStr);
+          lastFreezeUse = DateTime(parsed.year, parsed.month, parsed.day);
         }
 
         final weekAgo = today.subtract(const Duration(days: 7));
@@ -76,7 +65,6 @@ class StreakService {
           newStreak = 1;
         }
       } else {
-        // Streak broken
         newStreak = 1;
       }
     }
@@ -99,7 +87,7 @@ class StreakService {
     final updatedStats = stats.copyWith(
       currentStreak: newStreak,
       longestStreak: newLongest,
-      lastStudyDate: now,
+      lastStudyDate: today,
       freezeTokens: freezeTokens,
     );
 

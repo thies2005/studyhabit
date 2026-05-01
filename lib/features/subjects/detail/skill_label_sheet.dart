@@ -48,9 +48,13 @@ class _SkillLabelSheetState extends ConsumerState<SkillLabelSheet> {
 
     if (widget.topicId != null) {
       query.where((t) => t.topicId.equals(widget.topicId!));
+    } else {
+      query.where((t) => t.topicId.isNull());
     }
     if (widget.chapterId != null) {
       query.where((t) => t.chapterId.equals(widget.chapterId!));
+    } else {
+      query.where((t) => t.chapterId.isNull());
     }
 
     final rows = await query.get();
@@ -89,10 +93,10 @@ class _SkillLabelSheetState extends ConsumerState<SkillLabelSheet> {
             ),
             RadioGroup<SkillLevel>(
               groupValue: _selected,
-              onChanged: (v) => setState(() => _selected = v),
+              onChanged: (v) { if (v != null) setState(() => _selected = v); },
               child: Column(
                 children: SkillLevel.values.map((level) {
-                  final (color, label) = _levelStyle(level);
+                  final (color, label) = _levelStyle(level, Theme.of(context).colorScheme);
                   return RadioListTile<SkillLevel>(
                     value: level,
                     title: Row(
@@ -123,39 +127,64 @@ class _SkillLabelSheetState extends ConsumerState<SkillLabelSheet> {
     );
   }
 
-  (Color, String) _levelStyle(SkillLevel level) => switch (level) {
-    SkillLevel.beginner => (Colors.blue, 'Beginner'),
-    SkillLevel.intermediate => (Colors.amber.shade800, 'Intermediate'),
-    SkillLevel.advanced => (Colors.deepOrange, 'Advanced'),
-    SkillLevel.expert => (Colors.red.shade700, 'Expert'),
+  (Color, String) _levelStyle(SkillLevel level, ColorScheme colorScheme) => switch (level) {
+    SkillLevel.beginner => (colorScheme.primary, 'Beginner'),
+    SkillLevel.intermediate => (colorScheme.tertiary, 'Intermediate'),
+    SkillLevel.advanced => (colorScheme.error, 'Advanced'),
+    SkillLevel.expert => (colorScheme.primary, 'Expert'),
   };
 
   Future<void> _save() async {
     if (_selected == null) return;
 
-    // Check if this is an upward skill change and award XP
-    if (_previousLabel != null && _selected!.index > _previousLabel!.index) {
+    final shouldAwardXp =
+        _previousLabel != null && _selected!.index > _previousLabel!.index;
+
+    final db = ref.read(appDatabaseProvider);
+    const uuid = Uuid();
+    final existingQuery = db.select(db.skillLabels)
+      ..where((t) => t.subjectId.equals(widget.subjectId));
+
+    if (widget.topicId != null) {
+      existingQuery.where((t) => t.topicId.equals(widget.topicId!));
+    } else {
+      existingQuery.where((t) => t.topicId.isNull());
+    }
+    if (widget.chapterId != null) {
+      existingQuery.where((t) => t.chapterId.equals(widget.chapterId!));
+    } else {
+      existingQuery.where((t) => t.chapterId.isNull());
+    }
+
+    final existingRows = await existingQuery.get();
+    existingRows.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    final existingRow = existingRows.isNotEmpty ? existingRows.first : null;
+
+    if (existingRow != null) {
+      await db.update(db.skillLabels).replace(
+        existingRow.copyWith(label: _selected!, updatedAt: DateTime.now()),
+      );
+    } else {
+      await db
+          .into(db.skillLabels)
+          .insertOnConflictUpdate(
+            SkillLabelsCompanion.insert(
+              id: uuid.v4(),
+              subjectId: widget.subjectId,
+              topicId: Value(widget.topicId),
+              chapterId: Value(widget.chapterId),
+              label: _selected!,
+            ),
+          );
+    }
+
+    if (shouldAwardXp) {
       try {
         await ref.read(xpServiceProvider).award(ref, XpReason.skillAdvance);
       } catch (e) {
         debugPrint('Error awarding skill advance XP: $e');
       }
     }
-
-    final db = ref.read(appDatabaseProvider);
-    const uuid = Uuid();
-
-    await db
-        .into(db.skillLabels)
-        .insertOnConflictUpdate(
-          SkillLabelsCompanion.insert(
-            id: uuid.v4(),
-            subjectId: widget.subjectId,
-            topicId: Value(widget.topicId),
-            chapterId: Value(widget.chapterId),
-            label: _selected!,
-          ),
-        );
 
     if (mounted) {
       Navigator.of(context).pop();

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:studytracker/shared/widgets/animated_counter.dart';
 
 class SessionReviewSheet extends StatefulWidget {
   const SessionReviewSheet({
@@ -6,12 +7,14 @@ class SessionReviewSheet extends StatefulWidget {
     required this.durationMinutes,
     required this.pomodorosCompleted,
     required this.baseXpEarned,
+    required this.canAwardConfidenceXp,
     required this.onSave,
   });
 
   final int durationMinutes;
   final int pomodorosCompleted;
   final int baseXpEarned;
+  final bool canAwardConfidenceXp;
   final Future<void> Function(int? confidence, String? notes) onSave;
 
   static Future<void> show(
@@ -19,16 +22,19 @@ class SessionReviewSheet extends StatefulWidget {
     required int durationMinutes,
     required int pomodorosCompleted,
     required int baseXpEarned,
+    required bool canAwardConfidenceXp,
     required Future<void> Function(int? confidence, String? notes) onSave,
   }) {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       isDismissible: false,
+      enableDrag: false,
       builder: (_) => SessionReviewSheet(
         durationMinutes: durationMinutes,
         pomodorosCompleted: pomodorosCompleted,
         baseXpEarned: baseXpEarned,
+        canAwardConfidenceXp: canAwardConfidenceXp,
         onSave: onSave,
       ),
     );
@@ -54,7 +60,8 @@ class _SessionReviewSheetState extends State<SessionReviewSheet> {
     final colorScheme = Theme.of(context).colorScheme;
     // Use the actual XP earned (gated by 80% rule) passed from the notifier.
     // Confidence XP (+10) is shown conditionally if a rating is set.
-    final confidenceXp = _confidence != null ? 10 : 0;
+    final confidenceXp =
+        widget.canAwardConfidenceXp && _confidence != null ? 10 : 0;
     final xpEarned = widget.baseXpEarned + confidenceXp;
 
     return Padding(
@@ -176,35 +183,6 @@ class _StatChip extends StatelessWidget {
         const SizedBox(width: 6),
         Text(label, style: Theme.of(context).textTheme.bodyLarge),
       ],
-    );
-  }
-}
-
-class AnimatedCounter extends StatelessWidget {
-  const AnimatedCounter({
-    super.key,
-    required this.value,
-    this.prefix = '',
-    this.suffix = '',
-    this.style,
-    this.duration = const Duration(milliseconds: 800),
-  });
-
-  final int value;
-  final String prefix;
-  final String suffix;
-  final TextStyle? style;
-  final Duration duration;
-
-  @override
-  Widget build(BuildContext context) {
-    return TweenAnimationBuilder<int>(
-      tween: IntTween(begin: 0, end: value),
-      duration: duration,
-      curve: Curves.easeOut,
-      builder: (context, animatedValue, child) {
-        return Text('$prefix$animatedValue$suffix', style: style);
-      },
     );
   }
 }

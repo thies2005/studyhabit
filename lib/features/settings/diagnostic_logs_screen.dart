@@ -108,9 +108,9 @@ class _DiagnosticLogsScreenState extends State<DiagnosticLogsScreen> {
   Color _getLogLevelColor(LogLevel level, ColorScheme colorScheme) {
     switch (level) {
       case LogLevel.info:
-        return Colors.blue;
+        return colorScheme.primary;
       case LogLevel.warning:
-        return Colors.orange;
+        return colorScheme.tertiary;
       case LogLevel.error:
         return colorScheme.error;
     }

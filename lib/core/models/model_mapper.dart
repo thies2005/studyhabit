@@ -82,6 +82,7 @@ domain.StudySession mapStudySession(StudySessionRow row) {
     sourceId: row.sourceId,
     startPage: row.startPage,
     endPage: row.endPage,
+    isFreeTimer: row.isFreeTimer,
   );
 }
 

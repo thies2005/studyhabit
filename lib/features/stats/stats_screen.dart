@@ -344,7 +344,7 @@ class _WeeklyBarChart extends StatelessWidget {
               final day = data[group.x.toInt()];
               return BarTooltipItem(
                 '${DateFormat.E().format(day.date)}\n${day.hours.toStringAsFixed(1)}h',
-                const TextStyle(color: Colors.white, fontSize: 12),
+                TextStyle(color: Theme.of(context).colorScheme.onPrimary, fontSize: 12),
               );
             },
           ),
@@ -442,10 +442,10 @@ class _SubjectPieChart extends StatelessWidget {
           return PieChartSectionData(
             value: item.percentage,
             title: '${item.percentage.toStringAsFixed(0)}%',
-            titleStyle: const TextStyle(
+            titleStyle: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.onPrimary,
             ),
             color: subjectColors[item.subject.colorValue]!,
             radius: 60,
@@ -678,7 +678,7 @@ class _XpLineChart extends StatelessWidget {
                 final dateStr = DateFormat.Md().format(data[idx].date);
                 return LineTooltipItem(
                   '$dateStr\n${data[idx].cumulativeXp} XP',
-                  const TextStyle(color: Colors.white, fontSize: 12),
+                  TextStyle(color: Theme.of(context).colorScheme.onPrimary, fontSize: 12),
                 );
               }).toList();
             },
