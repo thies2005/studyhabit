@@ -1,8 +1,6 @@
 import { prisma } from '../index.js';
 
 export class XpService {
-  // Level thresholds: Level 1=0, Level 2=500, Level 3=1500, Level 4=3500, Level 5=7000
-  // Level 6+: threshold(n) = round(threshold(n-1) * 1.5 / 100) * 100
   static calculateLevel(totalXp: number): number {
     if (totalXp < 500) return 1;
     if (totalXp < 1500) return 2;
@@ -26,7 +24,6 @@ export class XpService {
       return thresholds[currentLevel] - totalXp;
     }
 
-    // Calculate for levels 6+
     let threshold = 7000;
     let level = 5;
     while (level < currentLevel) {
@@ -52,10 +49,8 @@ export class XpService {
   static xpForSession(minutes: number, pomodoros: number): number {
     let xp = 0;
 
-    // Complete 1 Pomodoro (25 min work block) = +50
     xp += pomodoros * 50;
 
-    // Complete long session (50+ min actual) = +120
     if (minutes >= 50) {
       xp += 120;
     }
@@ -63,14 +58,18 @@ export class XpService {
     return xp;
   }
 
-  static async addXpToUser(userId: string, xp: number): Promise<void> {
+  static async addXpAndMinutes(
+    userId: string,
+    xp: number,
+    studyMinutes: number
+  ): Promise<void> {
     const userStats = await prisma.userStats.findUnique({
       where: { userId },
     });
 
     if (!userStats) {
       await prisma.userStats.create({
-        data: { userId, totalXp: xp },
+        data: { userId, totalXp: xp, totalStudyMinutes: studyMinutes },
       });
     } else {
       const newTotalXp = userStats.totalXp + xp;
@@ -78,7 +77,11 @@ export class XpService {
 
       await prisma.userStats.update({
         where: { userId },
-        data: { totalXp: newTotalXp, currentLevel: newLevel },
+        data: {
+          totalXp: newTotalXp,
+          currentLevel: newLevel,
+          totalStudyMinutes: { increment: studyMinutes },
+        },
       });
     }
   }

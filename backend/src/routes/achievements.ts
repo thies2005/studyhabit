@@ -1,11 +1,9 @@
 import { Router } from 'express';
-import { z } from 'zod';
 import { prisma } from '../index.js';
 
 const router = Router();
 
-// Get all achievements
-router.get('/', async (req: any, res: any) => {
+router.get('/', async (req, res, next) => {
   try {
     const achievements = await prisma.achievement.findMany({
       where: { userId: req.user.userId },
@@ -13,18 +11,15 @@ router.get('/', async (req: any, res: any) => {
     });
     res.json({ data: achievements });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 });
 
-// Get single achievement
-router.get('/:key', async (req: any, res: any) => {
+router.get('/:key', async (req, res, next) => {
   try {
+    const key = String(req.params.key);
     const achievement = await prisma.achievement.findFirst({
-      where: {
-        key: req.params.key,
-        userId: req.user.userId,
-      },
+      where: { key, userId: req.user.userId },
     });
 
     if (!achievement) {
@@ -33,27 +28,19 @@ router.get('/:key', async (req: any, res: any) => {
 
     res.json({ data: achievement });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 });
 
-// Unlock achievement
-router.post('/:key/unlock', async (req: any, res: any) => {
+router.post('/:key/unlock', async (req, res, next) => {
   try {
+    const key = String(req.params.key);
     const achievement = await prisma.achievement.upsert({
-      where: {
-        userId_key: {
-          userId: req.user.userId,
-          key: req.params.key,
-        },
-      },
-      update: {
-        unlockedAt: new Date(),
-        progress: 1.0,
-      },
+      where: { userId_key: { userId: req.user.userId, key } },
+      update: { unlockedAt: new Date(), progress: 1.0 },
       create: {
         userId: req.user.userId,
-        key: req.params.key,
+        key,
         unlockedAt: new Date(),
         progress: 1.0,
       },
@@ -61,13 +48,13 @@ router.post('/:key/unlock', async (req: any, res: any) => {
 
     res.json({ data: achievement });
   } catch (error: any) {
-    res.status(400).json({ error: error.message });
+    next(error);
   }
 });
 
-// Update progress
-router.patch('/:key/progress', async (req: any, res: any) => {
+router.patch('/:key/progress', async (req, res, next) => {
   try {
+    const key = String(req.params.key);
     const { progress } = req.body;
     const numProgress = parseFloat(progress);
 
@@ -76,23 +63,14 @@ router.patch('/:key/progress', async (req: any, res: any) => {
     }
 
     const achievement = await prisma.achievement.upsert({
-      where: {
-        userId_key: {
-          userId: req.user.userId,
-          key: req.params.key,
-        },
-      },
+      where: { userId_key: { userId: req.user.userId, key } },
       update: { progress: numProgress },
-      create: {
-        userId: req.user.userId,
-        key: req.params.key,
-        progress: numProgress,
-      },
+      create: { userId: req.user.userId, key, progress: numProgress },
     });
 
     res.json({ data: achievement });
   } catch (error: any) {
-    res.status(400).json({ error: error.message });
+    next(error);
   }
 });
 

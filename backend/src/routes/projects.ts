@@ -12,8 +12,7 @@ const projectSchema = z.object({
 
 const updateProjectSchema = projectSchema.partial();
 
-// Get all projects for user
-router.get('/', async (req: any, res: any) => {
+router.get('/', async (req, res, next) => {
   try {
     const projects = await prisma.project.findMany({
       where: { userId: req.user.userId, isArchived: false },
@@ -21,53 +20,43 @@ router.get('/', async (req: any, res: any) => {
     });
     res.json({ data: projects });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 });
 
-// Get single project
-router.get('/:id', async (req: any, res: any) => {
+router.get('/:id', async (req, res, next) => {
   try {
+    const id = String(req.params.id);
     const project = await prisma.project.findFirst({
-      where: {
-        id: req.params.id,
-        userId: req.user.userId,
-      },
+      where: { id, userId: req.user.userId },
     });
     if (!project) {
       return res.status(404).json({ error: 'Project not found' });
     }
     res.json({ data: project });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 });
 
-// Create project
-router.post('/', async (req: any, res: any) => {
+router.post('/', async (req, res, next) => {
   try {
     const data = projectSchema.parse(req.body);
     const project = await prisma.project.create({
-      data: {
-        ...data,
-        userId: req.user.userId,
-      },
+      data: { ...data, userId: req.user.userId },
     });
     res.status(201).json({ data: project });
   } catch (error: any) {
-    res.status(400).json({ error: error.message });
+    next(error);
   }
 });
 
-// Update project
-router.patch('/:id', async (req: any, res: any) => {
+router.patch('/:id', async (req, res, next) => {
   try {
+    const id = String(req.params.id);
     const data = updateProjectSchema.parse(req.body);
     const project = await prisma.project.updateMany({
-      where: {
-        id: req.params.id,
-        userId: req.user.userId,
-      },
+      where: { id, userId: req.user.userId },
       data,
     });
 
@@ -75,24 +64,19 @@ router.patch('/:id', async (req: any, res: any) => {
       return res.status(404).json({ error: 'Project not found' });
     }
 
-    const updated = await prisma.project.findUnique({
-      where: { id: req.params.id },
-    });
+    const updated = await prisma.project.findUnique({ where: { id } });
 
     res.json({ data: updated });
   } catch (error: any) {
-    res.status(400).json({ error: error.message });
+    next(error);
   }
 });
 
-// Delete project
-router.delete('/:id', async (req: any, res: any) => {
+router.delete('/:id', async (req, res, next) => {
   try {
+    const id = String(req.params.id);
     const project = await prisma.project.deleteMany({
-      where: {
-        id: req.params.id,
-        userId: req.user.userId,
-      },
+      where: { id, userId: req.user.userId },
     });
 
     if (project.count === 0) {
@@ -101,7 +85,7 @@ router.delete('/:id', async (req: any, res: any) => {
 
     res.status(204).send();
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 });
 

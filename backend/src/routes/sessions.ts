@@ -9,6 +9,8 @@ const sessionSchema = z.object({
   subjectId: z.string().uuid(),
   topicId: z.string().uuid().optional(),
   chapterId: z.string().uuid().optional(),
+  startedAt: z.string().datetime().optional(),
+  endedAt: z.string().datetime().optional(),
   plannedDurationMinutes: z.number().int().min(5),
   actualDurationMinutes: z.number().int().min(0),
   pomodorosCompleted: z.number().int().min(0),
@@ -16,61 +18,61 @@ const sessionSchema = z.object({
   notes: z.string().optional(),
 });
 
-const updateSessionSchema = sessionSchema.partial();
+const updateSessionSchema = z.object({
+  topicId: z.string().uuid().optional(),
+  chapterId: z.string().uuid().optional(),
+  startedAt: z.string().datetime().optional(),
+  endedAt: z.string().datetime().optional(),
+  plannedDurationMinutes: z.number().int().min(5).optional(),
+  actualDurationMinutes: z.number().int().min(0).optional(),
+  pomodorosCompleted: z.number().int().min(0).optional(),
+  confidenceRating: z.number().int().min(1).max(5).optional(),
+  notes: z.string().optional(),
+});
 
-// Get sessions by subject
-router.get('/', async (req: any, res: any) => {
+router.get('/', async (req, res, next) => {
   try {
-    const { subjectId } = req.query;
+    const subjectId = String(req.query.subjectId ?? '');
     const sessions = await prisma.studySession.findMany({
       where: {
-        subjectId: subjectId as string,
+        subjectId,
         subject: { project: { userId: req.user.userId } },
       },
       orderBy: { startedAt: 'desc' },
     });
     res.json({ data: sessions });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 });
 
-// Get single session
-router.get('/:id', async (req: any, res: any) => {
+router.get('/:id', async (req, res, next) => {
   try {
+    const id = String(req.params.id);
     const session = await prisma.studySession.findFirst({
-      where: {
-        id: req.params.id,
-        subject: { project: { userId: req.user.userId } },
-      },
+      where: { id, subject: { project: { userId: req.user.userId } } },
     });
     if (!session) {
       return res.status(404).json({ error: 'Session not found' });
     }
     res.json({ data: session });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 });
 
-// Create session
-router.post('/', async (req: any, res: any) => {
+router.post('/', async (req, res, next) => {
   try {
     const data = sessionSchema.parse(req.body);
 
-    // Verify subject belongs to user
     const subject = await prisma.subject.findFirst({
-      where: {
-        id: data.subjectId,
-        project: { userId: req.user.userId },
-      },
+      where: { id: data.subjectId, project: { userId: req.user.userId } },
     });
 
     if (!subject) {
       return res.status(404).json({ error: 'Subject not found' });
     }
 
-    // Calculate XP
     const xpEarned = XpService.xpForSession(
       data.actualDurationMinutes,
       data.pomodorosCompleted
@@ -78,71 +80,80 @@ router.post('/', async (req: any, res: any) => {
 
     const session = await prisma.studySession.create({
       data: {
-        ...data,
+        subjectId: data.subjectId,
+        topicId: data.topicId,
+        chapterId: data.chapterId,
+        startedAt: data.startedAt ? new Date(data.startedAt) : new Date(),
+        endedAt: data.endedAt ? new Date(data.endedAt) : null,
+        plannedDurationMinutes: data.plannedDurationMinutes,
+        actualDurationMinutes: data.actualDurationMinutes,
+        pomodorosCompleted: data.pomodorosCompleted,
+        confidenceRating: data.confidenceRating,
+        notes: data.notes,
         xpEarned,
       },
     });
 
-    // Update subject XP
     await prisma.subject.update({
       where: { id: data.subjectId },
       data: { xpTotal: { increment: xpEarned } },
     });
 
-    // Update user stats
-    await XpService.addXpToUser(req.user.userId, xpEarned);
+    await XpService.addXpAndMinutes(
+      req.user.userId,
+      xpEarned,
+      data.actualDurationMinutes
+    );
 
     res.status(201).json({ data: session });
   } catch (error: any) {
-    res.status(400).json({ error: error.message });
+    next(error);
   }
 });
 
-// Update session
-router.patch('/:id', async (req: any, res: any) => {
+router.patch('/:id', async (req, res, next) => {
   try {
+    const id = String(req.params.id);
     const data = updateSessionSchema.parse(req.body);
 
-    // Verify session belongs to user
     const existing = await prisma.studySession.findFirst({
-      where: {
-        id: req.params.id,
-        subject: { project: { userId: req.user.userId } },
-      },
+      where: { id, subject: { project: { userId: req.user.userId } } },
     });
 
     if (!existing) {
       return res.status(404).json({ error: 'Session not found' });
     }
 
+    const updateData: any = { ...data };
+    if (data.startedAt) updateData.startedAt = new Date(data.startedAt);
+    if (data.endedAt) updateData.endedAt = new Date(data.endedAt);
+    delete updateData.subjectId;
+
     const session = await prisma.studySession.update({
-      where: { id: req.params.id },
-      data,
+      where: { id },
+      data: updateData,
     });
 
     res.json({ data: session });
   } catch (error: any) {
-    res.status(400).json({ error: error.message });
+    next(error);
   }
 });
 
-// Delete session
-router.delete('/:id', async (req: any, res: any) => {
+router.delete('/:id', async (req, res, next) => {
   try {
-    const session = await prisma.studySession.deleteMany({
-      where: {
-        id: req.params.id,
-        subject: { project: { userId: req.user.userId } },
-      },
+    const id = String(req.params.id);
+    const result = await prisma.studySession.deleteMany({
+      where: { id, subject: { project: { userId: req.user.userId } } },
     });
 
-    if (session.count === 0) {
+    if (result.count === 0) {
       return res.status(404).json({ error: 'Session not found' });
     }
 
     res.status(204).send();
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 });
 

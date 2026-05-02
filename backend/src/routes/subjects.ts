@@ -16,38 +16,26 @@ const subjectSchema = z.object({
 
 const updateSubjectSchema = subjectSchema.partial();
 
-// Get subjects by project
-router.get('/', async (req: any, res: any) => {
+router.get('/', async (req, res, next) => {
   try {
-    const { projectId } = req.query;
+    const projectId = String(req.query.projectId ?? '');
     const subjects = await prisma.subject.findMany({
-      where: {
-        projectId: projectId as string,
-        project: { userId: req.user.userId },
-      },
+      where: { projectId, project: { userId: req.user.userId } },
       orderBy: { createdAt: 'desc' },
     });
     res.json({ data: subjects });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 });
 
-// Get single subject
-router.get('/:id', async (req: any, res: any) => {
+router.get('/:id', async (req, res, next) => {
   try {
+    const id = String(req.params.id);
     const subject = await prisma.subject.findFirst({
-      where: {
-        id: req.params.id,
-        project: { userId: req.user.userId },
-      },
+      where: { id, project: { userId: req.user.userId } },
       include: {
-        topics: {
-          include: {
-            chapters: true,
-          },
-          orderBy: { order: 'asc' },
-        },
+        topics: { include: { chapters: true }, orderBy: { order: 'asc' } },
       },
     });
     if (!subject) {
@@ -55,66 +43,54 @@ router.get('/:id', async (req: any, res: any) => {
     }
     res.json({ data: subject });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 });
 
-// Create subject
-router.post('/', async (req: any, res: any) => {
+router.post('/', async (req, res, next) => {
   try {
     const data = subjectSchema.parse(req.body);
-    const subject = await prisma.subject.create({
-      data,
-    });
+    const subject = await prisma.subject.create({ data });
     res.status(201).json({ data: subject });
   } catch (error: any) {
-    res.status(400).json({ error: error.message });
+    next(error);
   }
 });
 
-// Update subject
-router.patch('/:id', async (req: any, res: any) => {
+router.patch('/:id', async (req, res, next) => {
   try {
+    const id = String(req.params.id);
     const data = updateSubjectSchema.parse(req.body);
-    const subject = await prisma.subject.updateMany({
-      where: {
-        id: req.params.id,
-        project: { userId: req.user.userId },
-      },
+    const result = await prisma.subject.updateMany({
+      where: { id, project: { userId: req.user.userId } },
       data,
     });
 
-    if (subject.count === 0) {
+    if (result.count === 0) {
       return res.status(404).json({ error: 'Subject not found' });
     }
 
-    const updated = await prisma.subject.findUnique({
-      where: { id: req.params.id },
-    });
-
+    const updated = await prisma.subject.findUnique({ where: { id } });
     res.json({ data: updated });
   } catch (error: any) {
-    res.status(400).json({ error: error.message });
+    next(error);
   }
 });
 
-// Delete subject
-router.delete('/:id', async (req: any, res: any) => {
+router.delete('/:id', async (req, res, next) => {
   try {
-    const subject = await prisma.subject.deleteMany({
-      where: {
-        id: req.params.id,
-        project: { userId: req.user.userId },
-      },
+    const id = String(req.params.id);
+    const result = await prisma.subject.deleteMany({
+      where: { id, project: { userId: req.user.userId } },
     });
 
-    if (subject.count === 0) {
+    if (result.count === 0) {
       return res.status(404).json({ error: 'Subject not found' });
     }
 
     res.status(204).send();
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 });
 

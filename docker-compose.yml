@@ -1,18 +1,18 @@
-version: '3.9'
 services:
   db:
     image: postgres:16-alpine
     restart: unless-stopped
+    profiles: ["internal-db"]
     environment:
-      POSTGRES_DB: studytracker
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:-studytracker}
+      POSTGRES_USER: ${DB_USER:-studytracker}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
-      interval: 10s
-      retries: 5
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-studytracker}"]
+      interval: 5s
+      retries: 10
       timeout: 5s
 
   api:
@@ -21,25 +21,41 @@ services:
     ports:
       - "${API_PORT:-3001}:3001"
     environment:
-      DATABASE_URL: postgres://${DB_USER}:${DB_PASSWORD}@db:5432/studytracker
-      JWT_SECRET: ${JWT_SECRET}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?Set JWT_REFRESH_SECRET in .env}
+      JWT_ACCESS_EXPIRY: ${JWT_ACCESS_EXPIRY:-15m}
+      JWT_REFRESH_EXPIRY: ${JWT_REFRESH_EXPIRY:-7d}
+      MAX_DEVICES_PER_USER: ${MAX_DEVICES_PER_USER:-5}
       NODE_ENV: production
+      PORT: 3001
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-900000}
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-100}
     depends_on:
       db:
         condition: service_healthy
+        required: false
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]
+      interval: 15s
+      retries: 5
+      timeout: 5s
+      start_period: 30s
     command: >
       sh -c "npx prisma migrate deploy && node dist/index.js"
 
   web:
-    build: ./web
+    build:
+      context: ./web
+      args:
+        VITE_API_URL: ${API_URL:-http://localhost:3001}
     restart: unless-stopped
     ports:
       - "${WEB_PORT:-3000}:80"
-    environment:
-      VITE_API_URL: ${API_URL}
     depends_on:
-      - api
+      api:
+        condition: service_healthy
 
 volumes:
   pgdata:

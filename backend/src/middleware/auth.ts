@@ -1,16 +1,11 @@
+import { Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { prisma } from '../index.js';
 import { config } from '../config.js';
-
-export interface UserPayload {
-  userId: string;
-  email: string;
-}
 
 export const authMiddleware = (
   req: any,
-  res: any,
-  next: any
+  res: Response,
+  next: NextFunction
 ) => {
   try {
     const authHeader = req.headers.authorization;
@@ -20,11 +15,11 @@ export const authMiddleware = (
     }
 
     const token = authHeader.substring(7);
+    const decoded = jwt.verify(token, config.JWT_SECRET) as { userId: string };
 
-    const decoded = jwt.verify(token, config.JWT_SECRET) as UserPayload;
-    req.user = decoded;
+    req.user = { userId: decoded.userId };
     next();
-  } catch (error) {
-    return res.status(401).json({ error: 'Invalid token' });
+  } catch {
+    return res.status(401).json({ error: 'Invalid or expired token' });
   }
 };

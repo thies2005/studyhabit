@@ -5,8 +5,11 @@ import { XpService } from '../services/xpService.js';
 
 const router = Router();
 
-// Get overview stats
-router.get('/overview', async (req: any, res: any) => {
+const daysQuerySchema = z.object({
+  days: z.coerce.number().int().min(1).max(365).default(84),
+});
+
+router.get('/overview', async (req, res, next) => {
   try {
     const userStats = await prisma.userStats.findUnique({
       where: { userId: req.user.userId },
@@ -19,7 +22,6 @@ router.get('/overview', async (req: any, res: any) => {
     const totalHours = userStats.totalStudyMinutes / 60;
     const levelName = XpService.levelName(userStats.currentLevel);
 
-    // Get this week's study minutes
     const oneWeekAgo = new Date();
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
 
@@ -34,12 +36,11 @@ router.get('/overview', async (req: any, res: any) => {
       (sum: number, s: any) => sum + s.actualDurationMinutes,
       0
     );
-    const weekHours = weekMinutes / 60;
 
     res.json({
       data: {
         totalHours,
-        weekHours,
+        weekHours: weekMinutes / 60,
         currentStreak: userStats.currentStreak,
         totalXp: userStats.totalXp,
         currentLevel: userStats.currentLevel,
@@ -47,14 +48,13 @@ router.get('/overview', async (req: any, res: any) => {
       },
     });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 });
 
-// Get heatmap data
-router.get('/heatmap', async (req: any, res: any) => {
+router.get('/heatmap', async (req, res, next) => {
   try {
-    const days = parseInt(req.query.days as string) || 84;
+    const { days } = daysQuerySchema.parse(req.query);
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
@@ -65,22 +65,26 @@ router.get('/heatmap', async (req: any, res: any) => {
       },
     });
 
-    // Group by date
-    const heatmapData = sessions.map((s: any) => ({
-      date: s.startedAt,
-      minutes: s.actualDurationMinutes,
+    const grouped = new Map<string, number>();
+    for (const s of sessions) {
+      const dateKey = s.startedAt.toISOString().split('T')[0];
+      grouped.set(dateKey, (grouped.get(dateKey) ?? 0) + s.actualDurationMinutes);
+    }
+
+    const heatmapData = Array.from(grouped.entries()).map(([date, minutes]) => ({
+      date,
+      minutes,
     }));
 
     res.json({ data: heatmapData });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 });
 
-// Get subject breakdown
-router.get('/subjects', async (req: any, res: any) => {
+router.get('/subjects', async (req, res, next) => {
   try {
-    const days = parseInt(req.query.days as string) || 30;
+    const { days } = daysQuerySchema.parse({ days: req.query.days || 30 });
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
@@ -92,7 +96,6 @@ router.get('/subjects', async (req: any, res: any) => {
       include: { subject: true },
     });
 
-    // Aggregate by subject
     const subjectMap = new Map();
 
     for (const session of sessions) {
@@ -116,7 +119,7 @@ router.get('/subjects', async (req: any, res: any) => {
       }
     }
 
-    const breakdown = Array.from(subjectMap.values()).map((d) => ({
+    const breakdown = Array.from(subjectMap.values()).map((d: any) => ({
       subject: d.subject,
       totalHours: d.totalMinutes / 60,
       sessionCount: d.sessionCount,
@@ -127,7 +130,7 @@ router.get('/subjects', async (req: any, res: any) => {
 
     res.json({ data: breakdown });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 });
 

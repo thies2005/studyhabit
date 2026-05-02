@@ -8,14 +8,31 @@ datasource db {
 }
 
 model User {
-  id           String    @id @default(uuid())
-  email        String    @unique
+  id           String         @id @default(uuid())
+  email        String         @unique
   passwordHash String
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
   projects     Project[]
   achievements Achievement[]
   userStats    UserStats?
+  refreshTokens RefreshToken[]
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  deviceName String?
+  deviceInfo String?
+  ipAddress String?
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  revokedAt DateTime?
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model Project {
@@ -30,6 +47,8 @@ model Project {
   isArchived   Boolean   @default(false)
   updatedAt    DateTime  @updatedAt
   subjects     Subject[]
+
+  @@index([userId])
 }
 
 model Subject {
@@ -49,6 +68,8 @@ model Subject {
   sessions               StudySession[]
   sources                Source[]
   skillLabels            SkillLabel[]
+
+  @@index([projectId])
 }
 
 model Topic {
@@ -60,6 +81,8 @@ model Topic {
   chapters  Chapter[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([subjectId])
 }
 
 model Chapter {
@@ -70,6 +93,8 @@ model Chapter {
   order     Int     @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([topicId])
 }
 
 model StudySession {
@@ -88,6 +113,9 @@ model StudySession {
   xpEarned                 Int        @default(0)
   createdAt                DateTime   @default(now())
   updatedAt                DateTime   @updatedAt
+
+  @@index([subjectId])
+  @@index([startedAt])
 }
 
 model Source {
@@ -106,6 +134,8 @@ model Source {
   notes           String?
   addedAt         DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+
+  @@index([subjectId])
 }
 
 model SkillLabel {
@@ -116,6 +146,8 @@ model SkillLabel {
   chapterId String?
   label     String   @default("beginner")
   updatedAt DateTime @updatedAt
+
+  @@index([subjectId])
 }
 
 model Achievement {
@@ -129,6 +161,7 @@ model Achievement {
   updatedAt   DateTime  @updatedAt
 
   @@unique([userId, key])
+  @@index([userId])
 }
 
 model UserStats {
