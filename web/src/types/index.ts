@@ -81,11 +81,70 @@ export interface ApiError {
   details?: unknown[];
 }
 
+export interface Topic {
+  id: string;
+  subjectId: string;
+  name: string;
+  order: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Chapter {
+  id: string;
+  topicId: string;
+  name: string;
+  order: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Source {
+  id: string;
+  subjectId: string;
+  topicId: string | null;
+  chapterId: string | null;
+  type: 'pdf' | 'url' | 'videoUrl';
+  title: string;
+  filePath: string | null;
+  url: string | null;
+  currentPage: number | null;
+  totalPages: number | null;
+  progressPercent: number | null;
+  notes: string | null;
+  addedAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SkillLabel {
+  id: string;
+  subjectId: string;
+  topicId: string | null;
+  chapterId: string | null;
+  label: 'beginner' | 'intermediate' | 'advanced' | 'expert';
+  updatedAt: string;
+  createdAt: string;
+  userId: string;
+}
+
 export interface StatsOverview {
   totalHours: number;
   weekHours: number;
   currentStreak: number;
   levelName: string;
+  currentLevel: number;
+  totalXp: number;
+  totalStudyMinutes: number;
+  longestStreak: number;
+}
+
+export interface SubjectBreakdown {
+  subject: Subject;
+  totalHours: number;
+  sessionCount: number;
+  avgConfidence: number;
+  skillLevel: string;
 }
 
 export interface WeeklyActivityData {

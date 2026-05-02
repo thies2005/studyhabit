@@ -1,10 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../database/app_database.dart';
+import '../services/app_logger.dart';
+import '../models/achievement.dart';
 import '../models/achievement.dart';
 import '../models/chapter.dart';
 import '../models/model_mapper.dart';
@@ -246,8 +247,8 @@ class ExportService {
       );
 
       return file;
-    } catch (e) {
-      debugPrint('Error exporting data: $e');
+    } catch (e, st) {
+      AppLogger.e('ExportService', 'Error exporting data', e, st);
       rethrow;
     }
   }

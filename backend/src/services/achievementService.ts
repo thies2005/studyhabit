@@ -149,12 +149,16 @@ export class AchievementService {
   }
 
   private static async buildContext(userId: string): Promise<AchievementContext> {
-    const [userStats, sessionAgg, sourceAgg, skillAgg, unlockedAchievements] =
+    const [userStats, sessionAgg, sessionMaxConfidence, sourceAgg, skillAgg, unlockedAchievements] =
       await Promise.all([
         prisma.userStats.findUnique({ where: { userId } }),
         prisma.studySession.aggregate({
           _count: true,
-          _sum: { pomodorosCompleted: true, actualDurationMinutes: true, confidenceRating: true },
+          _sum: { pomodorosCompleted: true, actualDurationMinutes: true },
+          where: { subject: { project: { userId } } },
+        }),
+        prisma.studySession.aggregate({
+          _max: { confidenceRating: true },
           where: { subject: { project: { userId } } },
         }),
         prisma.source.findFirst({
@@ -183,7 +187,7 @@ export class AchievementService {
       currentStreak: userStats?.currentStreak ?? 0,
       subjectHours,
       hasPdf: !!sourceAgg,
-      maxConfidence: sessionAgg._sum.confidenceRating ?? 0,
+      maxConfidence: sessionMaxConfidence._max.confidenceRating ?? 0,
       hasAdvancedSkill: !!skillAgg,
       unlockedKeys: new Set(unlockedAchievements.map((a) => a.key)),
     };

@@ -27,6 +27,21 @@ export default function Subjects() {
     return `#${colorValue.toString(16).padStart(6, '0')}`;
   };
 
+  const getLevel = (xp: number): number => {
+    if (xp < 500) return 1;
+    if (xp < 1500) return 2;
+    if (xp < 3500) return 3;
+    if (xp < 7000) return 4;
+    if (xp < 10500) return 5;
+    let level = 5;
+    let threshold = 7000;
+    while (xp >= Math.round((threshold * 1.5) / 100) * 100) {
+      threshold = Math.round((threshold * 1.5) / 100) * 100;
+      level++;
+    }
+    return level;
+  };
+
   const getSubjectIcon = (index: number) => {
     const icons = ['science', 'architecture', 'account_balance', 'psychology', 'code', 'school'];
     return icons[index % icons.length];
@@ -79,7 +94,7 @@ export default function Subjects() {
                       <span className="material-icons">{getSubjectIcon(index)}</span>
                     </div>
                     <span className="px-3 py-1 bg-primary/20 text-primary text-sm font-medium rounded-full">
-                      Lvl {Math.floor(subject.xpTotal / 500) + 1}
+                      Lvl {getLevel(subject.xpTotal)}
                     </span>
                   </div>
 

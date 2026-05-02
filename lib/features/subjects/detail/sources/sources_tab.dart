@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/models/enums.dart';
 import '../../../../core/models/source.dart';
+import '../../../../core/services/xp_service.dart';
 import '../../subject_providers.dart';
 import '../topics/chapter_providers.dart';
 import '../topics/topic_providers.dart';
@@ -319,7 +320,7 @@ class _UrlSourceCardState extends ConsumerState<_UrlSourceCard> {
                 onChanged: (v) => setState(() => _progress = v),
                 onChangeEnd: (v) {
                   ref
-                      .read(sourceProvider(widget.subjectId).notifier)
+                      .read(sourceNotifierProvider(widget.subjectId).notifier)
                       .updateProgress(widget.source.id, progressPercent: v);
                 },
               ),
@@ -619,7 +620,7 @@ class _AddSourceBottomSheetState extends ConsumerState<AddSourceBottomSheet> {
   }
 
   Future<void> _submit() async {
-    final notifier = ref.read(sourceProvider(widget.subjectId).notifier);
+    final notifier = ref.read(sourceNotifierProvider(widget.subjectId).notifier);
 
     try {
       if (_selectedType == SourceType.pdf) {
@@ -640,6 +641,13 @@ class _AddSourceBottomSheetState extends ConsumerState<AddSourceBottomSheet> {
           title: _titleController.text.trim(),
           url: _urlController.text.trim(),
         );
+      }
+
+      // Award +5 XP for adding a source
+      try {
+        await ref.read(xpServiceProvider).award(ref, XpReason.addSource);
+      } catch (e) {
+        debugPrint('Error awarding source XP: $e');
       }
 
       if (mounted) Navigator.of(context).pop();

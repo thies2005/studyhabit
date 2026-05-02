@@ -87,7 +87,8 @@ router.post('/', async (req, res, next) => {
 
     const xpEarned = XpService.xpForSession(
       data.actualDurationMinutes,
-      data.pomodorosCompleted
+      data.pomodorosCompleted,
+      data.confidenceRating
     );
 
     const session = await prisma.studySession.create({

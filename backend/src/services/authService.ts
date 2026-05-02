@@ -6,6 +6,22 @@ import { config } from '../config.js';
 import { TokenPair, DeviceInfo } from '../types/index.js';
 
 export class AuthService {
+  static parseDuration(duration: string): number {
+    const match = duration.match(/^(\d+)([dhms])$/);
+    if (!match) {
+      throw new Error(`Invalid duration format: ${duration}`);
+    }
+    const value = parseInt(match[1], 10);
+    const unit = match[2];
+    const multipliers: Record<string, number> = {
+      d: 24 * 60 * 60 * 1000,
+      h: 60 * 60 * 1000,
+      m: 60 * 1000,
+      s: 1000,
+    };
+    return value * multipliers[unit];
+  }
+
   static hashToken(token: string): string {
     return crypto.createHash('sha256').update(token).digest('hex');
   }
@@ -28,8 +44,7 @@ export class AuthService {
     device?: DeviceInfo
   ): Promise<void> {
     const tokenHash = this.hashToken(refreshToken);
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7);
+    const expiresAt = new Date(Date.now() + this.parseDuration(config.JWT_REFRESH_EXPIRY));
 
     const activeTokens = await prisma.refreshToken.count({
       where: { userId, revokedAt: null, expiresAt: { gt: new Date() } },
@@ -160,17 +175,19 @@ export class AuthService {
   }
 
   static async register(email: string, password: string) {
-    const passwordHash = await bcrypt.hash(password, 12);
+    return prisma.$transaction(async (tx) => {
+      const passwordHash = await bcrypt.hash(password, 12);
 
-    const user = await prisma.user.create({
-      data: { email, passwordHash },
+      const user = await tx.user.create({
+        data: { email, passwordHash },
+      });
+
+      await tx.userStats.create({
+        data: { userId: user.id },
+      });
+
+      return user;
     });
-
-    await prisma.userStats.create({
-      data: { userId: user.id },
-    });
-
-    return user;
   }
 
   static async login(email: string, password: string) {

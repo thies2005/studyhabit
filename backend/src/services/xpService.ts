@@ -6,10 +6,11 @@ export class XpService {
     if (totalXp < 1500) return 2;
     if (totalXp < 3500) return 3;
     if (totalXp < 7000) return 4;
+    if (totalXp < 10500) return 5;
 
-    let level = 5;
-    let threshold = 7000;
-    while (totalXp >= threshold) {
+    let level = 6;
+    let threshold = 10500;
+    while (totalXp >= Math.round((threshold * 1.5) / 100) * 100) {
       threshold = Math.round((threshold * 1.5) / 100) * 100;
       level++;
     }
@@ -18,19 +19,20 @@ export class XpService {
 
   static xpToNextLevel(totalXp: number): number {
     const currentLevel = this.calculateLevel(totalXp);
-    const thresholds = [0, 500, 1500, 3500, 7000];
+    const thresholds = [0, 500, 1500, 3500, 7000, 10500];
 
-    if (currentLevel <= 5) {
+    if (currentLevel < thresholds.length) {
       return thresholds[currentLevel] - totalXp;
     }
 
-    let threshold = 7000;
-    let level = 5;
+    let threshold = 10500;
+    let level = 6;
     while (level < currentLevel) {
       threshold = Math.round((threshold * 1.5) / 100) * 100;
       level++;
     }
-    return threshold - totalXp;
+    const nextThreshold = Math.round((threshold * 1.5) / 100) * 100;
+    return nextThreshold - totalXp;
   }
 
   static levelName(level: number): string {
@@ -46,7 +48,7 @@ export class XpService {
     return names[Math.min(level - 1, names.length - 1)];
   }
 
-  static xpForSession(minutes: number, pomodoros: number): number {
+  static xpForSession(minutes: number, pomodoros: number, confidenceRating?: number): number {
     let xp = 0;
 
     xp += pomodoros * 50;
@@ -55,7 +57,18 @@ export class XpService {
       xp += 120;
     }
 
+    if (confidenceRating && confidenceRating >= 1) {
+      xp += 10;
+    }
+
     return xp;
+  }
+
+  static xpForStreak(streak: number): number {
+    if (streak >= 100) return 500;
+    if (streak >= 30) return 500;
+    if (streak >= 7) return 500;
+    return 0;
   }
 
   static async addXpAndMinutes(

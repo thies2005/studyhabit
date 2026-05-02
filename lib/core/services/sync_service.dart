@@ -1,4 +1,5 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 part 'sync_service.g.dart';
 
@@ -47,10 +48,17 @@ SyncService syncService(Ref ref) {
 
 @Riverpod(keepAlive: true)
 class BackendEnabled extends _$BackendEnabled {
+  static const _backendEnabledKey = 'sync.backendEnabled';
+  late SharedPreferences _prefs;
+
   @override
-  bool build() => false;
+  Future<bool> build() async {
+    _prefs = await SharedPreferences.getInstance();
+    return _prefs.getBool(_backendEnabledKey) ?? false;
+  }
 
   Future<void> setEnabled(bool value) async {
     state = value;
+    await _prefs.setBool(_backendEnabledKey, value);
   }
 }

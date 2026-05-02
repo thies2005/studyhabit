@@ -23,6 +23,7 @@ const mockSessions = [
     description: 'Completed deep dive into neurotransmitter release mechanisms and receptor binding dynamics',
     tags: ['Synapse', 'Molecular'],
     isLab: false,
+    score: undefined,
     duration: '45 min',
     xp: 50,
     confidence: 4,
@@ -43,9 +44,10 @@ const mockSessions = [
     id: '3',
     date: 'OCT 8 · 10:00 AM',
     title: 'Dendritic Spine Structure',
-    description: 'Analyzing the morphological changes in dendritic spines during learning',
+    description: 'Analyzing morphological changes in dendritic spines during learning',
     tags: ['Structure', 'Learning'],
     isLab: false,
+    score: undefined,
     duration: '30 min',
     xp: 50,
     confidence: 3,
@@ -198,11 +200,11 @@ export default function SubjectDetail() {
                   source.type === 'video' ? 'bg-purple-500/20' :
                   'bg-blue-500/20'
                 }`}>
-                  <span className="material-icons text-2xl ${
+                  <span className={`material-icons text-2xl ${
                     source.type === 'pdf' ? 'text-red-400' :
                     source.type === 'video' ? 'text-purple-400' :
                     'text-blue-400'
-                  }">
+                  }`}>
                     {source.type === 'pdf' ? 'picture_as_pdf' :
                      source.type === 'video' ? 'play_circle' :
                      'article'}

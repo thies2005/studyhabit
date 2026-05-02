@@ -27,8 +27,8 @@ class SourceDao {
       _db.sources,
     )..where((table) => table.id.equals(id))).write(
       SourcesCompanion(
-        currentPage: Value(currentPage),
-        progressPercent: Value(progressPercent),
+        currentPage: currentPage != null ? Value(currentPage) : const Value.absent(),
+        progressPercent: progressPercent != null ? Value(progressPercent) : const Value.absent(),
       ),
     );
   }

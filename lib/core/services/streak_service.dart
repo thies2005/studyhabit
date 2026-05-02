@@ -1,6 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../providers/theme_provider.dart';
 import '../providers/user_stats_provider.dart';
 import 'xp_service.dart';
 
@@ -12,7 +13,8 @@ class StreakService {
 
   Future<void> recordStudyDay(Ref ref) async {
     final prefs = await SharedPreferences.getInstance();
-    final graceWindowHours = prefs.getDouble(_graceWindowKey) ?? 2.0;
+    final themeSettings = await ref.read(themeSettingsProvider.future);
+    final graceWindowHours = themeSettings.gracePeriodHours;
     final stats = await ref.read(userStatsProvider.future);
     final now = DateTime.now();
     final effectiveNow = now.subtract(
@@ -36,10 +38,12 @@ class StreakService {
     int newStreak = stats.currentStreak;
     bool usedFreeze = false;
 
+    int daysDiff = 0;
     if (lastStudyDate == null) {
       newStreak = 1;
+      daysDiff = 1; // First study day
     } else {
-      final daysDiff = today.difference(lastStudyDate).inDays;
+      daysDiff = today.difference(lastStudyDate).inDays;
 
       if (daysDiff == 0) {
         newStreak = stats.currentStreak;
@@ -87,7 +91,7 @@ class StreakService {
     final updatedStats = stats.copyWith(
       currentStreak: newStreak,
       longestStreak: newLongest,
-      lastStudyDate: today,
+      lastStudyDate: daysDiff != 0 ? today : stats.lastStudyDate,
       freezeTokens: freezeTokens,
     );
 

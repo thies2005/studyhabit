@@ -71,15 +71,11 @@ class AchievementService {
         if (s.isFreeTimer) {
           freeTimerCount++;
         }
-        
-        if (s.actualDurationMinutes >= 300) {
-          longSession5h++;
-        } else if (s.actualDurationMinutes >= 180) {
-          longSession3h++;
-        } else if (s.actualDurationMinutes >= 120) {
-          longSession2h++;
-        }
-        
+
+        if (s.actualDurationMinutes >= 120) longSession2h++;
+        if (s.actualDurationMinutes >= 180) longSession3h++;
+        if (s.actualDurationMinutes >= 300) longSession5h++;
+
         final hour = s.startedAt.hour;
         if (hour < 7) sessionsBefore7am++;
         if (hour >= 22) sessionsAfter10pm++;
@@ -172,17 +168,14 @@ class AchievementService {
         // Night/Day
         'night_owl': (sessionsAfter10pm > 0 ? 1.0 : 0.0),
         'early_bird': (sessionsBefore7am > 0 ? 1.0 : 0.0),
-
-        // Misc
-        'all_badges': _calcAllBadgesProgress(checks: null, earnedCount: -1), // Placeholder
       };
 
-      // Calculate the specific 'earned' count for the special progress badge
+      // Calculate all_badges progress (excludes itself from the total count)
       int earnedCount = 0;
       for (final progress in checks.values) {
         if (progress >= 1.0) earnedCount++;
       }
-      checks['all_badges'] = (earnedCount / (checks.length - 1).toDouble()).clamp(0.0, 1.0);
+      checks['all_badges'] = (earnedCount / checks.length.toDouble()).clamp(0.0, 1.0);
 
       final newlyUnlocked = <AchievementUnlock>[];
 

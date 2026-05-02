@@ -29,6 +29,7 @@ abstract class PomodoroState with _$PomodoroState {
     @Default(0) int lastSessionXpEarned,     // XP earned (pre-confidence) for review display
     @Default(false) bool isOvertime,
     @Default(0) int overtimeSeconds,
+    @Default(false) bool confidenceXpAwarded, // Prevents duplicate confidence XP awards
   }) = _PomodoroState;
 
   factory PomodoroState.fromJson(Map<String, dynamic> json) =>

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../index.js';
+import { XpService } from '../services/xpService.js';
 import { parsePagination } from '../types/index.js';
 
 const router = Router();
@@ -84,6 +85,9 @@ router.post('/', async (req, res, next) => {
     }
 
     const source = await prisma.source.create({ data });
+
+    await XpService.addXpAndMinutes(req.user.userId, 5, 0);
+
     res.status(201).json({ data: source });
   } catch (error: any) {
     next(error);

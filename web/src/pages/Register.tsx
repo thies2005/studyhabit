@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import apiClient from '../api/client';
 
 export default function Register() {
   const [email, setEmail] = useState('');
@@ -18,13 +19,14 @@ export default function Register() {
     }
 
     try {
-      const response = await fetch('/api/v1/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-      const data = await response.json();
-      const { user, accessToken, refreshToken } = data.data;
+      const response = await apiClient.post('/auth/register', { email, password });
+
+      if (response.data.error) {
+        setError(response.data.error);
+        return;
+      }
+
+      const { user, accessToken, refreshToken } = response.data.data;
 
       localStorage.setItem('access_token', accessToken);
       localStorage.setItem('refresh_token', refreshToken);

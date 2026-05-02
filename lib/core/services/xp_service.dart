@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../providers/user_stats_provider.dart';
+import 'achievement_service.dart';
 
 part 'xp_service.g.dart';
 
@@ -32,24 +33,19 @@ class XpService {
     };
   }
 
-  Future<void> award(Object ref, XpReason reason) async {
+  Future<void> award(Ref ref, XpReason reason) async {
     final xp = xpForReason(reason);
-    final notifier = switch (ref) {
-      Ref r => r.read(userStatsProvider.notifier),
-      WidgetRef r => r.read(userStatsProvider.notifier),
-      _ => throw ArgumentError.value(ref, 'ref', 'Expected Ref or WidgetRef'),
-    };
-    final stats = switch (ref) {
-      Ref r => await r.read(userStatsProvider.future),
-      WidgetRef r => await r.read(userStatsProvider.future),
-      _ => throw ArgumentError.value(ref, 'ref', 'Expected Ref or WidgetRef'),
-    };
+    final notifier = ref.read(userStatsProvider.notifier);
+    final stats = await ref.read(userStatsProvider.future);
     final newTotalXp = stats.totalXp + xp;
     final newLevel = calculateLevel(newTotalXp);
 
     await notifier.upsert(
       stats.copyWith(totalXp: newTotalXp, currentLevel: newLevel),
     );
+
+    final achievementService = ref.read(achievementServiceProvider.notifier);
+    await achievementService.checkAndUnlock(ref);
   }
 
   int calculateLevel(int totalXp) {
@@ -59,12 +55,10 @@ class XpService {
     if (totalXp < 7000) return 4;
     if (totalXp < 10500) return 5;
 
-    int threshold = 7000;
-    int level = 5;
-    while (level < 100) {
-      final next = ((threshold * 1.5) / 100).round() * 100;
-      if (totalXp < next) return level;
-      threshold = next;
+    int threshold = 10500;
+    int level = 6;
+    while (level < 100 && totalXp >= threshold) {
+      threshold = ((threshold * 1.5) / 100).round() * 100;
       level++;
     }
     return level;

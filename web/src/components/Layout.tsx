@@ -1,8 +1,9 @@
-import { Outlet, Link, useNavigate } from 'react-router-dom';
+import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useState } from 'react';
 
 export default function Layout() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [deepWorkMode, setDeepWorkMode] = useState(false);
 
@@ -77,17 +78,24 @@ export default function Layout() {
 
         {/* Navigation Items */}
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-          {navItems.map((item) => (
-            <Link
-              key={item.to}
-              to={item.to}
-              onClick={() => setSidebarOpen(false)}
-              className="flex items-center space-x-3 px-4 py-3 rounded-lg text-onSurface hover:bg-surfaceHigh transition-colors font-body"
-            >
-              <span className="material-icons">{item.icon}</span>
-              <span className="font-medium">{item.label}</span>
-            </Link>
-          ))}
+          {navItems.map((item) => {
+            const isActive = location.pathname === item.to;
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                onClick={() => setSidebarOpen(false)}
+                className={`flex items-center space-x-3 px-4 py-3 rounded-lg font-body transition-colors ${
+                  isActive
+                    ? 'bg-primary text-background'
+                    : 'text-onSurface hover:bg-surfaceHigh'
+                }`}
+              >
+                <span className="material-icons">{item.icon}</span>
+                <span className="font-medium">{item.label}</span>
+              </Link>
+            );
+          })}
         </nav>
 
         {/* Bottom Actions */}

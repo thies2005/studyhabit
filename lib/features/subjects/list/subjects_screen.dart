@@ -420,21 +420,21 @@ class _PopupMenu extends ConsumerWidget {
             onPressed: () => Navigator.of(ctx).pop(),
             child: const Text('Cancel'),
           ),
-          FilledButton(
-            onPressed: () {
-              final hours = int.tryParse(controller.text);
-              if (hours != null && hours > 0) {
-                ref.read(subjectProvider.notifier).updateSubject(
+              FilledButton(
+                onPressed: () {
+                  final hours = int.tryParse(controller.text);
+                  if (hours != null && hours > 0) {
+                    ref.read(subjectNotifierProvider.notifier).updateSubject(
                       subject.copyWith(
                         completenessMode: CompletenessMode.hoursGoal,
                         targetHours: hours,
                       ),
                     );
-              }
-              Navigator.of(ctx).pop();
-            },
-            child: const Text('Save'),
-          ),
+                  }
+                  Navigator.of(ctx).pop();
+                },
+                child: const Text('Save'),
+              ),
         ],
       ),
     );
@@ -466,7 +466,7 @@ class _PopupMenu extends ConsumerWidget {
             onPressed: () {
               final hours = int.tryParse(controller.text);
               if (hours != null && hours > 0) {
-                ref.read(subjectProvider.notifier).updateSubject(
+                ref.read(subjectNotifierProvider.notifier).updateSubject(
                       subject.copyWith(
                         completenessMode: CompletenessMode.weeklyHoursGoal,
                         targetWeeklyHours: hours,
@@ -499,7 +499,7 @@ class _PopupMenu extends ConsumerWidget {
               backgroundColor: Theme.of(ctx).colorScheme.error,
             ),
             onPressed: () {
-              ref.read(subjectProvider.notifier).delete(subject.id);
+              ref.read(subjectNotifierProvider.notifier).delete(subject.id);
               Navigator.of(ctx).pop();
             },
             child: const Text('Delete'),

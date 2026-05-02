@@ -407,11 +407,11 @@ export default function Stats() {
                               </div>
                             </td>
                             <td className="text-center py-3 px-2">
-                              <span className="px-2 py-1 text-xs rounded-full font-body ${
+                              <span className={`px-2 py-1 text-xs rounded-full font-body ${
                                 subject.skillLevel === 'Expert' ? 'bg-tertiary/20 text-tertiary' :
                                 subject.skillLevel === 'Advanced' ? 'bg-primary/20 text-primary' :
                                 'bg-gray-700 text-gray-300'
-                              }">
+                              }`}>
                                 {subject.skillLevel}
                               </span>
                             </td>

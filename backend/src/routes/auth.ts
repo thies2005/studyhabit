@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
+import bcrypt from 'bcryptjs';
 import { prisma } from '../index.js';
 import { AuthService } from '../services/authService.js';
 import { authMiddleware } from '../middleware/auth.js';
@@ -43,7 +44,8 @@ router.post('/register', async (req, res, next) => {
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
-      await new Promise((r) => setTimeout(r, 200 + Math.random() * 300));
+      // Perform dummy bcrypt hash to match timing and prevent timing side-channel attacks
+      await bcrypt.hash('dummy', 12);
       return res.status(201).json({
         data: {
           user: { id: existing.id, email: existing.email, createdAt: existing.createdAt },

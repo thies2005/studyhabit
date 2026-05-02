@@ -1,11 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { authMiddleware } from '../middleware/auth.js';
 import { SyncService } from '../services/syncService.js';
 
 const router = Router();
-
-router.use(authMiddleware);
 
 const pushSchema = z.object({
   projects: z.array(z.record(z.unknown())).optional(),

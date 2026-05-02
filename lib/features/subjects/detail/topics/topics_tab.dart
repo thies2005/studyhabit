@@ -176,7 +176,7 @@ class _TopicExpansionTile extends ConsumerWidget {
                                 onSelected: (action) {
                                   if (action == 'delete') {
                                     ref
-                                        .read(chapterProvider.notifier)
+                                        .read(chapterNotifierProvider.notifier)
                                         .delete(ch.id);
                                   } else if (action == 'rename') {
                                     _showRenameDialog(
@@ -184,7 +184,7 @@ class _TopicExpansionTile extends ConsumerWidget {
                                       'Rename Chapter',
                                       ch.name,
                                       (newName) => ref
-                                          .read(chapterProvider.notifier)
+                                          .read(chapterNotifierProvider.notifier)
                                           .rename(ch.id, newName),
                                     );
                                   }

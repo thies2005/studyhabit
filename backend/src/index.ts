@@ -10,17 +10,22 @@ import { authLimiter, apiLimiter, syncLimiter } from './middleware/rateLimit.js'
 import authRoutes from './routes/auth.js';
 import syncRoutes from './routes/sync.js';
 import projectRoutes from './routes/projects.js';
-import subjectRoutes from './routes/subjects.js';
+import subjectRoutes, { createProjectSubjectRoutes } from './routes/subjects.js';
 import sessionRoutes from './routes/sessions.js';
 import sourceRoutes from './routes/sources.js';
 import statsRoutes from './routes/stats.js';
 import achievementRoutes from './routes/achievements.js';
+import topicRoutes from './routes/topics.js';
+import chapterRoutes from './routes/chapters.js';
+import skillLabelRoutes from './routes/skill-labels.js';
 import { AuthService } from './services/authService.js';
 import docsRoutes from './routes/docs.js';
 
 export const prisma = new PrismaClient();
 
 const app = express();
+
+app.set('trust proxy', 1);
 
 app.use(helmet());
 
@@ -50,10 +55,14 @@ app.get('/health', async (_req, res) => {
 
 app.use('/api/v1/auth', authLimiter, authRoutes);
 
-app.use('/api/v1/sync', apiLimiter, syncLimiter, syncRoutes);
+app.use('/api/v1/sync', apiLimiter, syncLimiter, authMiddleware, syncRoutes);
 
 app.use('/api/v1/projects', apiLimiter, authMiddleware, projectRoutes);
+app.use('/api/v1/projects/:projectId/subjects', apiLimiter, authMiddleware, createProjectSubjectRoutes());
 app.use('/api/v1/subjects', apiLimiter, authMiddleware, subjectRoutes);
+app.use('/api/v1/topics', apiLimiter, authMiddleware, topicRoutes);
+app.use('/api/v1/chapters', apiLimiter, authMiddleware, chapterRoutes);
+app.use('/api/v1/skill-labels', apiLimiter, authMiddleware, skillLabelRoutes);
 app.use('/api/v1/sessions', apiLimiter, authMiddleware, sessionRoutes);
 app.use('/api/v1/sources', apiLimiter, authMiddleware, sourceRoutes);
 app.use('/api/v1/stats', apiLimiter, authMiddleware, statsRoutes);

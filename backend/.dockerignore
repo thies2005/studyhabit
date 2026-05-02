@@ -1,8 +1,36 @@
-node_modules
-dist
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Testing
+test/
+*.test.ts
+*.spec.ts
+
+# Development files
+.github/
+*.md
 .env
+.env.*
+.env.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Logs
 *.log
-coverage
-.vscode
-.idea
+npm-debug.log*
+
+# Temporary files
+*.tmp
+.cache/

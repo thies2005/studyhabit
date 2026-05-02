@@ -23,7 +23,11 @@ class SessionDao {
         .getSingleOrNull();
   }
 
-  Future<void> update(StudySessionRow row) {
+  Future<void> update(StudySessionsCompanion companion) {
+    return _db.update(_db.studySessions).write(companion);
+  }
+
+  Future<void> updateRow(StudySessionRow row) {
     return _db.update(_db.studySessions).replace(row);
   }
 

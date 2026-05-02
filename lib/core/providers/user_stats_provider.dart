@@ -7,7 +7,7 @@ import '../database/daos/stats_dao.dart';
 import '../models/model_mapper.dart';
 import '../models/user_stats.dart';
 import 'database_provider.dart';
-import '../../core/services/app_logger.dart';
+import '../services/app_logger.dart';
 
 part 'user_stats_provider.g.dart';
 
@@ -23,7 +23,7 @@ class UserStatsNotifier extends _$UserStatsNotifier {
 
     try {
       await _statsDao.initStats();
-      AppLogger.i('UserStatsNotifier', 'Stats initialization successful');
+      AppLogger.d('UserStatsNotifier', 'Stats initialization successful');
     } catch (e, stack) {
       AppLogger.e('UserStatsNotifier', 'Stats initialization failed', e, stack);
     }
@@ -31,10 +31,7 @@ class UserStatsNotifier extends _$UserStatsNotifier {
     yield* _db
         .select(_db.userStatsTable)
         .watchSingleOrNull()
-        .map((row) {
-          AppLogger.i('UserStatsNotifier', 'Stats row updated: ${row?.id}');
-          return mapUserStats(row);
-        });
+        .map((row) => mapUserStats(row));
   }
 
   Future<void> upsert(UserStats stats) async {

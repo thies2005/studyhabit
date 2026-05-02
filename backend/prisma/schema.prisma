@@ -73,26 +73,32 @@ model Subject {
 }
 
 model Topic {
-  id        String   @id @default(uuid())
+  id        String        @id @default(uuid())
   subjectId String
-  subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  subject   Subject       @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   name      String
-  order     Int      @default(0)
+  order     Int           @default(0)
   chapters  Chapter[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  sessions  StudySession[]
+  sources   Source[]
+  skillLabels SkillLabel[]
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
 
   @@index([subjectId])
 }
 
 model Chapter {
-  id        String  @id @default(uuid())
+  id        String        @id @default(uuid())
   topicId   String
-  topic     Topic   @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  topic     Topic         @relation(fields: [topicId], references: [id], onDelete: Cascade)
   name      String
-  order     Int     @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  order     Int           @default(0)
+  sessions  StudySession[]
+  sources   Source[]
+  skillLabels SkillLabel[]
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
 
   @@index([topicId])
 }
@@ -102,7 +108,9 @@ model StudySession {
   subjectId                String
   subject                  Subject    @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   topicId                  String?
+  topic                    Topic?     @relation(fields: [topicId], references: [id], onDelete: SetNull)
   chapterId                String?
+  chapter                  Chapter?   @relation(fields: [chapterId], references: [id], onDelete: SetNull)
   startedAt                DateTime
   endedAt                  DateTime?
   plannedDurationMinutes   Int        @default(25)
@@ -123,7 +131,9 @@ model Source {
   subjectId       String
   subject         Subject   @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   topicId         String?
+  topic           Topic?    @relation(fields: [topicId], references: [id], onDelete: SetNull)
   chapterId       String?
+  chapter         Chapter?  @relation(fields: [chapterId], references: [id], onDelete: SetNull)
   type            String    @default("pdf")
   title           String
   filePath        String?
@@ -143,7 +153,9 @@ model SkillLabel {
   subjectId String
   subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   topicId   String?
+  topic     Topic?   @relation(fields: [topicId], references: [id], onDelete: SetNull)
   chapterId String?
+  chapter   Chapter? @relation(fields: [chapterId], references: [id], onDelete: SetNull)
   label     String   @default("beginner")
   updatedAt DateTime @updatedAt
 

@@ -2,10 +2,11 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:drift/drift.dart';
-import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../database/app_database.dart';
+import '../services/app_logger.dart';
+import '../models/enums.dart';
 import '../models/enums.dart';
 import '../providers/database_provider.dart';
 import 'export_service.dart';
@@ -248,8 +249,7 @@ class ImportService {
         );
       });
     } catch (e, st) {
-      debugPrint('Error importing data: $e');
-      debugPrint(st.toString());
+      AppLogger.e('ImportService', 'Error importing data', e, st);
       errors.add(e.toString());
       projectCount = 0;
       subjectCount = 0;

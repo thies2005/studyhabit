@@ -32,8 +32,15 @@ class LogEntry {
 class AppLogger {
   static final List<LogEntry> _logs = [];
   static const int _maxLogs = 500;
+  static const bool _enableDebugLogs = true; // Set to false in production
 
   static List<LogEntry> get logs => List.unmodifiable(_logs);
+
+  static void d(String tag, String message) {
+    if (_enableDebugLogs) {
+      _log(LogLevel.info, tag, message);
+    }
+  }
 
   static void i(String tag, String message) {
     _log(LogLevel.info, tag, message);

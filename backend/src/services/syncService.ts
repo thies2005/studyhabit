@@ -1,5 +1,117 @@
 import { prisma } from '../index.js';
 import { SyncPushPayload, SyncPullResponse } from '../types/index.js';
+import { z } from 'zod';
+
+// Define Zod schemas for each entity type to validate and strip unknown fields
+const projectSchema = z.object({
+  id: z.string().uuid(),
+  userId: z.string().uuid(),
+  name: z.string(),
+  icon: z.string(),
+  colorValue: z.number(),
+  createdAt: z.string().or(z.date()),
+  lastOpenedAt: z.string().or(z.date()),
+  isArchived: z.boolean(),
+  updatedAt: z.string().or(z.date()),
+});
+
+const subjectSchema = z.object({
+  id: z.string().uuid(),
+  projectId: z.string().uuid(),
+  name: z.string(),
+  description: z.string().nullable(),
+  colorValue: z.number(),
+  hierarchyMode: z.enum(['flat', 'twoLevel', 'threeLevel']),
+  defaultDurationMinutes: z.number(),
+  defaultBreakMinutes: z.number(),
+  xpTotal: z.number(),
+  createdAt: z.string().or(z.date()),
+  updatedAt: z.string().or(z.date()),
+});
+
+const topicSchema = z.object({
+  id: z.string().uuid(),
+  subjectId: z.string().uuid(),
+  name: z.string(),
+  order: z.number(),
+  createdAt: z.string().or(z.date()),
+  updatedAt: z.string().or(z.date()),
+});
+
+const chapterSchema = z.object({
+  id: z.string().uuid(),
+  topicId: z.string().uuid(),
+  name: z.string(),
+  order: z.number(),
+  createdAt: z.string().or(z.date()),
+  updatedAt: z.string().or(z.date()),
+});
+
+const sessionSchema = z.object({
+  id: z.string().uuid(),
+  subjectId: z.string().uuid(),
+  topicId: z.string().uuid().nullable(),
+  chapterId: z.string().uuid().nullable(),
+  startedAt: z.string().or(z.date()),
+  endedAt: z.string().or(z.date()).nullable(),
+  plannedDurationMinutes: z.number(),
+  actualDurationMinutes: z.number(),
+  pomodorosCompleted: z.number(),
+  confidenceRating: z.number().nullable(),
+  notes: z.string().nullable(),
+  xpEarned: z.number(),
+  createdAt: z.string().or(z.date()),
+  updatedAt: z.string().or(z.date()),
+});
+
+const sourceSchema = z.object({
+  id: z.string().uuid(),
+  subjectId: z.string().uuid(),
+  topicId: z.string().uuid().nullable(),
+  chapterId: z.string().uuid().nullable(),
+  type: z.enum(['pdf', 'url', 'videoUrl']),
+  title: z.string(),
+  filePath: z.string().nullable(),
+  url: z.string().nullable(),
+  currentPage: z.number().nullable(),
+  totalPages: z.number().nullable(),
+  progressPercent: z.number().nullable(),
+  notes: z.string().nullable(),
+  addedAt: z.string().or(z.date()),
+  updatedAt: z.string().or(z.date()),
+});
+
+const skillLabelSchema = z.object({
+  id: z.string().uuid(),
+  subjectId: z.string().uuid(),
+  topicId: z.string().uuid().nullable(),
+  chapterId: z.string().uuid().nullable(),
+  label: z.enum(['beginner', 'intermediate', 'advanced', 'expert']),
+  updatedAt: z.string().or(z.date()),
+});
+
+const achievementSchema = z.object({
+  id: z.string().uuid().optional(),
+  key: z.string(),
+  unlockedAt: z.string().or(z.date()).nullable(),
+  progress: z.number(),
+  createdAt: z.string().or(z.date()),
+  updatedAt: z.string().or(z.date()),
+});
+
+const userStatsSchema = z.object({
+  id: z.string().uuid().optional(),
+  userId: z.string().uuid(),
+  totalXp: z.number(),
+  currentLevel: z.number(),
+  currentStreak: z.number(),
+  longestStreak: z.number(),
+  lastStudyDate: z.string().or(z.date()).nullable(),
+  totalStudyMinutes: z.number(),
+  freezeTokens: z.number(),
+  createdAt: z.string().or(z.date()),
+  updatedAt: z.string().or(z.date()),
+});
 
 interface ConflictResult {
   accepted: boolean;
@@ -123,25 +235,28 @@ export class SyncService {
       let c = 0;
       for (const item of payload.projects) {
         try {
+          // Validate and strip unknown fields
+          const validated = projectSchema.parse(item);
+
           const existing = await prisma.project.findUnique({
-            where: { id: item.id },
+            where: { id: validated.id },
           });
 
           if (existing && existing.userId !== userId) {
-            errors.push({ entity: 'project', id: item.id, error: 'forbidden' });
+            errors.push({ entity: 'project', id: validated.id, error: 'forbidden' });
             continue;
           }
 
-          const result = lastWriteWins(item, existing);
+          const result = lastWriteWins(validated, existing);
           if (!result.accepted) {
             c++;
             continue;
           }
 
           await prisma.project.upsert({
-            where: { id: item.id },
-            create: { ...item, userId },
-            update: item,
+            where: { id: validated.id },
+            create: { ...validated, userId },
+            update: validated,
           });
           a++;
         } catch (e: any) {
@@ -157,27 +272,30 @@ export class SyncService {
       let c = 0;
       for (const item of payload.subjects) {
         try {
+          // Validate and strip unknown fields
+          const validated = subjectSchema.parse(item);
+
           const project = await prisma.project.findUnique({
-            where: { id: item.projectId },
+            where: { id: validated.projectId },
           });
           if (!project || project.userId !== userId) {
-            errors.push({ entity: 'subject', id: item.id, error: 'forbidden' });
+            errors.push({ entity: 'subject', id: validated.id, error: 'forbidden' });
             continue;
           }
 
           const existing = await prisma.subject.findUnique({
-            where: { id: item.id },
+            where: { id: validated.id },
           });
-          const result = lastWriteWins(item, existing);
+          const result = lastWriteWins(validated, existing);
           if (!result.accepted) {
             c++;
             continue;
           }
 
           await prisma.subject.upsert({
-            where: { id: item.id },
-            create: item,
-            update: item,
+            where: { id: validated.id },
+            create: validated,
+            update: validated,
           });
           a++;
         } catch (e: any) {
@@ -193,25 +311,28 @@ export class SyncService {
       let c = 0;
       for (const item of payload.topics) {
         try {
-          const owned = await SyncService.verifySubjectOwnership(item.subjectId, userId);
+          // Validate and strip unknown fields
+          const validated = topicSchema.parse(item);
+
+          const owned = await SyncService.verifySubjectOwnership(validated.subjectId, userId);
           if (!owned) {
-            errors.push({ entity: 'topic', id: item.id, error: 'forbidden' });
+            errors.push({ entity: 'topic', id: validated.id, error: 'forbidden' });
             continue;
           }
 
           const existing = await prisma.topic.findUnique({
-            where: { id: item.id },
+            where: { id: validated.id },
           });
-          const result = lastWriteWins(item, existing);
+          const result = lastWriteWins(validated, existing);
           if (!result.accepted) {
             c++;
             continue;
           }
 
           await prisma.topic.upsert({
-            where: { id: item.id },
-            create: item,
-            update: item,
+            where: { id: validated.id },
+            create: validated,
+            update: validated,
           });
           a++;
         } catch (e: any) {
@@ -227,25 +348,28 @@ export class SyncService {
       let c = 0;
       for (const item of payload.chapters) {
         try {
-          const owned = await SyncService.verifyTopicOwnership(item.topicId, userId);
+          // Validate and strip unknown fields
+          const validated = chapterSchema.parse(item);
+
+          const owned = await SyncService.verifyTopicOwnership(validated.topicId, userId);
           if (!owned) {
-            errors.push({ entity: 'chapter', id: item.id, error: 'forbidden' });
+            errors.push({ entity: 'chapter', id: validated.id, error: 'forbidden' });
             continue;
           }
 
           const existing = await prisma.chapter.findUnique({
-            where: { id: item.id },
+            where: { id: validated.id },
           });
-          const result = lastWriteWins(item, existing);
+          const result = lastWriteWins(validated, existing);
           if (!result.accepted) {
             c++;
             continue;
           }
 
           await prisma.chapter.upsert({
-            where: { id: item.id },
-            create: item,
-            update: item,
+            where: { id: validated.id },
+            create: validated,
+            update: validated,
           });
           a++;
         } catch (e: any) {
@@ -261,25 +385,28 @@ export class SyncService {
       let c = 0;
       for (const item of payload.sessions) {
         try {
-          const owned = await SyncService.verifySubjectOwnership(item.subjectId, userId);
+          // Validate and strip unknown fields
+          const validated = sessionSchema.parse(item);
+
+          const owned = await SyncService.verifySubjectOwnership(validated.subjectId, userId);
           if (!owned) {
-            errors.push({ entity: 'session', id: item.id, error: 'forbidden' });
+            errors.push({ entity: 'session', id: validated.id, error: 'forbidden' });
             continue;
           }
 
           const existing = await prisma.studySession.findUnique({
-            where: { id: item.id },
+            where: { id: validated.id },
           });
-          const result = lastWriteWins(item, existing);
+          const result = lastWriteWins(validated, existing);
           if (!result.accepted) {
             c++;
             continue;
           }
 
           await prisma.studySession.upsert({
-            where: { id: item.id },
-            create: item,
-            update: item,
+            where: { id: validated.id },
+            create: validated,
+            update: validated,
           });
           a++;
         } catch (e: any) {
@@ -295,25 +422,28 @@ export class SyncService {
       let c = 0;
       for (const item of payload.sources) {
         try {
-          const owned = await SyncService.verifySubjectOwnership(item.subjectId, userId);
+          // Validate and strip unknown fields
+          const validated = sourceSchema.parse(item);
+
+          const owned = await SyncService.verifySubjectOwnership(validated.subjectId, userId);
           if (!owned) {
-            errors.push({ entity: 'source', id: item.id, error: 'forbidden' });
+            errors.push({ entity: 'source', id: validated.id, error: 'forbidden' });
             continue;
           }
 
           const existing = await prisma.source.findUnique({
-            where: { id: item.id },
+            where: { id: validated.id },
           });
-          const result = lastWriteWins(item, existing);
+          const result = lastWriteWins(validated, existing);
           if (!result.accepted) {
             c++;
             continue;
           }
 
           await prisma.source.upsert({
-            where: { id: item.id },
-            create: item,
-            update: item,
+            where: { id: validated.id },
+            create: validated,
+            update: validated,
           });
           a++;
         } catch (e: any) {
@@ -329,25 +459,28 @@ export class SyncService {
       let c = 0;
       for (const item of payload.skillLabels) {
         try {
-          const owned = await SyncService.verifySubjectOwnership(item.subjectId, userId);
+          // Validate and strip unknown fields
+          const validated = skillLabelSchema.parse(item);
+
+          const owned = await SyncService.verifySubjectOwnership(validated.subjectId, userId);
           if (!owned) {
-            errors.push({ entity: 'skillLabel', id: item.id, error: 'forbidden' });
+            errors.push({ entity: 'skillLabel', id: validated.id, error: 'forbidden' });
             continue;
           }
 
           const existing = await prisma.skillLabel.findUnique({
-            where: { id: item.id },
+            where: { id: validated.id },
           });
-          const result = lastWriteWins(item, existing);
+          const result = lastWriteWins(validated, existing);
           if (!result.accepted) {
             c++;
             continue;
           }
 
           await prisma.skillLabel.upsert({
-            where: { id: item.id },
-            create: item,
-            update: item,
+            where: { id: validated.id },
+            create: validated,
+            update: validated,
           });
           a++;
         } catch (e: any) {
@@ -362,22 +495,25 @@ export class SyncService {
       let a = 0;
       for (const item of payload.achievements) {
         try {
-          if (item.unlockedAt) {
-            errors.push({ entity: 'achievement', id: item.key, error: 'unlock_not_allowed_via_sync' });
+          // Validate and strip unknown fields
+          const validated = achievementSchema.parse(item);
+
+          if (validated.unlockedAt) {
+            errors.push({ entity: 'achievement', id: validated.key, error: 'unlock_not_allowed_via_sync' });
             continue;
           }
 
           const existing = await prisma.achievement.findUnique({
-            where: { userId_key: { userId, key: item.key } },
+            where: { userId_key: { userId, key: validated.key } },
           });
-          if (existing && item.progress <= existing.progress) continue;
+          if (existing && validated.progress <= existing.progress) continue;
 
           await prisma.achievement.upsert({
-            where: { userId_key: { userId, key: item.key } },
-            create: { ...item, userId, unlockedAt: null },
+            where: { userId_key: { userId, key: validated.key } },
+            create: { ...validated, userId, unlockedAt: null },
             update: {
-              ...(item.progress > (existing?.progress ?? 0)
-                ? { progress: item.progress }
+              ...(validated.progress > (existing?.progress ?? 0)
+                ? { progress: validated.progress }
                 : {}),
             },
           });
@@ -391,29 +527,32 @@ export class SyncService {
 
     if (payload.userStats) {
       try {
+        // Validate and strip unknown fields
+        const validated = userStatsSchema.parse(payload.userStats);
+
         const existing = await prisma.userStats.findUnique({
           where: { userId },
         });
         if (existing) {
-          const incomingUpdated = payload.userStats.updatedAt
-            ? new Date(payload.userStats.updatedAt)
+          const incomingUpdated = validated.updatedAt
+            ? new Date(validated.updatedAt)
             : new Date(0);
           if (incomingUpdated <= existing.updatedAt) {
             conflicts.userStats = 1;
           } else {
             const updates: any = {};
-            if (payload.userStats.totalXp > existing.totalXp) {
-              updates.totalXp = payload.userStats.totalXp;
+            if (validated.totalXp > existing.totalXp) {
+              updates.totalXp = validated.totalXp;
             }
-            if (payload.userStats.currentStreak > existing.currentStreak) {
-              updates.currentStreak = payload.userStats.currentStreak;
+            if (validated.currentStreak > existing.currentStreak) {
+              updates.currentStreak = validated.currentStreak;
               updates.longestStreak = Math.max(
                 existing.longestStreak,
-                payload.userStats.currentStreak
+                validated.currentStreak
               );
             }
-            if (payload.userStats.totalStudyMinutes > existing.totalStudyMinutes) {
-              updates.totalStudyMinutes = payload.userStats.totalStudyMinutes;
+            if (validated.totalStudyMinutes > existing.totalStudyMinutes) {
+              updates.totalStudyMinutes = validated.totalStudyMinutes;
             }
             if (Object.keys(updates).length > 0) {
               await prisma.userStats.update({ where: { userId }, data: updates });

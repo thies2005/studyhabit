@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { Prisma } from '@prisma/client';
+import { ZodError } from 'zod';
 
 export const errorHandler = (
   err: Error,
@@ -25,10 +26,10 @@ export const errorHandler = (
     }
   }
 
-  if (err.name === 'ZodError') {
+  if (err instanceof ZodError) {
     return res.status(400).json({
       error: 'Validation error',
-      details: JSON.parse(err.message),
+      details: err.errors,
     });
   }
 
