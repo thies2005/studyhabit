@@ -114,6 +114,10 @@ export class SyncService {
     const conflicts: Record<string, number> = {};
     const errors: Array<{ entity: string; id: string; error: string }> = [];
 
+    // Note: Per-item try/catch is intentional for sync — one bad record
+    // should not roll back the entire batch. If atomic per-entity-type
+    // is needed, wrap each section in prisma.$transaction().
+
     if (payload.projects?.length) {
       let a = 0;
       let c = 0;
@@ -358,6 +362,11 @@ export class SyncService {
       let a = 0;
       for (const item of payload.achievements) {
         try {
+          if (item.unlockedAt) {
+            errors.push({ entity: 'achievement', id: item.key, error: 'unlock_not_allowed_via_sync' });
+            continue;
+          }
+
           const existing = await prisma.achievement.findUnique({
             where: { userId_key: { userId, key: item.key } },
           });
@@ -365,12 +374,11 @@ export class SyncService {
 
           await prisma.achievement.upsert({
             where: { userId_key: { userId, key: item.key } },
-            create: { ...item, userId },
+            create: { ...item, userId, unlockedAt: null },
             update: {
               ...(item.progress > (existing?.progress ?? 0)
                 ? { progress: item.progress }
                 : {}),
-              ...(item.unlockedAt ? { unlockedAt: item.unlockedAt } : {}),
             },
           });
           a++;

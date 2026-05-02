@@ -60,7 +60,11 @@ export class AuthService {
     });
   }
 
-  static async verifyRefreshToken(refreshToken: string): Promise<string | null> {
+  static async verifyRefreshToken(
+    refreshToken: string,
+    currentIp?: string,
+    currentDevice?: string
+  ): Promise<{ userId: string; deviceMismatch: boolean } | null> {
     const tokenHash = this.hashToken(refreshToken);
 
     const record = await prisma.refreshToken.findUnique({
@@ -77,7 +81,13 @@ export class AuthService {
       return null;
     }
 
-    return record.userId;
+    const tokenAge = Date.now() - record.createdAt.getTime();
+    const deviceMismatch =
+      currentIp && record.ipAddress && currentIp !== record.ipAddress
+        ? tokenAge < 5 * 60 * 1000
+        : false;
+
+    return { userId: record.userId, deviceMismatch };
   }
 
   static async rotateRefreshToken(

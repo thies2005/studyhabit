@@ -43,7 +43,15 @@ router.post('/register', async (req, res, next) => {
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
-      return res.status(409).json({ error: 'Email already registered' });
+      await new Promise((r) => setTimeout(r, 200 + Math.random() * 300));
+      return res.status(201).json({
+        data: {
+          user: { id: existing.id, email: existing.email, createdAt: existing.createdAt },
+          accessToken: '',
+          refreshToken: '',
+        },
+        message: 'Registration processed. If this email is not yet registered, an account has been created.',
+      });
     }
 
     const user = await AuthService.register(email, password);
@@ -101,12 +109,23 @@ router.post('/refresh', async (req, res, next) => {
   try {
     const { refreshToken, deviceName } = refreshSchema.parse(req.body);
 
-    const userId = await AuthService.verifyRefreshToken(refreshToken);
-    if (!userId) {
+    const result = await AuthService.verifyRefreshToken(
+      refreshToken,
+      req.ip,
+      deviceName
+    );
+    if (!result) {
       return res.status(401).json({ error: 'Invalid or expired refresh token' });
     }
 
-    const tokens = await AuthService.rotateRefreshToken(refreshToken, userId, {
+    if (result.deviceMismatch) {
+      return res.status(401).json({
+        error: 'Device changed since login',
+        reason: 'device_mismatch',
+      });
+    }
+
+    const tokens = await AuthService.rotateRefreshToken(refreshToken, result.userId, {
       deviceName,
       ipAddress: req.ip,
     });

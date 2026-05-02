@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../index.js';
+import { parsePagination } from '../types/index.js';
 
 const router = Router();
 
@@ -10,15 +11,31 @@ const projectSchema = z.object({
   colorValue: z.number(),
 });
 
-const updateProjectSchema = projectSchema.partial();
+const updateProjectSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  icon: z.string().optional(),
+  colorValue: z.number().optional(),
+  isArchived: z.boolean().optional(),
+  lastOpenedAt: z.string().datetime().optional(),
+});
 
 router.get('/', async (req, res, next) => {
   try {
-    const projects = await prisma.project.findMany({
-      where: { userId: req.user.userId, isArchived: false },
-      orderBy: { lastOpenedAt: 'desc' },
+    const { skip, take, page, limit } = parsePagination(req.query as any);
+    const where = { userId: req.user.userId, isArchived: false };
+    const [projects, total] = await Promise.all([
+      prisma.project.findMany({
+        where,
+        orderBy: { lastOpenedAt: 'desc' },
+        skip,
+        take,
+      }),
+      prisma.project.count({ where }),
+    ]);
+    res.json({
+      data: projects,
+      pagination: { page, limit, total, hasMore: skip + take < total },
     });
-    res.json({ data: projects });
   } catch (error: any) {
     next(error);
   }

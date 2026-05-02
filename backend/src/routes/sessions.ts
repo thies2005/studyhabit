@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../index.js';
 import { XpService } from '../services/xpService.js';
+import { AchievementService } from '../services/achievementService.js';
+import { parsePagination } from '../types/index.js';
 
 const router = Router();
 
@@ -33,14 +35,24 @@ const updateSessionSchema = z.object({
 router.get('/', async (req, res, next) => {
   try {
     const subjectId = String(req.query.subjectId ?? '');
-    const sessions = await prisma.studySession.findMany({
-      where: {
-        subjectId,
-        subject: { project: { userId: req.user.userId } },
-      },
-      orderBy: { startedAt: 'desc' },
+    const { skip, take, page, limit } = parsePagination(req.query as any);
+    const where = {
+      subjectId,
+      subject: { project: { userId: req.user.userId } },
+    };
+    const [sessions, total] = await Promise.all([
+      prisma.studySession.findMany({
+        where,
+        orderBy: { startedAt: 'desc' },
+        skip,
+        take,
+      }),
+      prisma.studySession.count({ where }),
+    ]);
+    res.json({
+      data: sessions,
+      pagination: { page, limit, total, hasMore: skip + take < total },
     });
-    res.json({ data: sessions });
   } catch (error: any) {
     next(error);
   }
@@ -105,7 +117,9 @@ router.post('/', async (req, res, next) => {
       data.actualDurationMinutes
     );
 
-    res.status(201).json({ data: session });
+    const newAchievements = await AchievementService.checkAndUnlock(req.user.userId);
+
+    res.status(201).json({ data: { ...session, newAchievements } });
   } catch (error: any) {
     next(error);
   }

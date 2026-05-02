@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../index.js';
+import { parsePagination } from '../types/index.js';
 
 const router = Router();
 
@@ -14,16 +15,33 @@ const subjectSchema = z.object({
   defaultBreakMinutes: z.number().int().min(1).max(30),
 });
 
-const updateSubjectSchema = subjectSchema.partial();
+const updateSubjectSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  description: z.string().optional(),
+  colorValue: z.number().optional(),
+  hierarchyMode: z.enum(['flat', 'twoLevel', 'threeLevel']).optional(),
+  defaultDurationMinutes: z.number().int().min(5).max(90).optional(),
+  defaultBreakMinutes: z.number().int().min(1).max(30).optional(),
+});
 
 router.get('/', async (req, res, next) => {
   try {
     const projectId = String(req.query.projectId ?? '');
-    const subjects = await prisma.subject.findMany({
-      where: { projectId, project: { userId: req.user.userId } },
-      orderBy: { createdAt: 'desc' },
+    const { skip, take, page, limit } = parsePagination(req.query as any);
+    const where = { projectId, project: { userId: req.user.userId } };
+    const [subjects, total] = await Promise.all([
+      prisma.subject.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+      }),
+      prisma.subject.count({ where }),
+    ]);
+    res.json({
+      data: subjects,
+      pagination: { page, limit, total, hasMore: skip + take < total },
     });
-    res.json({ data: subjects });
   } catch (error: any) {
     next(error);
   }

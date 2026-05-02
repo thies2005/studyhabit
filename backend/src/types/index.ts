@@ -55,3 +55,24 @@ export interface ApiError {
   error: string;
   details?: any[];
 }
+
+export interface PaginationQuery {
+  page?: number;
+  limit?: number;
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    hasMore: boolean;
+  };
+}
+
+export function parsePagination(query: Record<string, unknown>): { skip: number; take: number; page: number; limit: number } {
+  const page = Math.max(1, Number(query.page) || 1);
+  const limit = Math.min(200, Math.max(1, Number(query.limit) || 50));
+  return { skip: (page - 1) * limit, take: limit, page, limit };
+}

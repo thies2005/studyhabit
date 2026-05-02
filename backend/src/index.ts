@@ -1,5 +1,4 @@
 import express from 'express';
-import rateLimit from 'express-rate-limit';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -17,16 +16,9 @@ import sourceRoutes from './routes/sources.js';
 import statsRoutes from './routes/stats.js';
 import achievementRoutes from './routes/achievements.js';
 import { AuthService } from './services/authService.js';
+import docsRoutes from './routes/docs.js';
 
 export const prisma = new PrismaClient();
-
-const sensitiveLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  max: 5,
-  message: { error: 'Too many attempts, try again later' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
 
 const app = express();
 
@@ -40,6 +32,8 @@ app.use(cors({
 app.use(morgan(config.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
 app.use(express.json({ limit: '1mb' }));
+
+app.use('/api/v1/docs', docsRoutes);
 
 app.get('/health', async (_req, res) => {
   try {
