@@ -371,7 +371,7 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
         await ref.read(streakServiceProvider).recordStudyDay(ref);
         _studyDayRecorded = true;
       }
-      await ref.read(achievementServiceProvider).checkAndUnlock(ref);
+      await AchievementService().checkAndUnlock(ref.read(appDatabaseProvider));
 
       if (continuousFocus) {
         // Switch to overtime instead of break
@@ -541,14 +541,14 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
       endedAt: DateTime.now(),
     );
 
-    await ref.read(achievementServiceProvider).checkAndUnlock(ref);
+    await AchievementService().checkAndUnlock(ref.read(appDatabaseProvider));
     await FlutterForegroundTask.stopService();
 
     // Cancel any pending reminder
     try {
       await ref.read(notificationServiceProvider).cancelReminder();
     } catch (e) {
-      AppLogger.w('PomodoroNotifier', 'Error cancelling reminder', e);
+      AppLogger.w('PomodoroNotifier', 'Error cancelling reminder: $e');
     }
 
     _persistence?.clearPomodoro();
@@ -610,7 +610,7 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
 
     if (sessionRow == null) return;
 
-    await _sessionDao!.update(
+    await _sessionDao!.updateRow(
       sessionRow.copyWith(
         confidenceRating: Value(confidenceRating),
         notes: Value(notes),
@@ -658,7 +658,7 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
       }
     }
 
-    await _sessionDao!.update(
+    await _sessionDao!.updateRow(
       sessionRow.copyWith(
         confidenceRating: Value(confidenceRating),
         notes: Value(notes),
@@ -683,7 +683,7 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
 
     if (sessionRow == null) return;
 
-    await _sessionDao!.update(
+    await _sessionDao!.updateRow(
       sessionRow.copyWith(
         endedAt: Value(endedAt ?? sessionRow.endedAt),
         actualDurationMinutes: actualDurationMinutes,

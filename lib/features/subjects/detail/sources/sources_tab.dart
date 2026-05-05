@@ -6,7 +6,6 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/models/enums.dart';
 import '../../../../core/models/source.dart';
-import '../../../../core/services/xp_service.dart';
 import '../../../../core/services/app_logger.dart';
 import '../../subject_providers.dart';
 import '../topics/chapter_providers.dart';
@@ -239,7 +238,6 @@ class _UrlSourceCardState extends ConsumerState<_UrlSourceCard> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final isVideo = widget.source.type == SourceType.videoUrl;
 
     final domain = _extractDomain(widget.source.url ?? '');
     final firstLetter = domain.isNotEmpty ? domain[0].toUpperCase() : '?';
@@ -299,7 +297,7 @@ class _UrlSourceCardState extends ConsumerState<_UrlSourceCard> {
             ],
             const Spacer(),
             Text(
-              isVideo ? 'Progress' : 'Progress',
+              'Progress',
               style: textTheme.labelSmall?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),
@@ -321,7 +319,7 @@ class _UrlSourceCardState extends ConsumerState<_UrlSourceCard> {
                 onChanged: (v) => setState(() => _progress = v),
                 onChangeEnd: (v) {
                   ref
-                      .read(sourceNotifierProvider(widget.subjectId).notifier)
+                      .read(sourceProvider(widget.subjectId).notifier)
                       .updateProgress(widget.source.id, progressPercent: v);
                 },
               ),
@@ -621,7 +619,7 @@ class _AddSourceBottomSheetState extends ConsumerState<AddSourceBottomSheet> {
   }
 
   Future<void> _submit() async {
-    final notifier = ref.read(sourceNotifierProvider(widget.subjectId).notifier);
+    final notifier = ref.read(sourceProvider(widget.subjectId).notifier);
 
     try {
       if (_selectedType == SourceType.pdf) {
@@ -682,7 +680,7 @@ class _TopicPicker extends ConsumerWidget {
         if (topics.isEmpty) return const SizedBox.shrink();
 
         return DropdownButtonFormField<String?>(
-          value: selectedTopicId,
+          initialValue: selectedTopicId,
           decoration: const InputDecoration(
             labelText: 'Topic',
             border: OutlineInputBorder(),
@@ -729,7 +727,7 @@ class _ChapterPicker extends ConsumerWidget {
         if (chapters.isEmpty) return const SizedBox.shrink();
 
         return DropdownButtonFormField<String?>(
-          value: selectedChapterId,
+          initialValue: selectedChapterId,
           decoration: const InputDecoration(
             labelText: 'Chapter',
             border: OutlineInputBorder(),

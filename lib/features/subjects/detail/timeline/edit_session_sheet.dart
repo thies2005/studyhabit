@@ -97,7 +97,7 @@ class _EditSessionSheetState extends ConsumerState<EditSessionSheet> {
         notes: Value(_notesController.text.trim().isEmpty ? null : _notesController.text.trim()),
       );
 
-      await dao.update(updated);
+      await dao.updateRow(updated);
       
       if (mounted) Navigator.of(context).pop();
     } catch (e) {

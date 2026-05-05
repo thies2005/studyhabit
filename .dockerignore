@@ -1,0 +1,42 @@
+# Flutter / Dart
+.dart_tool/
+build/
+.packages
+.flutter-plugins
+.flutter-plugins-dependencies
+*.g.dart
+*.freezed.dart
+
+# Node
+backend/node_modules/
+web/node_modules/
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+*.local
+
+# Logs
+*.log
+
+# Git
+.git/
+.gitignore
+
+# Build artifacts
+backend/dist/
+web/dist/
+
+# AGENTS / docs
+AGENTS.md
+.opencode/
+PHASE_*_HANDOFF.md
+*.pdf

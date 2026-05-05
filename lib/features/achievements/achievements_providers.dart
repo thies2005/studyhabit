@@ -20,7 +20,7 @@ class AchievementList extends _$AchievementList {
       final service = AchievementService();
       
       try {
-        await service.checkAndUnlock(ref);
+        await service.checkAndUnlock(db);
       } catch (e, stack) {
         AppLogger.e('AchievementList', 'Initial checkAndUnlock failed', e, stack);
       }

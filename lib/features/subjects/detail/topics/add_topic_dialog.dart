@@ -75,7 +75,7 @@ class _AddTopicDialogState extends ConsumerState<AddTopicDialog> {
     final name = _nameController.text.trim();
     if (name.isEmpty) return;
 
-    ref.read(topicNotifierProvider.notifier).create(widget.subjectId, name);
+    ref.read(topicProvider.notifier).create(widget.subjectId, name);
     Navigator.of(context).pop();
   }
 }

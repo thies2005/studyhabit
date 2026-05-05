@@ -6,7 +6,6 @@ import 'package:path_provider/path_provider.dart';
 import '../database/app_database.dart';
 import '../services/app_logger.dart';
 import '../models/achievement.dart';
-import '../models/achievement.dart';
 import '../models/chapter.dart';
 import '../models/model_mapper.dart';
 import '../models/project.dart';

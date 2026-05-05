@@ -181,7 +181,7 @@ class _SkillLabelSheetState extends ConsumerState<SkillLabelSheet> {
 
     if (shouldAwardXp) {
       try {
-        await ref.read(xpServiceProvider).award(ref, XpReason.skillAdvance);
+        await ref.read(xpServiceProvider).awardFromWidget(ref, XpReason.skillAdvance);
       } catch (e) {
         AppLogger.e('SkillLabelSheet', 'Error awarding skill advance XP', e);
       }

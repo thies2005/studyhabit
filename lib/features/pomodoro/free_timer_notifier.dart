@@ -144,12 +144,12 @@ class FreeTimerNotifier extends _$FreeTimerNotifier {
     }
 
     // Award achievements
-    await ref.read(achievementServiceProvider).checkAndUnlock(ref);
+    await AchievementService().checkAndUnlock(ref.read(appDatabaseProvider));
 
     // Update session in DB
     final session = await _sessionDao?.getById(state.activeSessionId!);
     if (session != null) {
-      await _sessionDao?.update(
+      await _sessionDao?.updateRow(
         session.copyWith(
           actualDurationMinutes: elapsedMinutes,
           endedAt: Value(endedAt),
@@ -187,7 +187,7 @@ class FreeTimerNotifier extends _$FreeTimerNotifier {
       newXpEarned += 10;
     }
 
-    await _sessionDao?.update(
+    await _sessionDao?.updateRow(
       session.copyWith(
         confidenceRating: Value(confidenceRating),
         notes: Value(notes),

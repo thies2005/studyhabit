@@ -3,7 +3,6 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../database/app_database.dart';
 import '../models/enums.dart';
-import '../providers/database_provider.dart';
 import '../services/app_logger.dart';
 
 part 'achievement_service.g.dart';
@@ -16,10 +15,9 @@ class AchievementUnlock {
 }
 
 class AchievementService {
-  Future<List<AchievementUnlock>> checkAndUnlock(Ref ref) async {
+  Future<List<AchievementUnlock>> checkAndUnlock(AppDatabase db) async {
     try {
       AppLogger.i('AchievementService', 'Checking achievements');
-      final db = ref.read(appDatabaseProvider);
 
       final allSessions = await db.select(db.studySessions).get();
       final statsRows = await db.select(db.userStatsTable).get();
@@ -219,17 +217,6 @@ class AchievementService {
       AppLogger.e('AchievementService', 'Achievement check failed', e, stack);
       return [];
     }
-  }
-
-  double _calcAllBadgesProgress({Map<String, double>? checks, int earnedCount = -1}) {
-    if (earnedCount >= 0) return (earnedCount / (checks?.length ?? 65 - 1).toDouble()).clamp(0.0, 1.0);
-    if (checks == null) return 0.0;
-    
-    int earned = 0;
-    for (final entry in checks.entries) {
-      if (entry.key != 'all_badges' && entry.value >= 1.0) earned++;
-    }
-    return (earned / (checks.length - 1).toDouble()).clamp(0.0, 1.0);
   }
 }
 

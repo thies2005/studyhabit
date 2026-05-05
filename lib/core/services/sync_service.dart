@@ -39,7 +39,8 @@ class HttpSyncService implements SyncService {
 
 @Riverpod(keepAlive: true)
 SyncService syncService(Ref ref) {
-  final isEnabled = ref.watch(backendEnabledProvider);
+  final asyncEnabled = ref.watch(backendEnabledProvider);
+  final isEnabled = asyncEnabled.value ?? false;
   if (isEnabled) {
     return HttpSyncService();
   }
@@ -58,7 +59,7 @@ class BackendEnabled extends _$BackendEnabled {
   }
 
   Future<void> setEnabled(bool value) async {
-    state = value;
+    state = AsyncValue.data(value);
     await _prefs.setBool(_backendEnabledKey, value);
   }
 }

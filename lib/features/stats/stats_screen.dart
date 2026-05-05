@@ -126,7 +126,7 @@ class StatsScreen extends ConsumerWidget {
                             child: heatmap_lib.StudyHeatmap(
                               data: data
                                   .map(
-                                    (d) => heatmap_lib.HeatmapDay(
+                                    (d) => HeatmapDay(
                                       date: d.date,
                                       minutes: d.minutes,
                                     ),

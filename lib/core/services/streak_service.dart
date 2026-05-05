@@ -8,7 +8,6 @@ import 'xp_service.dart';
 part 'streak_service.g.dart';
 
 class StreakService {
-  static const _graceWindowKey = 'streak.gracePeriod';
   static const _lastFreezeUseKey = 'streak.lastFreezeUseDate';
 
   Future<void> recordStudyDay(Ref ref) async {
