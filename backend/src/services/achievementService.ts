@@ -1,4 +1,4 @@
-import { prisma } from '../index.js';
+import { prisma } from './db.js';
 
 interface AchievementThreshold {
   key: string;
@@ -183,13 +183,13 @@ export class AchievementService {
     return {
       totalSessions: sessionAgg._count,
       totalPomodoros: sessionAgg._sum.pomodorosCompleted ?? 0,
-      totalMinutes: userStats?.totalStudyMinutes ?? 0,
+      totalMinutes: sessionAgg._sum.actualDurationMinutes ?? 0,
       currentStreak: userStats?.currentStreak ?? 0,
       subjectHours,
       hasPdf: !!sourceAgg,
       maxConfidence: sessionMaxConfidence._max.confidenceRating ?? 0,
       hasAdvancedSkill: !!skillAgg,
-      unlockedKeys: new Set(unlockedAchievements.map((a) => a.key)),
+      unlockedKeys: new Set(unlockedAchievements.map((a: { key: string }) => a.key)),
     };
   }
 
@@ -205,7 +205,7 @@ export class AchievementService {
       by: ['subjectId'],
       _sum: { actualDurationMinutes: true },
       where: {
-        subjectId: { in: subjectIds.map((s) => s.id) },
+        subjectId: { in: subjectIds.map((s: { id: string }) => s.id) },
       },
     });
 

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { prisma } from '../index.js';
+import { prisma } from '../db.js';
 import { parsePagination } from '../types/index.js';
 
 const router = Router();
@@ -36,7 +36,7 @@ router.get('/', async (req, res, next) => {
       data: projects,
       pagination: { page, limit, total, hasMore: skip + take < total },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 });
@@ -51,7 +51,7 @@ router.get('/:id', async (req, res, next) => {
       return res.status(404).json({ error: 'Project not found' });
     }
     res.json({ data: project });
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 });
@@ -63,7 +63,7 @@ router.post('/', async (req, res, next) => {
       data: { ...data, userId: req.user.userId },
     });
     res.status(201).json({ data: project });
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 });
@@ -84,7 +84,7 @@ router.patch('/:id', async (req, res, next) => {
     const updated = await prisma.project.findUnique({ where: { id } });
 
     res.json({ data: updated });
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 });
@@ -101,7 +101,7 @@ router.delete('/:id', async (req, res, next) => {
     }
 
     res.status(204).send();
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 });

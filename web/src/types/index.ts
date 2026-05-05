@@ -47,6 +47,14 @@ export interface StudySession {
   updatedAt: string;
 }
 
+export interface SessionWithSubject extends StudySession {
+  subject: {
+    id: string;
+    name: string;
+    colorValue: number;
+  };
+}
+
 export interface Achievement {
   id: string;
   userId: string;

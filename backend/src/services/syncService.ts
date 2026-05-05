@@ -1,5 +1,17 @@
-import { prisma } from '../index.js';
-import { SyncPushPayload, SyncPullResponse } from '../types/index.js';
+import { prisma } from './db.js';
+import {
+  SyncPushPayload,
+  SyncPullResponse,
+  SyncProject,
+  SyncSubject,
+  SyncTopic,
+  SyncChapter,
+  SyncSession,
+  SyncSource,
+  SyncSkillLabel,
+  SyncAchievement,
+  SyncUserStats,
+} from '../types/index.js';
 import { z } from 'zod';
 
 // Define Zod schemas for each entity type to validate and strip unknown fields
@@ -118,7 +130,11 @@ interface ConflictResult {
   reason?: string;
 }
 
-function lastWriteWins(incoming: any, existing: any): ConflictResult {
+interface TimestampedEntity {
+  updatedAt: string | Date;
+}
+
+function lastWriteWins(incoming: TimestampedEntity, existing: TimestampedEntity | null | undefined): ConflictResult {
   if (!existing) return { accepted: true };
   if (new Date(incoming.updatedAt) > new Date(existing.updatedAt)) {
     return { accepted: true };
@@ -136,15 +152,9 @@ export class SyncService {
       where: { userId, ...whereClause },
     });
 
-    const projectIds = projects.map((p) => p.id);
+    const projectIds = projects.map((p: SyncProject) => p.id);
 
-    const subjects = projectIds.length
-      ? await prisma.subject.findMany({
-          where: { projectId: { in: projectIds }, ...whereClause },
-        })
-      : [];
-
-    const subjectIds = subjects.map((s) => s.id);
+    const subjectIds = subjects.map((s: SyncSubject) => s.id);
 
     const [topics, sessions, sources, skillLabels] = await Promise.all([
       subjectIds.length
@@ -169,7 +179,7 @@ export class SyncService {
         : [],
     ]);
 
-    const topicIds = topics.map((t) => t.id);
+    const topicIds = topics.map((t: SyncTopic) => t.id);
 
     const chapters = topicIds.length
       ? await prisma.chapter.findMany({
@@ -238,6 +248,12 @@ export class SyncService {
           // Validate and strip unknown fields
           const validated = projectSchema.parse(item);
 
+          // Verify that the userId in payload matches authenticated user
+          if (validated.userId !== userId) {
+            errors.push({ entity: 'project', id: validated.id, error: 'forbidden' });
+            continue;
+          }
+
           const existing = await prisma.project.findUnique({
             where: { id: validated.id },
           });
@@ -259,8 +275,9 @@ export class SyncService {
             update: validated,
           });
           a++;
-        } catch (e: any) {
-          errors.push({ entity: 'project', id: item.id, error: e.message });
+        } catch (e: unknown) {
+          const message = e instanceof Error ? e.message : String(e);
+          errors.push({ entity: 'project', id: item.id, error: message });
         }
       }
       applied.projects = a;
@@ -298,7 +315,7 @@ export class SyncService {
             update: validated,
           });
           a++;
-        } catch (e: any) {
+        } catch (e: unknown) {
           errors.push({ entity: 'subject', id: item.id, error: e.message });
         }
       }
@@ -335,7 +352,7 @@ export class SyncService {
             update: validated,
           });
           a++;
-        } catch (e: any) {
+        } catch (e: unknown) {
           errors.push({ entity: 'topic', id: item.id, error: e.message });
         }
       }
@@ -372,7 +389,7 @@ export class SyncService {
             update: validated,
           });
           a++;
-        } catch (e: any) {
+        } catch (e: unknown) {
           errors.push({ entity: 'chapter', id: item.id, error: e.message });
         }
       }
@@ -409,8 +426,9 @@ export class SyncService {
             update: validated,
           });
           a++;
-        } catch (e: any) {
-          errors.push({ entity: 'session', id: item.id, error: e.message });
+        } catch (e: unknown) {
+          const message = e instanceof Error ? e.message : String(e);
+          errors.push({ entity: 'project', id: (item as any).id, error: message });
         }
       }
       applied.sessions = a;
@@ -446,7 +464,7 @@ export class SyncService {
             update: validated,
           });
           a++;
-        } catch (e: any) {
+        } catch (e: unknown) {
           errors.push({ entity: 'source', id: item.id, error: e.message });
         }
       }
@@ -483,7 +501,7 @@ export class SyncService {
             update: validated,
           });
           a++;
-        } catch (e: any) {
+        } catch (e: unknown) {
           errors.push({ entity: 'skillLabel', id: item.id, error: e.message });
         }
       }
@@ -518,7 +536,7 @@ export class SyncService {
             },
           });
           a++;
-        } catch (e: any) {
+        } catch (e: unknown) {
           errors.push({ entity: 'achievement', id: item.key, error: e.message });
         }
       }
@@ -530,39 +548,49 @@ export class SyncService {
         // Validate and strip unknown fields
         const validated = userStatsSchema.parse(payload.userStats);
 
-        const existing = await prisma.userStats.findUnique({
-          where: { userId },
-        });
-        if (existing) {
-          const incomingUpdated = validated.updatedAt
-            ? new Date(validated.updatedAt)
-            : new Date(0);
-          if (incomingUpdated <= existing.updatedAt) {
-            conflicts.userStats = 1;
-          } else {
-            const updates: any = {};
-            if (validated.totalXp > existing.totalXp) {
-              updates.totalXp = validated.totalXp;
-            }
-            if (validated.currentStreak > existing.currentStreak) {
-              updates.currentStreak = validated.currentStreak;
-              updates.longestStreak = Math.max(
-                existing.longestStreak,
-                validated.currentStreak
-              );
-            }
-            if (validated.totalStudyMinutes > existing.totalStudyMinutes) {
-              updates.totalStudyMinutes = validated.totalStudyMinutes;
-            }
-            if (Object.keys(updates).length > 0) {
-              await prisma.userStats.update({ where: { userId }, data: updates });
-              applied.userStats = 1;
-            } else {
-              conflicts.userStats = 1;
-            }
+        // Verify that the userId in payload matches authenticated user
+        if (validated.userId !== userId) {
+          errors.push({ entity: 'userStats', id: userId, error: 'forbidden' });
+        } else {
+          const existing = await prisma.userStats.findUnique({
+            where: { userId },
+          });
+          if (existing) {
+            const incomingUpdated = validated.updatedAt
+              ? new Date(validated.updatedAt)
+              : new Date(0);
+              if (incomingUpdated <= existing.updatedAt) {
+                conflicts.userStats = 1;
+              } else {
+                const updates: {
+                  totalXp?: number;
+                  currentStreak?: number;
+                  longestStreak?: number;
+                  totalStudyMinutes?: number;
+                } = {};
+                if (validated.totalXp > existing.totalXp) {
+                  updates.totalXp = validated.totalXp;
+                }
+                if (validated.currentStreak > existing.currentStreak) {
+                  updates.currentStreak = validated.currentStreak;
+                  updates.longestStreak = Math.max(
+                    existing.longestStreak,
+                    validated.currentStreak
+                  );
+                }
+                if (validated.totalStudyMinutes > existing.totalStudyMinutes) {
+                  updates.totalStudyMinutes = validated.totalStudyMinutes;
+                }
+                if (Object.keys(updates).length > 0) {
+                  await prisma.userStats.update({ where: { userId }, data: updates });
+                  applied.userStats = 1;
+                } else {
+                  conflicts.userStats = 1;
+                }
+              }
           }
         }
-      } catch (e: any) {
+      } catch (e: unknown) {
         errors.push({ entity: 'userStats', id: userId, error: e.message });
       }
     }

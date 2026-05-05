@@ -241,8 +241,7 @@ Future<List<XpDayData>> xpLineChartData(Ref ref) async {
     xpByDay[key] = (xpByDay[key] ?? 0) + session.xpEarned;
   }
 
-  final baseXp =
-      stats.totalXp - xpByDay.values.fold<int>(0, (sum, v) => sum + v);
+  final baseXp = (stats.totalXp - xpByDay.values.fold<int>(0, (sum, v) => sum + v)).clamp(0, double.infinity).toInt();
 
   final result = <XpDayData>[];
   var cumulative = baseXp;

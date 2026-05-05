@@ -364,7 +364,7 @@ const Map<String, AchievementMetadata> achievementMetadataMap = {
   // Misc
   'all_badges': AchievementMetadata(
     name: 'Completionist',
-    description: 'Unlock all 65 original achievements.',
+    description: 'Unlock all achievements.',
     icon: Icons.emoji_events,
     category: 'Mastery',
   ),

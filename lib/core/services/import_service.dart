@@ -74,6 +74,9 @@ class ImportService {
     int sourceCount = 0;
 
     try {
+      if (mode != ImportMode.merge && mode != ImportMode.replace) {
+        throw Exception('Invalid import mode: $mode');
+      }
       final jsonString = await file.readAsString();
       final json = jsonDecode(jsonString) as Map<String, dynamic>;
 

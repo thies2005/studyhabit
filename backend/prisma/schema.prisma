@@ -146,6 +146,7 @@ model Source {
   updatedAt       DateTime  @updatedAt
 
   @@index([subjectId])
+  @@index([subjectId, addedAt])
 }
 
 model SkillLabel {
@@ -160,6 +161,9 @@ model SkillLabel {
   updatedAt DateTime @updatedAt
 
   @@index([subjectId])
+  @@index([subjectId, topicId])
+  @@index([subjectId, chapterId])
+  @@index([topicId, chapterId])
 }
 
 model Achievement {

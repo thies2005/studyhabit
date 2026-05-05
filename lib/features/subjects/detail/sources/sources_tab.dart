@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/models/enums.dart';
 import '../../../../core/models/source.dart';
 import '../../../../core/services/xp_service.dart';
+import '../../../../core/services/app_logger.dart';
 import '../../subject_providers.dart';
 import '../topics/chapter_providers.dart';
 import '../topics/topic_providers.dart';
@@ -347,7 +348,7 @@ class _UrlSourceCardState extends ConsumerState<_UrlSourceCard> {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       }
     } catch (e) {
-      debugPrint('Error launching URL: $e');
+      AppLogger.e('SourcesTab', 'Error launching URL', e);
     }
   }
 }
@@ -602,7 +603,7 @@ class _AddSourceBottomSheetState extends ConsumerState<AddSourceBottomSheet> {
         }
       }
     } catch (e) {
-      debugPrint('Error picking PDF: $e');
+      AppLogger.e('SourcesTab', 'Error picking PDF', e);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -643,16 +644,9 @@ class _AddSourceBottomSheetState extends ConsumerState<AddSourceBottomSheet> {
         );
       }
 
-      // Award +5 XP for adding a source
-      try {
-        await ref.read(xpServiceProvider).award(ref, XpReason.addSource);
-      } catch (e) {
-        debugPrint('Error awarding source XP: $e');
-      }
-
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
-      debugPrint('Error adding source: $e');
+      AppLogger.e('SourcesTab', 'Error adding source', e);
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -688,7 +682,7 @@ class _TopicPicker extends ConsumerWidget {
         if (topics.isEmpty) return const SizedBox.shrink();
 
         return DropdownButtonFormField<String?>(
-          initialValue: selectedTopicId,
+          value: selectedTopicId,
           decoration: const InputDecoration(
             labelText: 'Topic',
             border: OutlineInputBorder(),
@@ -735,7 +729,7 @@ class _ChapterPicker extends ConsumerWidget {
         if (chapters.isEmpty) return const SizedBox.shrink();
 
         return DropdownButtonFormField<String?>(
-          initialValue: selectedChapterId,
+          value: selectedChapterId,
           decoration: const InputDecoration(
             labelText: 'Chapter',
             border: OutlineInputBorder(),

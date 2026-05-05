@@ -12,6 +12,9 @@ const envSchema = z.object({
   CORS_ORIGIN: z.string().default('http://localhost:3000'),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(15 * 60 * 1000),
   RATE_LIMIT_MAX: z.coerce.number().default(100),
+}).refine((data) => data.JWT_SECRET !== data.JWT_REFRESH_SECRET, {
+  message: 'JWT_SECRET and JWT_REFRESH_SECRET must be different',
+  path: ['JWT_REFRESH_SECRET'],
 });
 
 export const config = envSchema.parse(process.env);

@@ -1,11 +1,12 @@
 import 'package:drift/drift.dart';
-import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:studytracker/core/database/app_database.dart';
 import 'package:studytracker/core/models/chapter.dart';
+import 'package:studytracker/core/models/model_mapper.dart';
 import 'package:studytracker/core/providers/database_provider.dart';
+import 'package:studytracker/core/services/app_logger.dart';
 
 part 'chapter_providers.g.dart';
 
@@ -16,16 +17,7 @@ Stream<List<Chapter>> chapterList(Ref ref, String topicId) {
     ..where((t) => t.topicId.equals(topicId))
     ..orderBy([(t) => OrderingTerm.asc(t.order)]);
   return query.watch().map((rows) {
-    return rows
-        .map(
-          (row) => Chapter(
-            id: row.id,
-            topicId: row.topicId,
-            name: row.name,
-            order: row.order,
-          ),
-        )
-        .toList();
+    return rows.map(mapChapter).toList();
   });
 }
 
@@ -56,7 +48,7 @@ class ChapterNotifier extends _$ChapterNotifier {
         ),
       );
     } catch (e, st) {
-      debugPrint('Error creating chapter: $e\n$st');
+      AppLogger.e('ChapterNotifier', 'Error creating chapter', e, st);
       rethrow;
     }
   }
@@ -68,7 +60,7 @@ class ChapterNotifier extends _$ChapterNotifier {
         ChaptersCompanion(name: Value(newName)),
       );
     } catch (e, st) {
-      debugPrint('Error renaming chapter: $e\n$st');
+      AppLogger.e('ChapterNotifier', 'Error renaming chapter', e, st);
       rethrow;
     }
   }
@@ -78,7 +70,7 @@ class ChapterNotifier extends _$ChapterNotifier {
       final db = ref.read(appDatabaseProvider);
       await (db.delete(db.chapters)..where((t) => t.id.equals(id))).go();
     } catch (e, st) {
-      debugPrint('Error deleting chapter: $e\n$st');
+      AppLogger.e('ChapterNotifier', 'Error deleting chapter', e, st);
       rethrow;
     }
   }

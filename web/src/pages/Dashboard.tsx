@@ -1,216 +1,274 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import apiClient from '../api/client';
-import type { UserStats, Subject } from '../types';
+import { Link, useNavigate } from 'react-router-dom';
+import type { StatsOverview, SessionWithSubject } from '../types';
+import { useApi } from '../api/hooks';
+
+// Level names from spec
+const LEVEL_NAMES = ['Novice', 'Apprentice', 'Scholar', 'Adept', 'Expert', 'Master', 'Grandmaster'];
+
+// Calculate XP threshold for level (from spec)
+const calculateLevelThreshold = (level: number): number => {
+  if (level === 1) return 0;
+  if (level === 2) return 500;
+  if (level === 3) return 1500;
+  if (level === 4) return 3500;
+  if (level === 5) return 7000;
+  // Level 6+ formula
+  let threshold = 7000;
+  for (let i = 6; i <= level; i++) {
+    threshold = Math.round(threshold * 1.5 / 100) * 100;
+  }
+  return threshold;
+};
+
+// Calculate progress within current level
+const calculateLevelProgress = (currentLevel: number, totalXp: number): number => {
+  if (currentLevel >= 7) return 1; // Grandmaster is max level
+  const currentLevelThreshold = calculateLevelThreshold(currentLevel);
+  const nextLevelThreshold = calculateLevelThreshold(currentLevel + 1);
+  const xpInCurrentLevel = totalXp - currentLevelThreshold;
+  const xpNeededForNextLevel = nextLevelThreshold - currentLevelThreshold;
+  return xpNeededForNextLevel > 0 ? xpInCurrentLevel / xpNeededForNextLevel : 1;
+};
+
+const getLevelName = (level: number): string => {
+  return LEVEL_NAMES[Math.min(level - 1, LEVEL_NAMES.length - 1)] || 'Grandmaster';
+};
 
 export default function Dashboard() {
-  const [stats, setStats] = useState<UserStats | null>(null);
-  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const navigate = useNavigate();
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
+  // Fetch stats overview
+  const { data: stats, loading: statsLoading, error: statsError, refetch: refetchStats } = useApi<StatsOverview>('/stats/overview');
 
-  const fetchDashboardData = async () => {
-    try {
-      const [statsRes, subjectsRes] = await Promise.all([
-        apiClient.get('/stats/overview'),
-        apiClient.get('/subjects'),
-      ]);
+  // Fetch sessions for today and recent sessions
+  const { data: sessions, loading: sessionsLoading, error: sessionsError, refetch: refetchSessions } = useApi<SessionWithSubject[]>('/sessions?limit=3');
 
-      setStats(statsRes.data.data);
-      setSubjects(subjectsRes.data.data);
-    } catch (error) {
-      console.error('Failed to fetch dashboard data', error);
-    }
+  const loading = statsLoading || sessionsLoading;
+  const error = statsError || sessionsError;
+
+  const handleRetry = () => {
+    refetchStats();
+    refetchSessions();
   };
 
   const formatColor = (colorValue: number) => {
     return `#${colorValue.toString(16).padStart(6, '0')}`;
   };
 
+  // Calculate today's hours from sessions
+  const todayHours = sessions?.reduce((total, session) => {
+    const sessionDate = new Date(session.startedAt);
+    const today = new Date();
+    return sessionDate.toDateString() === today.toDateString()
+      ? total + (session.actualDurationMinutes / 60)
+      : total;
+  }, 0) || 0;
+
   return (
     <div className="px-4 py-6 sm:px-0">
-      <div className="mb-8">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Welcome back, Alex.</h2>
-        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-          ⭐ You've completed 85% of your weekly focus goal.
-        </p>
-      </div>
+      {/* Loading State */}
+      {loading && (
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </div>
+      )}
 
-      {stats && (
+      {/* Error State */}
+      {error && (
+        <div className="bg-red-500/20 border border-red-500/30 rounded-2xl p-6 mb-6">
+          <p className="text-red-400 mb-4">Failed to load dashboard data</p>
+          <button
+            onClick={handleRetry}
+            className="px-4 py-2 bg-primary hover:bg-primary-container rounded-lg text-background font-medium transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      {/* Content */}
+      {!loading && !error && stats && (
         <>
-          {/* Level Card */}
-          <div className="bg-white dark:bg-[#323536] rounded-2xl p-6 mb-6 shadow-lg">
-            <div className="flex items-center justify-between mb-4">
+          {/* Header Section */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between flex-wrap gap-4">
               <div>
-                <h3 className="text-3xl font-bold text-gray-900 dark:text-white">
-                  Level {stats.currentLevel}
-                </h3>
-                <p className="text-lg text-[#FDB87C] font-medium">Zen Master</p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">XP Progress</p>
-                <p className="text-sm font-medium text-gray-900 dark:text-white">
-                  {stats.totalXp.toLocaleString()} / 15,000 XP
+                <h2 className="text-2xl font-bold text-onSurface font-heading">Welcome back!</h2>
+                <p className="mt-1 text-sm text-gray-400 font-body">
+                  Today: {todayHours.toFixed(1)}h studied
                 </p>
               </div>
+              <div className="flex items-center gap-3">
+                <span className="px-3 py-1 bg-tertiary/20 text-tertiary rounded-full text-sm font-medium font-body flex items-center gap-2">
+                  <span className="material-icons text-sm">local_fire_department</span>
+                  {stats.currentStreak} day streak
+                </span>
+                <span className="px-3 py-1 bg-primary/20 text-primary rounded-full text-sm font-medium font-body">
+                  Level {stats.currentLevel} — {getLevelName(stats.currentLevel)}
+                </span>
+              </div>
             </div>
-            <div className="w-full bg-gray-200 dark:bg-[#101415] rounded-full h-3">
-              <div
-                className="bg-[#FDB87C] h-3 rounded-full transition-all"
-                style={{ width: `${(stats.totalXp / 15000) * 100}%` }}
-              ></div>
+
+            {/* XP Bar */}
+            <div className="mt-4">
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-gray-400 font-body">XP Progress</span>
+                <span className="text-onSurface font-data">
+                  {stats.totalXp.toLocaleString()} / {calculateLevelThreshold(stats.currentLevel + 1).toLocaleString()} XP
+                </span>
+              </div>
+              <div className="w-full bg-surface rounded-full h-3">
+                <div
+                  className="bg-primary h-3 rounded-full transition-all duration-600"
+                  style={{ width: `${calculateLevelProgress(stats.currentLevel, stats.totalXp) * 100}%` }}
+                ></div>
+              </div>
             </div>
           </div>
 
-          {/* 4 Stat Cards */}
+          {/* Start Session FAB */}
+          <div className="flex justify-center mb-8">
+            <Link
+              to="/subjects"
+              className="flex items-center gap-2 px-8 py-4 bg-primary hover:bg-primary-container text-white rounded-2xl text-lg font-medium font-body shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
+            >
+              <span className="material-icons">play_arrow</span>
+              Start Session
+            </Link>
+          </div>
+
+          {/* Empty State */}
+          {!loading && sessions && sessions.length === 0 && (
+            <div className="bg-surfaceHigh rounded-2xl p-12 mb-8 text-center">
+              <span className="material-icons text-6xl text-primary mb-4">school</span>
+              <h3 className="text-2xl font-bold text-onSurface font-heading mb-2">
+                Let's start learning!
+              </h3>
+              <p className="text-gray-400 font-body mb-6">
+                Tap the button below to begin your first session
+              </p>
+              <Link
+                to="/subjects"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-primary hover:bg-primary-container text-white rounded-xl font-medium font-body transition-colors"
+              >
+                <span className="material-icons">play_arrow</span>
+                Start Your First Session
+              </Link>
+            </div>
+          )}
+
+          {/* Overview Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div className="bg-white dark:bg-[#323536] rounded-2xl p-6 shadow-lg">
+            <div className="bg-surfaceHigh rounded-2xl p-6 shadow-lg">
               <div className="flex items-center space-x-3">
                 <span className="text-3xl">⏱</span>
                 <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Deep Work</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {(stats.totalStudyMinutes / 60).toFixed(0)}h
+                  <p className="text-sm text-gray-400 font-body">Total Hours</p>
+                  <p className="text-2xl font-bold text-onSurface font-data">
+                    {stats.totalHours.toFixed(1)}h
                   </p>
                 </div>
               </div>
             </div>
-            <div className="bg-white dark:bg-[#323536] rounded-2xl p-6 shadow-lg">
+            <div className="bg-surfaceHigh rounded-2xl p-6 shadow-lg">
               <div className="flex items-center space-x-3">
-                <span className="text-3xl">⚡</span>
+                <span className="text-3xl">📅</span>
                 <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Efficiency</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">94%</p>
+                  <p className="text-sm text-gray-400 font-body">This Week</p>
+                  <p className="text-2xl font-bold text-onSurface font-data">
+                    {stats.weekHours.toFixed(1)}h
+                  </p>
                 </div>
               </div>
             </div>
-            <div className="bg-white dark:bg-[#323536] rounded-2xl p-6 shadow-lg">
+            <div className="bg-surfaceHigh rounded-2xl p-6 shadow-lg">
               <div className="flex items-center space-x-3">
-                <span className="text-3xl">📊</span>
+                <span className="text-3xl">🔥</span>
                 <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Sessions</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">128</p>
+                  <p className="text-sm text-gray-400 font-body">Streak</p>
+                  <p className="text-2xl font-bold text-onSurface font-data">
+                    {stats.currentStreak}d
+                  </p>
                 </div>
               </div>
             </div>
-            <div className="bg-white dark:bg-[#323536] rounded-2xl p-6 shadow-lg">
+            <div className="bg-surfaceHigh rounded-2xl p-6 shadow-lg">
               <div className="flex items-center space-x-3">
-                <span className="text-3xl">🌍</span>
+                <span className="text-3xl">⭐</span>
                 <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Global Rank</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">#402</p>
+                  <p className="text-sm text-gray-400 font-body">Level</p>
+                  <p className="text-2xl font-bold text-onSurface font-data">
+                    {getLevelName(stats.currentLevel)}
+                  </p>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Recent Sessions */}
-          <div className="bg-white dark:bg-[#323536] rounded-2xl shadow-lg mb-6">
-            <div className="px-6 py-5 border-b border-gray-200 dark:border-[#1C2021]">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white">Recent Sessions</h3>
-                <Link to="/subjects" className="text-sm text-[#85D2E0] hover:text-[#006874]">
-                  View All
-                </Link>
+          {sessions && sessions.length > 0 && (
+            <div className="bg-surfaceHigh rounded-2xl shadow-lg mb-6">
+              <div className="px-6 py-5 border-b border-gray-200 dark:border-[#1C2021]">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-medium text-onSurface font-heading">Recent Sessions</h3>
+                  <Link to="/subjects" className="text-sm text-primary hover:text-primary-container transition-colors font-body">
+                    View All
+                  </Link>
+                </div>
               </div>
-            </div>
-            <div className="p-6">
-              <div className="space-y-3">
-                {subjects.length === 0 ? (
-                  <p className="text-gray-500 dark:text-gray-400 text-center py-8">
-                    No subjects yet. Create your first subject to get started!
-                  </p>
-                ) : (
-                  subjects.slice(0, 5).map((subject) => (
+              <div className="p-6">
+                <div className="space-y-3">
+                  {sessions.map((session) => (
                     <div
-                      key={subject.id}
-                      className="flex items-center justify-between p-3 bg-gray-50 dark:bg-[#1C2021] rounded-lg hover:bg-gray-100 dark:hover:bg-[#323536] transition-colors cursor-pointer"
-                      onClick={() => window.location.href = `/subjects/${subject.id}`}
+                      key={session.id}
+                      className="flex items-center justify-between p-3 bg-surface rounded-lg hover:bg-gray-100 dark:hover:bg-[#323536] transition-colors cursor-pointer"
+                      onClick={() => navigate(`/subjects/${session.subjectId}`)}
                     >
                       <div className="flex items-center space-x-3">
                         <div
                           className="w-3 h-3 rounded-full"
-                          style={{ backgroundColor: formatColor(subject.colorValue) }}
+                          style={{ backgroundColor: formatColor(session.subject.colorValue) }}
                         ></div>
                         <div>
-                          <p className="text-sm font-medium text-gray-900 dark:text-white">
-                            {subject.name}
+                          <p className="text-sm font-medium text-onSurface font-body">
+                            {session.subject.name}
                           </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            Today, 2:30 PM
+                          <p className="text-xs text-gray-400 font-body">
+                            {new Date(session.startedAt).toLocaleDateString()} at {new Date(session.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </p>
                         </div>
                       </div>
                       <div className="flex items-center space-x-3">
-                        <span className="px-2 py-1 text-xs font-medium bg-[#FDB87C] text-black rounded">
-                          +50 XP
+                        <span className="px-2 py-1 text-xs font-medium bg-[#FDB87C] text-black rounded font-body">
+                          +{session.xpEarned} XP
                         </span>
-                        <span className="text-sm text-gray-500 dark:text-gray-400">25 min</span>
+                        <span className="text-sm text-gray-400 font-body">{session.actualDurationMinutes} min</span>
                       </div>
                     </div>
-                  ))
-                )}
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Streak Card */}
-          <div className="bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl p-6 text-white mb-6 shadow-lg">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <span className="text-4xl">🔥</span>
-                <div>
-                  <p className="text-3xl font-bold">{stats.currentStreak} Days Strong</p>
-                  <p className="text-sm opacity-90">3 days to reaching 'Unstoppable'</p>
+          {stats.currentStreak > 0 && (
+            <div className="bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl p-6 text-white mb-6 shadow-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <span className="text-4xl">🔥</span>
+                  <div>
+                    <p className="text-3xl font-bold font-heading">{stats.currentStreak} Day Streak</p>
+                    <p className="text-sm opacity-90 font-body">
+                      {stats.longestStreak > stats.currentStreak
+                        ? `Personal best: ${stats.longestStreak} days`
+                        : "You're on fire!"}
+                    </p>
+                  </div>
                 </div>
               </div>
-              <div className="text-right">
-                <div className="w-24 bg-white/20 rounded-full h-2 mb-2">
-                  <div className="bg-white h-2 rounded-full" style={{ width: '85%' }}></div>
-                </div>
-                <p className="text-sm opacity-90">85% to milestone</p>
-              </div>
             </div>
-          </div>
-
-          {/* Daily Objectives */}
-          <div className="bg-white dark:bg-[#323536] rounded-2xl p-6 mb-6 shadow-lg">
-            <div className="flex items-center space-x-2 mb-4">
-              <span className="text-xl">✅</span>
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Daily Objectives</h3>
-            </div>
-            <div className="space-y-3">
-              {[
-                '2 Hour Deep Work Block',
-                'Read 20 pages',
-                'Complete 4 Pomodoro sessions',
-              ].map((objective, index) => (
-                <label key={index} className="flex items-center space-x-3 cursor-pointer">
-                  <input type="checkbox" className="w-4 h-4 text-[#85D2E0] rounded focus:ring-[#85D2E0]" />
-                  <span className="text-sm text-gray-700 dark:text-gray-300">{objective}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {/* Study Tip */}
-          <div className="bg-white dark:bg-[#323536] rounded-2xl p-6 shadow-lg border-l-4 border-[#FDB87C]">
-            <div className="flex items-start space-x-3">
-              <span className="text-2xl">💡</span>
-              <div>
-                <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                  The Feynman Technique
-                </h4>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Teach what you've learned to someone else. If you can't explain it simply,
-                  you don't understand it well enough. This technique helps identify gaps in your
-                  knowledge and reinforces learning through active recall.
-                </p>
-              </div>
-            </div>
-          </div>
+          )}
         </>
       )}
     </div>

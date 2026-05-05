@@ -6,6 +6,8 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
+import 'app_logger.dart';
+
 part 'notification_service.g.dart';
 
 @Riverpod(keepAlive: true)
@@ -39,7 +41,7 @@ class NotificationService {
     await _plugin.initialize(
       settings,
       onDidReceiveNotificationResponse: (response) {
-        debugPrint('Notification tapped: ${response.payload}');
+        AppLogger.d('NotificationService', 'Notification tapped: ${response.payload}');
       },
     );
 
@@ -80,7 +82,7 @@ class NotificationService {
         details,
       );
     } catch (e) {
-      debugPrint('Error showing session complete notification: $e');
+      AppLogger.e('NotificationService', 'Error showing session complete notification', e);
     }
   }
 
@@ -117,7 +119,7 @@ class NotificationService {
             UILocalNotificationDateInterpretation.absoluteTime,
       );
     } catch (e) {
-      debugPrint('Error scheduling study reminder: $e');
+      AppLogger.e('NotificationService', 'Error scheduling study reminder', e);
     }
   }
 
@@ -125,7 +127,7 @@ class NotificationService {
     try {
       await _plugin.cancel(1);
     } catch (e) {
-      debugPrint('Error cancelling reminder: $e');
+      AppLogger.e('NotificationService', 'Error cancelling reminder', e);
     }
   }
 
@@ -172,10 +174,10 @@ class NotificationService {
         androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
         uiLocalNotificationDateInterpretation:
             UILocalNotificationDateInterpretation.absoluteTime,
-        matchDateTimeComponents: DateTimeComponents.time,
+            matchDateTimeComponents: DateTimeComponents.time,
       );
     } catch (e) {
-      debugPrint('Error scheduling daily reminder: $e');
+      AppLogger.e('NotificationService', 'Error scheduling daily reminder', e);
     }
   }
 
@@ -183,7 +185,7 @@ class NotificationService {
     try {
       await _plugin.cancel(2);
     } catch (e) {
-      debugPrint('Error cancelling daily reminder: $e');
+      AppLogger.e('NotificationService', 'Error cancelling daily reminder', e);
     }
   }
 }

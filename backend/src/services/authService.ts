@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { prisma } from '../index.js';
+import { prisma } from './db.js';
 import { config } from '../config.js';
 import { TokenPair, DeviceInfo } from '../types/index.js';
 
@@ -175,7 +175,7 @@ export class AuthService {
   }
 
   static async register(email: string, password: string) {
-    return prisma.$transaction(async (tx) => {
+    return prisma.$transaction(async (tx: any) => {
       const passwordHash = await bcrypt.hash(password, 12);
 
       const user = await tx.user.create({
@@ -192,7 +192,12 @@ export class AuthService {
 
   static async login(email: string, password: string) {
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) return null;
+    if (!user) {
+      // Add dummy bcrypt compare to match timing and prevent timing side-channel attacks
+      const DUMMY_HASH = '$2b$12$dummyHashToPreventTimingAttackAAAAAAAAAAAA';
+      await bcrypt.compare(password, DUMMY_HASH);
+      return null;
+    }
 
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) return null;

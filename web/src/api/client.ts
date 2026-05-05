@@ -9,31 +9,17 @@ const apiClient = axios.create({
   },
 });
 
-// Token refresh mutex
-let isRefreshing = false;
-let failedQueue: Array<{
-  resolve: (token: string) => void;
-  reject: (error: any) => void;
-}> = [];
+// Store access token in memory (not localStorage) for security
+let accessToken: string | null = null;
 
-const processQueue = (error: any, token: string | null = null) => {
-  failedQueue.forEach((prom) => {
-    if (error) {
-      prom.reject(error);
-    } else {
-      prom.resolve(token!);
-    }
-  });
-
-  failedQueue = [];
-};
+// Token refresh mutex - prevents concurrent refresh requests
+let refreshPromise: Promise<any> | null = null;
 
 // Request interceptor to add auth token
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    if (accessToken) {
+      config.headers.Authorization = `Bearer ${accessToken}`;
     }
     return config;
   },
@@ -51,43 +37,37 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
-      if (isRefreshing) {
-        return new Promise<string>((resolve, reject) => {
-          failedQueue.push({ resolve, reject });
-        })
-          .then((token) => {
-            originalRequest.headers.Authorization = `Bearer ${token}`;
-            return apiClient(originalRequest);
-          })
-          .catch((err) => {
-            return Promise.reject(err);
-          });
+      // Use mutex to prevent concurrent refresh requests
+      if (!refreshPromise) {
+        refreshPromise = (async () => {
+          try {
+            const refreshToken = localStorage.getItem('refresh_token');
+            const response = await axios.post(`${API_URL}/auth/refresh`, {
+              refreshToken,
+            });
+
+            const { accessToken: newAccessToken, refreshToken: newRefreshToken } = response.data.data;
+            accessToken = newAccessToken;
+            localStorage.setItem('refresh_token', newRefreshToken);
+
+            return newAccessToken;
+          } catch (refreshError) {
+            accessToken = null;
+            localStorage.removeItem('refresh_token');
+            window.location.href = '/login';
+            throw refreshError;
+          } finally {
+            refreshPromise = null;
+          }
+        })();
       }
 
-      isRefreshing = true;
-
       try {
-        const refreshToken = localStorage.getItem('refresh_token');
-        const response = await axios.post(`${API_URL}/auth/refresh`, {
-          refreshToken,
-        });
-
-        const { accessToken, refreshToken: newRefreshToken } = response.data.data;
-        localStorage.setItem('access_token', accessToken);
-        localStorage.setItem('refresh_token', newRefreshToken);
-
-        processQueue(null, accessToken);
-
-        originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+        const newToken = await refreshPromise;
+        originalRequest.headers.Authorization = `Bearer ${newToken}`;
         return apiClient(originalRequest);
-      } catch (refreshError) {
-        processQueue(refreshError, null);
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        window.location.href = '/login';
-        return Promise.reject(refreshError);
-      } finally {
-        isRefreshing = false;
+      } catch (err) {
+        return Promise.reject(err);
       }
     }
 

@@ -172,10 +172,10 @@ class AchievementService {
 
       // Calculate all_badges progress (excludes itself from the total count)
       int earnedCount = 0;
-      for (final progress in checks.values) {
-        if (progress >= 1.0) earnedCount++;
+      for (final entry in checks.entries) {
+        if (entry.key != 'all_badges' && entry.value >= 1.0) earnedCount++;
       }
-      checks['all_badges'] = (earnedCount / checks.length.toDouble()).clamp(0.0, 1.0);
+      checks['all_badges'] = (earnedCount / (checks.length - 1).toDouble()).clamp(0.0, 1.0);
 
       final newlyUnlocked = <AchievementUnlock>[];
 
@@ -222,14 +222,14 @@ class AchievementService {
   }
 
   double _calcAllBadgesProgress({Map<String, double>? checks, int earnedCount = -1}) {
-    if (earnedCount >= 0) return (earnedCount / 65.0).clamp(0.0, 1.0);
+    if (earnedCount >= 0) return (earnedCount / (checks?.length ?? 65 - 1).toDouble()).clamp(0.0, 1.0);
     if (checks == null) return 0.0;
     
     int earned = 0;
-    for (final v in checks.values) {
-      if (v >= 1.0) earned++;
+    for (final entry in checks.entries) {
+      if (entry.key != 'all_badges' && entry.value >= 1.0) earned++;
     }
-    return (earned / 65.0).clamp(0.0, 1.0);
+    return (earned / (checks.length - 1).toDouble()).clamp(0.0, 1.0);
   }
 }
 

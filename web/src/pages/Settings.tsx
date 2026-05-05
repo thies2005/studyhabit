@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const presetSeeds = [
   '#006874', // Deep Teal
@@ -15,25 +15,88 @@ const presetSeeds = [
   '#4A4458', // Slate
 ];
 
+const STORAGE_KEY = 'studytracker_settings';
+
+interface SettingsState {
+  seedColor: string;
+  fontScale: 'small' | 'normal' | 'large';
+  workDuration: number;
+  shortBreak: number;
+  longBreak: number;
+  longBreakEvery: number;
+  autoStartBreaks: boolean;
+  vibrationOnComplete: boolean;
+  enableNotifications: boolean;
+  gracePeriod: number;
+}
+
+const loadSettings = (): SettingsState => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (error) {
+    console.error('Failed to load settings:', error);
+  }
+  return {
+    seedColor: '#006874',
+    fontScale: 'normal',
+    workDuration: 25,
+    shortBreak: 5,
+    longBreak: 15,
+    longBreakEvery: 4,
+    autoStartBreaks: false,
+    vibrationOnComplete: true,
+    enableNotifications: true,
+    gracePeriod: 2,
+  };
+};
+
+const saveSettings = (settings: SettingsState) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  } catch (error) {
+    console.error('Failed to save settings:', error);
+  }
+};
+
 export default function Settings() {
   // Theme settings
-  const [seedColor, setSeedColor] = useState('#006874');
-  const [fontScale, setFontScale] = useState<'small' | 'normal' | 'large'>('normal');
+  const [seedColor, setSeedColor] = useState(() => loadSettings().seedColor);
+  const [fontScale, setFontScale] = useState<'small' | 'normal' | 'large'>(() => loadSettings().fontScale);
 
   // Pomodoro settings
-  const [workDuration, setWorkDuration] = useState(25);
-  const [shortBreak, setShortBreak] = useState(5);
-  const [longBreak, setLongBreak] = useState(15);
-  const [longBreakEvery, setLongBreakEvery] = useState(4);
-  const [autoStartBreaks, setAutoStartBreaks] = useState(false);
-  const [vibrationOnComplete, setVibrationOnComplete] = useState(true);
+  const [workDuration, setWorkDuration] = useState(() => loadSettings().workDuration);
+  const [shortBreak, setShortBreak] = useState(() => loadSettings().shortBreak);
+  const [longBreak, setLongBreak] = useState(() => loadSettings().longBreak);
+  const [longBreakEvery, setLongBreakEvery] = useState(() => loadSettings().longBreakEvery);
+  const [autoStartBreaks, setAutoStartBreaks] = useState(() => loadSettings().autoStartBreaks);
+  const [vibrationOnComplete, setVibrationOnComplete] = useState(() => loadSettings().vibrationOnComplete);
 
   // Notifications
-  const [enableNotifications, setEnableNotifications] = useState(true);
+  const [enableNotifications, setEnableNotifications] = useState(() => loadSettings().enableNotifications);
 
   // Streak settings
-  const [gracePeriod, setGracePeriod] = useState(2);
+  const [gracePeriod, setGracePeriod] = useState(() => loadSettings().gracePeriod);
   const freezeTokens = 3;
+
+  // Save settings whenever they change
+  useEffect(() => {
+    saveSettings({
+      seedColor,
+      fontScale,
+      workDuration,
+      shortBreak,
+      longBreak,
+      longBreakEvery,
+      autoStartBreaks,
+      vibrationOnComplete,
+      enableNotifications,
+      gracePeriod,
+    });
+  }, [seedColor, fontScale, workDuration, shortBreak, longBreak, longBreakEvery,
+      autoStartBreaks, vibrationOnComplete, enableNotifications, gracePeriod]);
 
   // Data management
   const [showDeleteConfirm1, setShowDeleteConfirm1] = useState(false);

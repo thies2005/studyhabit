@@ -1,11 +1,12 @@
 import 'package:drift/drift.dart';
-import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:studytracker/core/database/app_database.dart';
 import 'package:studytracker/core/models/topic.dart';
+import 'package:studytracker/core/models/model_mapper.dart';
 import 'package:studytracker/core/providers/database_provider.dart';
+import 'package:studytracker/core/services/app_logger.dart';
 
 part 'topic_providers.g.dart';
 
@@ -16,16 +17,7 @@ Stream<List<Topic>> topicList(Ref ref, String subjectId) {
     ..where((t) => t.subjectId.equals(subjectId))
     ..orderBy([(t) => OrderingTerm.asc(t.order)]);
   return query.watch().map((rows) {
-    return rows
-        .map(
-          (row) => Topic(
-            id: row.id,
-            subjectId: row.subjectId,
-            name: row.name,
-            order: row.order,
-          ),
-        )
-        .toList();
+    return rows.map(mapTopic).toList();
   });
 }
 
@@ -56,7 +48,7 @@ class TopicNotifier extends _$TopicNotifier {
         ),
       );
     } catch (e, st) {
-      debugPrint('Error creating topic: $e\n$st');
+      AppLogger.e('TopicNotifier', 'Error creating topic', e, st);
       rethrow;
     }
   }
@@ -68,7 +60,7 @@ class TopicNotifier extends _$TopicNotifier {
         TopicsCompanion(name: Value(newName)),
       );
     } catch (e, st) {
-      debugPrint('Error renaming topic: $e\n$st');
+      AppLogger.e('TopicNotifier', 'Error renaming topic', e, st);
       rethrow;
     }
   }
@@ -78,7 +70,7 @@ class TopicNotifier extends _$TopicNotifier {
       final db = ref.read(appDatabaseProvider);
       await (db.delete(db.topics)..where((t) => t.id.equals(id))).go();
     } catch (e, st) {
-      debugPrint('Error deleting topic: $e\n$st');
+      AppLogger.e('TopicNotifier', 'Error deleting topic', e, st);
       rethrow;
     }
   }

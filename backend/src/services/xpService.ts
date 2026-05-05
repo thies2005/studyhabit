@@ -1,4 +1,4 @@
-import { prisma } from '../index.js';
+import { prisma } from './db.js';
 
 export class XpService {
   static calculateLevel(totalXp: number): number {
@@ -69,6 +69,21 @@ export class XpService {
     if (streak >= 30) return 500;
     if (streak >= 7) return 500;
     return 0;
+  }
+
+  static xpForStreakMilestones(oldStreak: number, newStreak: number): number {
+    // Only award XP for milestones that were JUST crossed
+    // (old < threshold AND new >= threshold)
+    const milestones = [7, 30, 100];
+    let xp = 0;
+
+    for (const milestone of milestones) {
+      if (oldStreak < milestone && newStreak >= milestone) {
+        xp += 500;
+      }
+    }
+
+    return xp;
   }
 
   static async addXpAndMinutes(

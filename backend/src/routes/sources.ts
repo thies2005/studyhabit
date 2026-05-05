@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { prisma } from '../index.js';
+import { prisma } from '../db.js';
 import { XpService } from '../services/xpService.js';
 import { parsePagination } from '../types/index.js';
 
@@ -52,7 +52,7 @@ router.get('/', async (req, res, next) => {
       data: sources,
       pagination: { page, limit, total, hasMore: skip + take < total },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 });
@@ -67,7 +67,7 @@ router.get('/:id', async (req, res, next) => {
       return res.status(404).json({ error: 'Source not found' });
     }
     res.json({ data: source });
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 });
@@ -89,7 +89,7 @@ router.post('/', async (req, res, next) => {
     await XpService.addXpAndMinutes(req.user.userId, 5, 0);
 
     res.status(201).json({ data: source });
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 });
@@ -113,7 +113,7 @@ router.patch('/:id', async (req, res, next) => {
     });
 
     res.json({ data: source });
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 });
@@ -130,7 +130,7 @@ router.delete('/:id', async (req, res, next) => {
     }
 
     res.status(204).send();
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 });

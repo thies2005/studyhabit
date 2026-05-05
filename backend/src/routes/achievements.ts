@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { prisma } from '../index.js';
+import { prisma } from '../db.js';
 import { AchievementService } from '../services/achievementService.js';
 
 const router = Router();
@@ -11,7 +11,7 @@ router.get('/', async (req, res, next) => {
       orderBy: { unlockedAt: 'desc' },
     });
     res.json({ data: achievements });
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 });
@@ -28,7 +28,7 @@ router.get('/:key', async (req, res, next) => {
     }
 
     res.json({ data: achievement });
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 });
@@ -41,7 +41,7 @@ router.post('/check', async (req, res, next) => {
       orderBy: { unlockedAt: 'desc' },
     });
     res.json({ data: { achievements: all, newlyUnlocked } });
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 });
@@ -63,7 +63,7 @@ router.post('/:key/unlock', async (req, res, next) => {
     });
 
     res.json({ data: achievement });
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 });

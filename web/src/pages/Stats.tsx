@@ -12,6 +12,7 @@ import {
   LineChart,
   Line,
   ResponsiveContainer,
+  TooltipProps,
 } from 'recharts';
 
 // Mock data for demo purposes
@@ -60,8 +61,7 @@ const subjectBreakdownData = [
   { name: 'Biology', hours: 15, sessions: 12, avgConfidence: 4.0, skillLevel: 'Intermediate', color: '#5D9ECE' },
 ];
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type TooltipRendererProps = { active?: boolean; payload?: any[]; label?: string };
+type TooltipRendererProps = TooltipProps<any, any>;
 
 const CustomTooltip = ({ active, payload, label }: TooltipRendererProps) => {
   if (active && payload && payload.length) {

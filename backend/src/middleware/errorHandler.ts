@@ -8,7 +8,7 @@ export const errorHandler = (
   res: Response,
   _next: NextFunction
 ) => {
-  if (process.env.NODE_ENV !== 'test') {
+  if (process.env.NODE_ENV !== 'test' && process.env.NODE_ENV !== 'production') {
     console.error(`[${new Date().toISOString()}] Error:`, err.message);
   }
 

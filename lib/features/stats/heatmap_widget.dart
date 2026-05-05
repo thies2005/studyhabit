@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'stats_models.dart';
+
 class StudyHeatmap extends StatelessWidget {
   const StudyHeatmap({super.key, required this.data});
 
@@ -239,11 +241,4 @@ class StudyHeatmap extends StatelessWidget {
     ];
     return '${months[day.month]} ${day.day}';
   }
-}
-
-class HeatmapDay {
-  const HeatmapDay({required this.date, required this.minutes});
-
-  final DateTime date;
-  final int minutes;
 }

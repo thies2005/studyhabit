@@ -8,8 +8,9 @@ import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/providers/database_provider.dart';
+import '../../../core/services/app_logger.dart';
 import '../subjects/detail/sources/source_providers.dart';
-import 'pomodorno_provider_import.dart';
+import 'pomodoro_provider_import.dart';
 
 class PdfViewerScreen extends ConsumerStatefulWidget {
   const PdfViewerScreen({
@@ -68,7 +69,7 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> {
         }
       }
     } catch (e) {
-      debugPrint('Error saving page position: $e');
+      AppLogger.e('PdfViewerScreen', 'Error saving page position', e);
     }
   }
 
@@ -84,7 +85,7 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> {
               progressPercent: null,
             );
       } catch (e) {
-        debugPrint('Error updating progress: $e');
+        AppLogger.e('PdfViewerScreen', 'Error updating progress', e);
       }
     });
   }
@@ -101,7 +102,7 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> {
             .write(SourcesCompanion(totalPages: Value(totalPages)));
       }
     } catch (e) {
-      debugPrint('Error updating total pages: $e');
+      AppLogger.e('PdfViewerScreen', 'Error updating total pages', e);
     }
   }
 

@@ -19,6 +19,7 @@ import '../../core/services/achievement_service.dart';
 import '../../core/services/notification_service.dart';
 import '../../core/services/streak_service.dart';
 import '../../core/services/xp_service.dart';
+import '../../core/services/app_logger.dart';
 import 'pomodoro_state.dart';
 import 'pomodoro_task_handler.dart';
 import '../../core/services/timer_persistence_service.dart';
@@ -59,6 +60,7 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
   bool _listenerRegistered = false;
   Timer? _localTimer;
   bool _handlingPhaseComplete = false;
+  bool _studyDayRecorded = false;
 
   @override
   PomodoroState build() {
@@ -267,6 +269,7 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
   }
 
   Future<void> start(PomodoroConfig config) async {
+    _studyDayRecorded = false;
     const uuid = Uuid();
     final sessionId = uuid.v4();
     final now = DateTime.now();
@@ -310,12 +313,12 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
         ),
       );
     } catch (e) {
-      debugPrint('Error inserting session: $e');
+      AppLogger.e('PomodoroNotifier', 'Error inserting session', e);
       return;
     }
 
     _startForegroundService().catchError((e) {
-      debugPrint('Error starting foreground service: $e');
+      AppLogger.e('PomodoroNotifier', 'Error starting foreground service', e);
     });
 
     _persistState();
@@ -327,12 +330,12 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
     final deviceInfo = DeviceInfoPlugin();
     final androidInfo = await deviceInfo.androidInfo;
     final manufacturer = androidInfo.manufacturer.toLowerCase();
-    
+
     final problematicOems = ['xiaomi', 'samsung', 'huawei', 'oppo', 'vivo', 'realme'];
     if (problematicOems.contains(manufacturer)) {
-      // We could trigger a dialog or guide here. 
+      // We could trigger a dialog or guide here.
       // For now, let's just log it. The UI can check a provider.
-      debugPrint('Detected problematic OEM: $manufacturer');
+      AppLogger.d('PomodoroNotifier', 'Detected problematic OEM: $manufacturer');
     }
   }
 
@@ -366,6 +369,7 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
 
       if (isEligible) {
         await ref.read(streakServiceProvider).recordStudyDay(ref);
+        _studyDayRecorded = true;
       }
       await ref.read(achievementServiceProvider).checkAndUnlock(ref);
 
@@ -455,7 +459,7 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
           }
         }
       } catch (e) {
-        debugPrint('Error showing notification: $e');
+        AppLogger.e('PomodoroNotifier', 'Error showing notification', e);
       }
     } else if (state.phase == TimerPhase.shortBreak ||
         state.phase == TimerPhase.longBreak) {
@@ -527,7 +531,7 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
         : state.totalSeconds - state.remainingSeconds;
     final actualMinutes = elapsed ~/ 60;
 
-    if (state.pomodorosCompleted > 0) {
+    if (state.pomodorosCompleted > 0 && !_studyDayRecorded) {
       await ref.read(streakServiceProvider).recordStudyDay(ref);
     }
 
@@ -544,7 +548,7 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
     try {
       await ref.read(notificationServiceProvider).cancelReminder();
     } catch (e) {
-      debugPrint('Error cancelling reminder: $e');
+      AppLogger.w('PomodoroNotifier', 'Error cancelling reminder', e);
     }
 
     _persistence?.clearPomodoro();
@@ -647,10 +651,10 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
           newXpEarned += 10;
           state = state.copyWith(confidenceXpAwarded: true);
         } catch (e) {
-          debugPrint('Error awarding confidence XP: $e');
+          AppLogger.e('PomodoroNotifier', 'Error awarding confidence XP', e);
         }
       } else {
-        debugPrint('Confidence XP skipped: session completion < 80%.');
+        AppLogger.d('PomodoroNotifier', 'Confidence XP skipped: session completion < 80%.');
       }
     }
 

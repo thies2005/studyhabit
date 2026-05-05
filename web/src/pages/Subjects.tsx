@@ -17,7 +17,7 @@ export default function Subjects() {
       const response = await apiClient.get('/subjects');
       setSubjects(response.data.data);
     } catch (error) {
-      console.error('Failed to fetch subjects', error);
+      // Silent error handling - loading state will be cleared in finally block
     } finally {
       setLoading(false);
     }

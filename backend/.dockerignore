@@ -5,6 +5,10 @@ node_modules/
 dist/
 build/
 
+# Source files (already in dist/)
+src/
+tsconfig.json
+
 # Testing
 test/
 *.test.ts

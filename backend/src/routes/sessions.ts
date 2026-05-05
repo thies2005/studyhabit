@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { prisma } from '../index.js';
+import { prisma } from '../db.js';
 import { XpService } from '../services/xpService.js';
 import { AchievementService } from '../services/achievementService.js';
 import { parsePagination } from '../types/index.js';
@@ -46,6 +46,15 @@ router.get('/', async (req, res, next) => {
         orderBy: { startedAt: 'desc' },
         skip,
         take,
+        include: {
+          subject: {
+            select: {
+              id: true,
+              name: true,
+              colorValue: true,
+            },
+          },
+        },
       }),
       prisma.studySession.count({ where }),
     ]);
@@ -53,7 +62,7 @@ router.get('/', async (req, res, next) => {
       data: sessions,
       pagination: { page, limit, total, hasMore: skip + take < total },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 });
@@ -63,12 +72,21 @@ router.get('/:id', async (req, res, next) => {
     const id = String(req.params.id);
     const session = await prisma.studySession.findFirst({
       where: { id, subject: { project: { userId: req.user.userId } } },
+      include: {
+        subject: {
+          select: {
+            id: true,
+            name: true,
+            colorValue: true,
+          },
+        },
+      },
     });
     if (!session) {
       return res.status(404).json({ error: 'Session not found' });
     }
     res.json({ data: session });
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 });
@@ -118,10 +136,51 @@ router.post('/', async (req, res, next) => {
       data.actualDurationMinutes
     );
 
+    // Update streak if this is a new study day
+    const userStats = await prisma.userStats.findUnique({
+      where: { userId: req.user.userId },
+    });
+    if (userStats) {
+      const sessionDate = new Date(session.startedAt);
+      const lastStudyDate = userStats.lastStudyDate ? new Date(userStats.lastStudyDate) : null;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      sessionDate.setHours(0, 0, 0, 0);
+      const isNewStudyDay = !lastStudyDate ||
+        lastStudyDate.getTime() !== sessionDate.getTime();
+      
+      if (isNewStudyDay) {
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const isConsecutive = lastStudyDate &&
+          lastStudyDate.getTime() >= yesterday.getTime();
+
+        const oldStreak = userStats.currentStreak;
+        const newStreak = isConsecutive ? oldStreak + 1 : 1;
+        const longestStreak = Math.max(newStreak, userStats.longestStreak);
+
+        // Award XP only for milestones that were just crossed
+        // (old < threshold AND new >= threshold)
+        const streakXp = XpService.xpForStreakMilestones(oldStreak, newStreak);
+        if (streakXp > 0) {
+          await XpService.addXpAndMinutes(req.user.userId, streakXp, 0);
+        }
+
+        await prisma.userStats.update({
+          where: { userId: req.user.userId },
+          data: {
+            currentStreak: newStreak,
+            longestStreak,
+            lastStudyDate: sessionDate,
+          },
+        });
+      }
+    }
+
     const newAchievements = await AchievementService.checkAndUnlock(req.user.userId);
 
     res.status(201).json({ data: { ...session, newAchievements } });
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 });
@@ -139,18 +198,66 @@ router.patch('/:id', async (req, res, next) => {
       return res.status(404).json({ error: 'Session not found' });
     }
 
-    const updateData: any = { ...data };
+    // Destructure data to exclude any fields that shouldn't be updated
+    const { subjectId: _unusedSubjectId, ...dataWithoutSubjectId } = data;
+    const updateData: {
+      topicId?: string | null;
+      chapterId?: string | null;
+      startedAt?: Date;
+      endedAt?: Date | null;
+      plannedDurationMinutes?: number;
+      actualDurationMinutes?: number;
+      pomodorosCompleted?: number;
+      confidenceRating?: number | null;
+      notes?: string | null;
+      xpEarned?: number;
+    } = {};
+
     if (data.startedAt) updateData.startedAt = new Date(data.startedAt);
-    if (data.endedAt) updateData.endedAt = new Date(data.endedAt);
-    delete updateData.subjectId;
+    if (data.endedAt !== undefined) {
+      updateData.endedAt = data.endedAt ? new Date(data.endedAt) : null;
+    }
+    if (data.topicId !== undefined) updateData.topicId = data.topicId;
+    if (data.chapterId !== undefined) updateData.chapterId = data.chapterId;
+    if (data.plannedDurationMinutes !== undefined) updateData.plannedDurationMinutes = data.plannedDurationMinutes;
+    if (data.actualDurationMinutes !== undefined) updateData.actualDurationMinutes = data.actualDurationMinutes;
+    if (data.pomodorosCompleted !== undefined) updateData.pomodorosCompleted = data.pomodorosCompleted;
+    if (data.confidenceRating !== undefined) updateData.confidenceRating = data.confidenceRating;
+    if (data.notes !== undefined) updateData.notes = data.notes;
+
+    // Recalculate XP if pomodorosCompleted, confidenceRating, or actualDurationMinutes changed
+    const xpChanged = data.pomodorosCompleted !== undefined ||
+      data.confidenceRating !== undefined ||
+      data.actualDurationMinutes !== undefined;
+
+    if (xpChanged) {
+      const newXpEarned = XpService.xpForSession(
+        data.actualDurationMinutes ?? existing.actualDurationMinutes,
+        data.pomodorosCompleted ?? existing.pomodorosCompleted,
+        data.confidenceRating ?? existing.confidenceRating ?? undefined
+      );
+      updateData.xpEarned = newXpEarned;
+    }
 
     const session = await prisma.studySession.update({
       where: { id },
       data: updateData,
     });
 
+    // If XP changed, update subject XP and user stats
+    if (xpChanged) {
+      const xpDelta = session.xpEarned - existing.xpEarned;
+      if (xpDelta !== 0) {
+        await prisma.subject.update({
+          where: { id: session.subjectId },
+          data: { xpTotal: { increment: xpDelta } },
+        });
+        await XpService.addXpAndMinutes(req.user.userId, xpDelta, 0);
+      }
+    }
+
     res.json({ data: session });
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 });
@@ -167,7 +274,7 @@ router.delete('/:id', async (req, res, next) => {
     }
 
     res.status(204).send();
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 });

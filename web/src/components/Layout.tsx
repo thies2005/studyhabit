@@ -1,16 +1,16 @@
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useState } from 'react';
+import { useAuth } from '../hooks/useAuth';
 
 export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { logout } = useAuth();
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [deepWorkMode, setDeepWorkMode] = useState(false);
 
-  const handleLogout = () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    localStorage.removeItem('user');
+  const handleLogout = async () => {
+    await logout();
     navigate('/login');
   };
 
@@ -79,7 +79,7 @@ export default function Layout() {
         {/* Navigation Items */}
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
           {navItems.map((item) => {
-            const isActive = location.pathname === item.to;
+            const isActive = location.pathname.startsWith(item.to);
             return (
               <Link
                 key={item.to}
@@ -100,12 +100,6 @@ export default function Layout() {
 
         {/* Bottom Actions */}
         <div className="p-4 border-t border-surfaceHigh space-y-2">
-          {/* Workspace Switcher */}
-          <button className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-onSurface hover:bg-surfaceHigh transition-colors font-body">
-            <span className="material-icons">swap_horiz</span>
-            <span className="font-medium">Workspace Switcher</span>
-          </button>
-
           {/* Settings */}
           <Link
             to="/settings"
@@ -132,18 +126,7 @@ export default function Layout() {
         {/* Top Bar */}
         <header className="bg-surfaceHigh border-b border-surfaceHigh px-6 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex-1 max-w-md">
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  className="w-full px-4 py-2 pl-10 bg-background border border-gray-700 rounded-lg text-onSurface placeholder-gray-500 focus:outline-none focus:border-primary font-body"
-                />
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 material-icons">
-                  search
-                </span>
-              </div>
-            </div>
+            <div className="flex-1"></div>
 
             <div className="flex items-center space-x-4">
               {/* Notifications */}

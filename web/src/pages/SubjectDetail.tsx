@@ -322,7 +322,7 @@ export default function SubjectDetail() {
 
           {/* Tab Buttons */}
           <div className="flex gap-6 mb-6 border-b border-gray-700">
-            {(['timeline', 'sources', 'topics'] as Tab[]).map((tab) => (
+            {(['timeline', 'sources', ...(displaySubject.hierarchyMode !== 'flat' ? ['topics'] : [])] as Tab[]).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}

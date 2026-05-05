@@ -1,11 +1,5 @@
 import { useEffect, useState } from 'react';
-
-interface Achievement {
-  id: string;
-  key: string;
-  unlockedAt: string | null;
-  progress: number;
-}
+import type { Achievement } from '../types';
 
 const achievementIcons: Record<string, string> = {
   streak_3: 'local_fire_department',
@@ -131,21 +125,21 @@ function getXpForLevel(level: number): number {
 
 // Mock data for demo purposes
 const mockAchievements: Achievement[] = [
-  { id: '1', key: 'streak_7', unlockedAt: '2024-10-01', progress: 1 },
-  { id: '2', key: 'pomodoro_10', unlockedAt: '2024-09-28', progress: 1 },
-  { id: '3', key: 'hours_10', unlockedAt: '2024-09-25', progress: 1 },
-  { id: '4', key: 'subject_5h', unlockedAt: '2024-09-20', progress: 1 },
-  { id: '5', key: 'first_pdf', unlockedAt: '2024-09-15', progress: 1 },
-  { id: '6', key: 'confidence_5', unlockedAt: '2024-09-12', progress: 1 },
-  { id: '7', key: 'streak_30', unlockedAt: null, progress: 0.23 },
-  { id: '8', key: 'pomodoro_100', unlockedAt: null, progress: 0.12 },
-  { id: '9', key: 'hours_100', unlockedAt: null, progress: 0.42 },
-  { id: '10', key: 'streak_3', unlockedAt: '2024-08-25', progress: 1 },
-  { id: '11', key: 'subject_10h', unlockedAt: null, progress: 0.65 },
-  { id: '12', key: 'skill_advanced', unlockedAt: null, progress: 0.35 },
-  { id: '13', key: 'streak_100', unlockedAt: null, progress: 0.12 },
-  { id: '14', key: 'pomodoro_500', unlockedAt: null, progress: 0.02 },
-  { id: '15', key: 'all_badges', unlockedAt: null, progress: 0.40 },
+  { id: '1', userId: 'mock-user', key: 'streak_7', unlockedAt: '2024-10-01', progress: 1, createdAt: '2024-10-01', updatedAt: '2024-10-01' },
+  { id: '2', userId: 'mock-user', key: 'pomodoro_10', unlockedAt: '2024-09-28', progress: 1, createdAt: '2024-09-28', updatedAt: '2024-09-28' },
+  { id: '3', userId: 'mock-user', key: 'hours_10', unlockedAt: '2024-09-25', progress: 1, createdAt: '2024-09-25', updatedAt: '2024-09-25' },
+  { id: '4', userId: 'mock-user', key: 'subject_5h', unlockedAt: '2024-09-20', progress: 1, createdAt: '2024-09-20', updatedAt: '2024-09-20' },
+  { id: '5', userId: 'mock-user', key: 'first_pdf', unlockedAt: '2024-09-15', progress: 1, createdAt: '2024-09-15', updatedAt: '2024-09-15' },
+  { id: '6', userId: 'mock-user', key: 'confidence_5', unlockedAt: '2024-09-12', progress: 1, createdAt: '2024-09-12', updatedAt: '2024-09-12' },
+  { id: '7', userId: 'mock-user', key: 'streak_30', unlockedAt: null, progress: 0.23, createdAt: '2024-10-01', updatedAt: '2024-10-01' },
+  { id: '8', userId: 'mock-user', key: 'pomodoro_100', unlockedAt: null, progress: 0.12, createdAt: '2024-10-01', updatedAt: '2024-10-01' },
+  { id: '9', userId: 'mock-user', key: 'hours_100', unlockedAt: null, progress: 0.42, createdAt: '2024-10-01', updatedAt: '2024-10-01' },
+  { id: '10', userId: 'mock-user', key: 'streak_3', unlockedAt: '2024-08-25', progress: 1, createdAt: '2024-08-25', updatedAt: '2024-08-25' },
+  { id: '11', userId: 'mock-user', key: 'subject_10h', unlockedAt: null, progress: 0.65, createdAt: '2024-10-01', updatedAt: '2024-10-01' },
+  { id: '12', userId: 'mock-user', key: 'skill_advanced', unlockedAt: null, progress: 0.35, createdAt: '2024-10-01', updatedAt: '2024-10-01' },
+  { id: '13', userId: 'mock-user', key: 'streak_100', unlockedAt: null, progress: 0.12, createdAt: '2024-10-01', updatedAt: '2024-10-01' },
+  { id: '14', userId: 'mock-user', key: 'pomodoro_500', unlockedAt: null, progress: 0.02, createdAt: '2024-10-01', updatedAt: '2024-10-01' },
+  { id: '15', userId: 'mock-user', key: 'all_badges', unlockedAt: null, progress: 0.40, createdAt: '2024-10-01', updatedAt: '2024-10-01' },
 ];
 
 export default function Achievements() {

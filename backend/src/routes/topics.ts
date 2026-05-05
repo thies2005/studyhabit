@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { prisma } from '../index.js';
+import { prisma } from '../db.js';
 import { parsePagination } from '../types/index.js';
 
 const router = Router();
@@ -40,7 +40,7 @@ router.get('/', async (req, res, next) => {
       data: topics,
       pagination: { page, limit, total, hasMore: skip + take < total },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 });
@@ -61,7 +61,7 @@ router.get('/:id', async (req, res, next) => {
     }
 
     res.json({ data: topic });
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 });
@@ -81,7 +81,7 @@ router.post('/', async (req, res, next) => {
 
     const topic = await prisma.topic.create({ data });
     res.status(201).json({ data: topic });
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 });
@@ -108,7 +108,7 @@ router.patch('/:id', async (req, res, next) => {
     });
 
     res.json({ data: updated });
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 });
@@ -128,7 +128,7 @@ router.delete('/:id', async (req, res, next) => {
     }
 
     res.status(204).send();
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 });

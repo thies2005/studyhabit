@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { prisma } from '../index.js';
+import { prisma } from '../db.js';
 import { XpService } from '../services/xpService.js';
+import { StudySession } from '@prisma/client';
 
 const router = Router();
 
@@ -33,7 +34,7 @@ router.get('/overview', async (req, res, next) => {
     });
 
     const weekMinutes = weekSessions.reduce(
-      (sum: number, s: any) => sum + s.actualDurationMinutes,
+      (sum: number, s: StudySession) => sum + s.actualDurationMinutes,
       0
     );
 
@@ -47,7 +48,7 @@ router.get('/overview', async (req, res, next) => {
         levelName,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 });
@@ -77,7 +78,7 @@ router.get('/heatmap', async (req, res, next) => {
     }));
 
     res.json({ data: heatmapData });
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 });
@@ -129,7 +130,7 @@ router.get('/subjects', async (req, res, next) => {
     }));
 
     res.json({ data: breakdown });
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 });

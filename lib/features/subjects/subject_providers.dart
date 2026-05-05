@@ -171,7 +171,7 @@ Future<SubjectStats> subjectStats(Ref ref, String subjectId) async {
     final subjectDao = SubjectDao(db);
     final milestoneDao = SubjectMilestoneDao(db);
 
-    final sessions = await sessionDao.watchBySubject(subjectId).first;
+    final sessions = await sessionDao.getBySubject(subjectId);
     final totalMinutes = sessions.fold<int>(
       0,
       (sum, s) => sum + s.actualDurationMinutes,

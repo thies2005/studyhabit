@@ -2,8 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import { PrismaClient } from '@prisma/client';
 import { config } from './config.js';
+import { prisma } from './db.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { authMiddleware } from './middleware/auth.js';
 import { authLimiter, apiLimiter, syncLimiter } from './middleware/rateLimit.js';
@@ -21,24 +21,30 @@ import skillLabelRoutes from './routes/skill-labels.js';
 import { AuthService } from './services/authService.js';
 import docsRoutes from './routes/docs.js';
 
-export const prisma = new PrismaClient();
-
 const app = express();
-
-app.set('trust proxy', 1);
 
 app.use(helmet());
 
+app.set('trust proxy', 1);
+
 app.use(cors({
-  origin: config.CORS_ORIGIN === '*' ? true : config.CORS_ORIGIN.split(','),
-  credentials: true,
+  origin: (origin, callback) => {
+    if (!origin || config.CORS_ORIGIN === '*') {
+      callback(null, true);
+    } else {
+      callback(null, config.CORS_ORIGIN);
+    }
+  },
+  credentials: config.CORS_ORIGIN !== '*',
 }));
 
 app.use(morgan(config.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
 app.use(express.json({ limit: '1mb' }));
 
-app.use('/api/v1/docs', docsRoutes);
+if (config.NODE_ENV !== 'production') {
+  app.use('/api/v1/docs', docsRoutes);
+}
 
 app.get('/health', async (_req, res) => {
   try {

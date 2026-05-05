@@ -7,6 +7,7 @@ import '../../../../core/database/daos/session_dao.dart';
 import '../../../../core/models/enums.dart';
 import '../../../../core/models/study_session.dart';
 import '../../../../core/providers/database_provider.dart';
+import '../../../../core/services/app_logger.dart';
 import '../../subject_providers.dart';
 import 'timeline_providers.dart';
 import 'edit_session_sheet.dart';
@@ -338,7 +339,7 @@ class _SessionCardState extends ConsumerState<SessionCard> {
       final dao = SessionDao(db);
       await dao.delete(sessionId);
     } catch (e) {
-      debugPrint('Error deleting session: $e');
+      AppLogger.e('TimelineTab', 'Error deleting session', e);
     }
   }
 }

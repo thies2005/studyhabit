@@ -14,6 +14,13 @@ class SessionDao {
     return query.watch();
   }
 
+  Future<List<StudySessionRow>> getBySubject(String subjectId) {
+    final query = _db.select(_db.studySessions)
+      ..where((table) => table.subjectId.equals(subjectId))
+      ..orderBy([(table) => OrderingTerm.desc(table.startedAt)]);
+    return query.get();
+  }
+
   Future<void> insert(StudySessionsCompanion companion) {
     return _db.into(_db.studySessions).insert(companion);
   }

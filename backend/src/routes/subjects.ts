@@ -1,9 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { prisma } from '../index.js';
+import { prisma } from '../db.js';
 import { parsePagination } from '../types/index.js';
-import { XpService } from '../services/xpService.js';
-import { AchievementService } from '../services/achievementService.js';
 
 const router = Router();
 
@@ -26,9 +24,14 @@ const updateSubjectSchema = z.object({
   defaultBreakMinutes: z.number().int().min(1).max(30).optional(),
 });
 
+// Schema for validating query parameters
+const listSubjectsQuerySchema = z.object({
+  projectId: z.string().uuid('Invalid or missing projectId'),
+});
+
 router.get('/', async (req, res, next) => {
   try {
-    const projectId = String(req.query.projectId ?? '');
+    const { projectId } = listSubjectsQuerySchema.parse(req.query);
     const { skip, take, page, limit } = parsePagination(req.query as any);
     const where = { projectId, project: { userId: req.user.userId } };
     const [subjects, total] = await Promise.all([
@@ -44,7 +47,7 @@ router.get('/', async (req, res, next) => {
       data: subjects,
       pagination: { page, limit, total, hasMore: skip + take < total },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 });
@@ -62,7 +65,7 @@ router.get('/:id', async (req, res, next) => {
       return res.status(404).json({ error: 'Subject not found' });
     }
     res.json({ data: subject });
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 });
@@ -81,7 +84,7 @@ router.post('/', async (req, res, next) => {
 
     const subject = await prisma.subject.create({ data });
     res.status(201).json({ data: subject });
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 });
@@ -101,7 +104,7 @@ router.patch('/:id', async (req, res, next) => {
 
     const updated = await prisma.subject.findUnique({ where: { id } });
     res.json({ data: updated });
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 });
@@ -118,7 +121,7 @@ router.delete('/:id', async (req, res, next) => {
     }
 
     res.status(204).send();
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 });
@@ -156,7 +159,7 @@ export function createProjectSubjectRoutes(): Router {
         data: subjects,
         pagination: { page, limit, total, hasMore: skip + take < total },
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       next(error);
     }
   });
@@ -180,7 +183,7 @@ export function createProjectSubjectRoutes(): Router {
       });
 
       res.status(201).json({ data: subject });
-    } catch (error: any) {
+    } catch (error: unknown) {
       next(error);
     }
   });

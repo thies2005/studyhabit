@@ -33,6 +33,12 @@ class SourceDao {
     );
   }
 
+  Future<SourceRow?> getById(String id) {
+    return (_db.select(_db.sources)
+          ..where((table) => table.id.equals(id)))
+        .getSingleOrNull();
+  }
+
   Future<void> delete(String id) {
     return (_db.delete(
       _db.sources,

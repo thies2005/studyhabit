@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import apiClient from '../api/client';
+import { useAuth } from '../hooks/useAuth';
 
 export default function Register() {
   const [email, setEmail] = useState('');
@@ -8,6 +8,7 @@ export default function Register() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const { register } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,19 +20,7 @@ export default function Register() {
     }
 
     try {
-      const response = await apiClient.post('/auth/register', { email, password });
-
-      if (response.data.error) {
-        setError(response.data.error);
-        return;
-      }
-
-      const { user, accessToken, refreshToken } = response.data.data;
-
-      localStorage.setItem('access_token', accessToken);
-      localStorage.setItem('refresh_token', refreshToken);
-      localStorage.setItem('user', JSON.stringify(user));
-
+      await register(email, password);
       navigate('/dashboard');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Registration failed');

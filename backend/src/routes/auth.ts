@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
+import { ZodError } from 'zod';
 import bcrypt from 'bcryptjs';
-import { prisma } from '../index.js';
+import { prisma } from '../db.js';
 import { AuthService } from '../services/authService.js';
 import { authMiddleware } from '../middleware/auth.js';
 
@@ -18,13 +19,13 @@ const sensitiveLimiter = rateLimit({
 
 const registerSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(8),
+  password: z.string().min(8).max(128),
   deviceName: z.string().max(100).optional(),
 });
 
 const loginSchema = z.object({
   email: z.string().email(),
-  password: z.string(),
+  password: z.string().max(128),
   deviceName: z.string().max(100).optional(),
 });
 
@@ -70,8 +71,8 @@ router.post('/register', async (req, res, next) => {
         ...tokens,
       },
     });
-  } catch (error: any) {
-    if (error.name === 'ZodError') {
+  } catch (error: unknown) {
+    if (error instanceof ZodError) {
       return res.status(400).json({ error: 'Validation error', details: error.errors });
     }
     next(error);
@@ -99,8 +100,8 @@ router.post('/login', async (req, res, next) => {
         ...tokens,
       },
     });
-  } catch (error: any) {
-    if (error.name === 'ZodError') {
+  } catch (error: unknown) {
+    if (error instanceof ZodError) {
       return res.status(400).json({ error: 'Validation error', details: error.errors });
     }
     next(error);
@@ -133,8 +134,8 @@ router.post('/refresh', async (req, res, next) => {
     });
 
     res.json({ data: tokens });
-  } catch (error: any) {
-    if (error.name === 'ZodError') {
+  } catch (error: unknown) {
+    if (error instanceof ZodError) {
       return res.status(400).json({ error: 'Validation error', details: error.errors });
     }
     next(error);
@@ -143,13 +144,19 @@ router.post('/refresh', async (req, res, next) => {
 
 router.post('/logout', async (req, res, next) => {
   try {
-    const { refreshToken } = req.body;
+    const logoutSchema = z.object({
+      refreshToken: z.string().optional(),
+    });
+    const { refreshToken } = logoutSchema.parse(req.body);
     if (refreshToken) {
       await AuthService.revokeRefreshToken(refreshToken);
     }
     res.json({ data: { message: 'Logged out successfully' } });
-  } catch {
-    res.json({ data: { message: 'Logged out' } });
+  } catch (error: unknown) {
+    if (error instanceof ZodError) {
+      return res.status(400).json({ error: 'Validation error', details: error.errors });
+    }
+    next(error);
   }
 });
 
@@ -157,7 +164,7 @@ router.post('/logout-all', authMiddleware, async (req, res, next) => {
   try {
     const count = await AuthService.revokeAllUserTokens(req.user.userId);
     res.json({ data: { message: `Revoked ${count} sessions` } });
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 });
@@ -178,7 +185,7 @@ router.get('/me', authMiddleware, async (req, res, next) => {
     });
 
     res.json({ data: { ...user, stats } });
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 });
@@ -198,8 +205,8 @@ router.patch('/password', sensitiveLimiter, authMiddleware, async (req, res, nex
     }
 
     res.json({ data: { message: 'Password updated successfully' } });
-  } catch (error: any) {
-    if (error.name === 'ZodError') {
+  } catch (error: unknown) {
+    if (error instanceof ZodError) {
       return res.status(400).json({ error: 'Validation error', details: error.errors });
     }
     next(error);
@@ -228,7 +235,7 @@ router.delete('/account', sensitiveLimiter, authMiddleware, async (req, res, nex
 
     await AuthService.deleteAccount(req.user.userId);
     res.json({ data: { message: 'Account deleted successfully' } });
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 });
@@ -237,7 +244,7 @@ router.get('/devices', authMiddleware, async (req, res, next) => {
   try {
     const devices = await AuthService.getActiveDevices(req.user.userId);
     res.json({ data: devices });
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 });
@@ -250,7 +257,7 @@ router.delete('/devices/:tokenId', authMiddleware, async (req, res, next) => {
       return res.status(404).json({ error: 'Device session not found' });
     }
     res.json({ data: { message: 'Device revoked' } });
-  } catch (error: any) {
+  } catch (error: unknown) {
     next(error);
   }
 });
