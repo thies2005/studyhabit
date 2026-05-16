@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:drift/drift.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../database/app_database.dart';
 import '../services/app_logger.dart';
@@ -249,6 +250,22 @@ class ImportService {
             freezeTokens: Value(document.userStats.freezeTokens),
           ),
         );
+
+        if (document.settings != null) {
+          final prefs = await SharedPreferences.getInstance();
+          for (final entry in document.settings!.entries) {
+            final value = entry.value;
+            if (value is int) {
+              await prefs.setInt(entry.key, value);
+            } else if (value is double) {
+              await prefs.setDouble(entry.key, value);
+            } else if (value is bool) {
+              await prefs.setBool(entry.key, value);
+            } else if (value is String) {
+              await prefs.setString(entry.key, value);
+            }
+          }
+        }
       });
     } catch (e, st) {
       AppLogger.e('ImportService', 'Error importing data', e, st);

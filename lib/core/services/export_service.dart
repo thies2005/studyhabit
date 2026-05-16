@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../database/app_database.dart';
 import '../services/app_logger.dart';
@@ -24,6 +25,7 @@ class ExportDocument {
     required this.userStats,
     required this.projects,
     required this.achievements,
+    this.settings,
   });
 
   final int exportVersion;
@@ -31,6 +33,7 @@ class ExportDocument {
   final UserStats userStats;
   final List<ExportProject> projects;
   final List<Achievement> achievements;
+  final Map<String, dynamic>? settings;
 
   Map<String, dynamic> toJson() {
     return {
@@ -39,6 +42,7 @@ class ExportDocument {
       'userStats': userStats.toJson(),
       'projects': projects.map((p) => p.toJson()).toList(),
       'achievements': achievements.map((a) => a.toJson()).toList(),
+      if (settings != null) 'settings': settings,
     };
   }
 
@@ -53,6 +57,7 @@ class ExportDocument {
       achievements: (json['achievements'] as List)
           .map((a) => Achievement.fromJson(a as Map<String, dynamic>))
           .toList(),
+      settings: json['settings'] as Map<String, dynamic>?,
     );
   }
 }
@@ -224,14 +229,6 @@ class ExportService {
         );
       }
 
-      final document = ExportDocument(
-        exportVersion: 1,
-        exportedAt: DateTime.now().toIso8601String(),
-        userStats: userStats,
-        projects: exportProjects,
-        achievements: achievementModels,
-      );
-
       // Write to file
       final tempDir = await getTemporaryDirectory();
       final timestamp = DateTime.now()
@@ -240,9 +237,29 @@ class ExportService {
           .split('.')[0];
       final filePath = '${tempDir.path}/studytracker_$timestamp.json';
 
+      // Collect settings from SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      final settingsKeys = prefs.getKeys().where(
+        (k) => k.startsWith('theme.') || k.startsWith('pomodoro.') || k.startsWith('notifications.') || k.startsWith('streak.'),
+      );
+      final settingsMap = <String, dynamic>{};
+      for (final key in settingsKeys) {
+        final value = prefs.get(key);
+        if (value != null) settingsMap[key] = value;
+      }
+
+      final documentWithSettings = ExportDocument(
+        exportVersion: 1,
+        exportedAt: DateTime.now().toIso8601String(),
+        userStats: userStats,
+        projects: exportProjects,
+        achievements: achievementModels,
+        settings: settingsMap,
+      );
+
       final file = File(filePath);
       await file.writeAsString(
-        const JsonEncoder.withIndent('  ').convert(document.toJson()),
+        const JsonEncoder.withIndent('  ').convert(documentWithSettings.toJson()),
       );
 
       return file;

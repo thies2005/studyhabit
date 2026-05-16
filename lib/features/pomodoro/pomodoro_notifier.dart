@@ -542,6 +542,7 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
     );
 
     await AchievementService().checkAndUnlock(ref.read(appDatabaseProvider));
+    await _checkDailyGoalXp();
     await FlutterForegroundTask.stopService();
 
     // Cancel any pending reminder
@@ -702,6 +703,37 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
       startPage: startPage,
       endPage: endPage,
     );
+  }
+
+  Future<void> _checkDailyGoalXp() async {
+    final settings = ref.read(themeSettingsProvider).value;
+    if (settings == null || settings.dailyGoalMinutes <= 0) return;
+
+    final todayStr = _todayDateString();
+    if (settings.lastDailyGoalAwardDate == todayStr) return;
+
+    final db = ref.read(appDatabaseProvider);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final sessions = await (db.select(db.studySessions)
+          ..where((t) => t.startedAt.isBiggerOrEqualValue(today)))
+        .get();
+    final todayMinutes = sessions.fold<int>(
+      0,
+      (sum, s) => sum + s.actualDurationMinutes,
+    );
+
+    if (todayMinutes >= settings.dailyGoalMinutes) {
+      await ref.read(xpServiceProvider).award(ref, XpReason.dailyGoal);
+      await ref
+          .read(themeSettingsProvider.notifier)
+          .setLastDailyGoalAwardDate(todayStr);
+    }
+  }
+
+  String _todayDateString() {
+    final now = DateTime.now();
+    return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
   }
 
   String _formatTime(int seconds) {

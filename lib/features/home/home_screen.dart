@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../core/models/user_stats.dart';
 import '../../core/providers/database_provider.dart';
+import '../../core/providers/theme_provider.dart';
 import '../../core/providers/user_stats_provider.dart';
 import '../../core/services/xp_service.dart';
 import '../../features/subjects/subject_providers.dart';
@@ -45,7 +45,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               child: statsAsync.when(
                 loading: () => const SizedBox.shrink(),
                 error: (_, __) => const SizedBox.shrink(),
-                data: (stats) => _WeeklyFocusSection(stats: stats),
+                data: (stats) => _FocusSection(stats: stats),
               ),
             ),
           ),
@@ -60,7 +60,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     return const _EmptyState();
                   }
                   return _RecentSessionsList(
-                    sessions: sessions.take(3).toList(),
+                    sessions: sessions,
                   );
                 },
               ),
@@ -178,8 +178,110 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-class _WeeklyFocusSection extends ConsumerWidget {
-  const _WeeklyFocusSection({required this.stats});
+class _FocusSection extends ConsumerWidget {
+  const _FocusSection({required this.stats});
+
+  final UserStats stats;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeSettingsAsync = ref.watch(themeSettingsProvider);
+    return themeSettingsAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (settings) {
+        if (settings.dailyGoalMinutes > 0) {
+          return _DailyGoalCard(stats: stats, goalMinutes: settings.dailyGoalMinutes);
+        }
+        return _WeeklyFocusCard(stats: stats);
+      },
+    );
+  }
+}
+
+class _DailyGoalCard extends ConsumerWidget {
+  const _DailyGoalCard({required this.stats, required this.goalMinutes});
+
+  final UserStats stats;
+  final int goalMinutes;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final todayMinutesAsync = ref.watch(todaySessionsProvider);
+
+    return todayMinutesAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (todayMinutes) {
+        final progress = goalMinutes > 0
+            ? (todayMinutes / goalMinutes).clamp(0.0, 1.0)
+            : 0.0;
+        final isComplete = todayMinutes >= goalMinutes;
+
+        return Card(
+          color: colorScheme.surfaceContainerHigh,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Daily Goal',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Icon(
+                      isComplete ? Icons.check_circle : Icons.flag_outlined,
+                      color: isComplete ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                      size: 20,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: AnimatedProgressBar(value: progress, height: 8),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      '$todayMinutes / $goalMinutes min',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: isComplete
+                            ? colorScheme.primary
+                            : colorScheme.onSurfaceVariant,
+                        fontWeight: isComplete ? FontWeight.w600 : FontWeight.normal,
+                      ),
+                    ),
+                  ],
+                ),
+                if (isComplete)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      'Goal reached! Great work today.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colorScheme.primary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _WeeklyFocusCard extends ConsumerWidget {
+  const _WeeklyFocusCard({required this.stats});
 
   final UserStats stats;
 
@@ -194,7 +296,7 @@ class _WeeklyFocusSection extends ConsumerWidget {
         : 0.0;
 
     return Card(
-      color: colorScheme.surfaceContainerLow,
+      color: colorScheme.surfaceContainerHigh,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -226,16 +328,28 @@ class _WeeklyFocusSection extends ConsumerWidget {
   }
 }
 
-class _RecentSessionsList extends ConsumerWidget {
+class _RecentSessionsList extends ConsumerStatefulWidget {
   const _RecentSessionsList({required this.sessions});
 
   final List<StudySessionData> sessions;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    if (sessions.isEmpty) {
+  ConsumerState<_RecentSessionsList> createState() => _RecentSessionsListState();
+}
+
+class _RecentSessionsListState extends ConsumerState<_RecentSessionsList> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.sessions.isEmpty) {
       return const SizedBox.shrink();
     }
+
+    final displaySessions = _expanded
+        ? widget.sessions
+        : widget.sessions.take(3).toList();
+    final canExpand = widget.sessions.length > 3;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -249,14 +363,15 @@ class _RecentSessionsList extends ConsumerWidget {
                 'Recent Sessions',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
-              TextButton(
-                onPressed: () => context.goNamed('subjects'),
-                child: const Text('View all'),
-              ),
+              if (canExpand)
+                TextButton(
+                  onPressed: () => setState(() => _expanded = !_expanded),
+                  child: Text(_expanded ? 'Show less' : 'View all'),
+                ),
             ],
           ),
         ),
-        ...sessions.map((session) => _SessionCard(session: session)),
+        ...displaySessions.map((session) => _SessionCard(session: session)),
         const SizedBox(height: 100),
       ],
     );
@@ -345,10 +460,7 @@ class _SessionCard extends ConsumerWidget {
               ],
             ),
             onTap: () {
-              context.pushNamed(
-                'subject-detail',
-                pathParameters: {'subjectId': subject.id},
-              );
+              // No navigation — cards are informational only in home feed
             },
           ),
         );
@@ -446,7 +558,8 @@ Stream<List<StudySessionData>> allSessions(Ref ref) {
                 xpEarned: row.xpEarned,
               ),
             )
-            .toList(),
+            .toList()
+          ..sort((a, b) => b.startedAt.compareTo(a.startedAt)),
       );
 }
 

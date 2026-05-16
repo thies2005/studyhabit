@@ -18,6 +18,7 @@ enum XpReason {
   streak7,
   streak30,
   streak100,
+  dailyGoal,
 }
 
 class XpService {
@@ -33,6 +34,7 @@ class XpService {
       XpReason.streak7 => 500,
       XpReason.streak30 => 500,
       XpReason.streak100 => 500,
+      XpReason.dailyGoal => 75,
     };
   }
 

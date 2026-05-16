@@ -141,9 +141,12 @@ class AppTheme {
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: BorderSide.none,
+          side: BorderSide(
+            color: scheme.outlineVariant.withValues(alpha: 0.5),
+            width: 1,
+          ),
         ),
-        color: scheme.surfaceContainerLow,
+        color: scheme.surfaceContainerHigh,
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: scheme.surfaceContainer.withValues(alpha: 0.8),

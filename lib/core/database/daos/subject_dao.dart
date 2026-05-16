@@ -29,4 +29,23 @@ class SubjectDao {
       _db.subjects,
     )..where((table) => table.id.equals(id))).go();
   }
+
+  Future<void> updateDefaultDurations({
+    required int oldWork,
+    required int newWork,
+    required int oldBreak,
+    required int newBreak,
+  }) async {
+    final query = _db.select(_db.subjects)
+      ..where((t) => t.defaultDurationMinutes.equals(oldWork) & t.defaultBreakMinutes.equals(oldBreak));
+    final rows = await query.get();
+    for (final row in rows) {
+      await _db.into(_db.subjects).insertOnConflictUpdate(
+        row.copyWith(
+          defaultDurationMinutes: newWork,
+          defaultBreakMinutes: newBreak,
+        ),
+      );
+    }
+  }
 }

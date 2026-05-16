@@ -10,6 +10,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../core/models/enums.dart';
 import '../../core/models/user_stats.dart';
 import '../../core/providers/database_provider.dart';
+import '../../core/database/daos/subject_dao.dart';
 import '../../core/providers/theme_provider.dart';
 import '../../core/providers/user_stats_provider.dart';
 import '../../core/services/export_service.dart';
@@ -198,9 +199,12 @@ class _SettingsContent extends ConsumerWidget {
                 max: 90,
                 unit: 'min',
                 onChanged: (value) {
+                  final oldVal = settings.workDuration;
+                  final currentBreak = settings.shortBreak;
                   ref
                       .read(themeSettingsProvider.notifier)
                       .setWorkDuration(value.round());
+                  _propagateWorkDuration(oldVal, value.round(), currentBreak, ref);
                 },
               ),
               const Divider(height: 1),
@@ -211,9 +215,12 @@ class _SettingsContent extends ConsumerWidget {
                 max: 30,
                 unit: 'min',
                 onChanged: (value) {
+                  final oldVal = settings.shortBreak;
+                  final currentWork = settings.workDuration;
                   ref
                       .read(themeSettingsProvider.notifier)
                       .setShortBreak(value.round());
+                  _propagateShortBreak(currentWork, oldVal, value.round(), ref);
                 },
               ),
               const Divider(height: 1),
@@ -514,6 +521,61 @@ class _SettingsContent extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 24),
+        const _SectionHeader(
+          icon: Icons.flag_outlined,
+          label: 'Daily Study Goal',
+        ),
+        const SizedBox(height: 8),
+        Card(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Daily goal', style: theme.textTheme.bodyLarge),
+                    Text(
+                      settings.dailyGoalMinutes > 0
+                          ? '${settings.dailyGoalMinutes} min'
+                          : 'Off',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: settings.dailyGoalMinutes > 0
+                            ? colorScheme.primary
+                            : colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Slider(
+                value: settings.dailyGoalMinutes.toDouble(),
+                min: 0,
+                max: 240,
+                divisions: 24,
+                label: settings.dailyGoalMinutes > 0
+                    ? '${settings.dailyGoalMinutes} min'
+                    : 'Off',
+                onChanged: (value) {
+                  ref
+                      .read(themeSettingsProvider.notifier)
+                      .setDailyGoalMinutes(value.round());
+                },
+              ),
+              if (settings.dailyGoalMinutes > 0)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  child: Text(
+                    'Earn bonus XP when you reach your daily study goal',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
         const _SectionHeader(icon: Icons.storage_outlined, label: 'Data Vault'),
         const SizedBox(height: 8),
         Card(
@@ -665,6 +727,30 @@ class _SettingsContent extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+
+  Future<void> _propagateWorkDuration(int oldVal, int newVal, int currentBreak, WidgetRef ref) async {
+    if (oldVal == newVal) return;
+    final db = ref.read(appDatabaseProvider);
+    final dao = SubjectDao(db);
+    await dao.updateDefaultDurations(
+      oldWork: oldVal,
+      newWork: newVal,
+      oldBreak: currentBreak,
+      newBreak: currentBreak,
+    );
+  }
+
+  Future<void> _propagateShortBreak(int currentWork, int oldVal, int newVal, WidgetRef ref) async {
+    if (oldVal == newVal) return;
+    final db = ref.read(appDatabaseProvider);
+    final dao = SubjectDao(db);
+    await dao.updateDefaultDurations(
+      oldWork: currentWork,
+      newWork: currentWork,
+      oldBreak: oldVal,
+      newBreak: newVal,
     );
   }
 

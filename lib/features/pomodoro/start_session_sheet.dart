@@ -7,6 +7,7 @@ import 'dart:io';
 import '../../core/models/enums.dart';
 import '../../core/models/project.dart';
 import '../../core/models/subject.dart';
+import '../../core/providers/database_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../projects/project_providers.dart';
 import '../subjects/subject_providers.dart';
@@ -44,6 +45,8 @@ class _StartSessionSheetState extends ConsumerState<StartSessionSheet> {
   double _longBreakEvery = 4;
   String? _problematicManufacturer;
   bool _isFreeTimerMode = false;
+  bool _hasTopics = false;
+  bool _hasChapters = false;
 
   // Inline creation state
   bool _creatingProject = false;
@@ -220,23 +223,26 @@ class _StartSessionSheetState extends ConsumerState<StartSessionSheet> {
             0 => _SubjectPicker(
                 subjects: subjects,
                 selected: _selectedSubject,
-                onSelected: (s) {
+                onSelected: (s) async {
                   setState(() {
                     _selectedSubject = s;
                     _selectedTopicId = null;
                     _selectedChapterId = null;
                     _topicChoiceMade = false;
                     _chapterChoiceMade = false;
+                    _hasTopics = false;
+                    _hasChapters = false;
                     _workDuration = s.defaultDurationMinutes.toDouble();
                     _shortBreak = s.defaultBreakMinutes.toDouble();
                   });
                   _applyProjectDefaults(currentProject);
+                  await _checkHierarchyAvailability(s);
                 },
                 onCreateNew: () {
                   setState(() => _creatingSubject = true);
                 },
               ),
-            1 => _TopicPicker(
+            _ when _isTopicStep() => _TopicPicker(
                 subjectId: _selectedSubject!.id,
                 selectedTopicId: _selectedTopicId,
                 onSelected: (id) => setState(() {
@@ -245,7 +251,7 @@ class _StartSessionSheetState extends ConsumerState<StartSessionSheet> {
                 }),
                 hierarchyMode: _selectedSubject!.hierarchyMode,
               ),
-            2 => _ChapterPicker(
+            _ when _isChapterStep() => _ChapterPicker(
                 topicId: _selectedTopicId ?? '',
                 selectedChapterId: _selectedChapterId,
                 onSelected: (id) => setState(() {
@@ -253,7 +259,7 @@ class _StartSessionSheetState extends ConsumerState<StartSessionSheet> {
                   _chapterChoiceMade = true;
                 }),
               ),
-            3 => Column(
+            _ => Column(
                 children: [
                   Expanded(
                     child: _DurationConfig(
@@ -300,7 +306,6 @@ class _StartSessionSheetState extends ConsumerState<StartSessionSheet> {
                     ),
                 ],
               ),
-            _ => const SizedBox.shrink(),
           },
         ),
         Padding(
@@ -332,32 +337,44 @@ class _StartSessionSheetState extends ConsumerState<StartSessionSheet> {
   }
 
   String _getStepTitle() {
+    if (_selectedSubject == null) return 'Choose Subject';
+    final mode = _selectedSubject!.hierarchyMode;
+    final showTopicStep = mode != HierarchyMode.flat && _hasTopics;
+    final showChapterStep = mode == HierarchyMode.threeLevel && _hasChapters;
+
     return switch (_step) {
       0 => 'Choose Subject',
-      1 => 'Select Topic',
-      2 => 'Select Chapter',
-      3 => 'Session Settings',
-      _ => 'Start Session',
+      1 when showTopicStep && showChapterStep => 'Select Topic',
+      1 when showTopicStep && !showChapterStep => 'Select Topic',
+      1 when !showTopicStep && showChapterStep => 'Select Chapter',
+      1 when !showTopicStep && !showChapterStep => 'Session Settings',
+      2 when showChapterStep => 'Select Chapter',
+      2 => 'Session Settings',
+      _ => 'Session Settings',
     };
   }
 
   int _totalSteps() {
     if (_selectedSubject == null) return 3;
     final mode = _selectedSubject!.hierarchyMode;
-    final maxHierarchyStep = mode == HierarchyMode.flat
-        ? 0
-        : mode == HierarchyMode.twoLevel
-            ? 1
-            : 2;
 
-    if (_isFreeTimerMode) return maxHierarchyStep;
-
-    if (mode == HierarchyMode.threeLevel &&
-        _selectedTopicId == null &&
-        _topicChoiceMade) {
-      return 2;
+    if (mode == HierarchyMode.flat) {
+      return _isFreeTimerMode ? 0 : 3;
     }
-    return 3;
+
+    final showTopicStep = _hasTopics;
+    final showChapterStep = mode == HierarchyMode.threeLevel && _hasChapters;
+
+    if (_isFreeTimerMode) {
+      int steps = 0;
+      if (showTopicStep) steps++;
+      return steps;
+    }
+
+    int steps = 3; // subject (0) + ... + duration (last)
+    if (!showTopicStep) steps--;
+    if (!showChapterStep) steps--;
+    return steps;
   }
 
   void _applyProjectDefaults(Project? project) {
@@ -369,16 +386,62 @@ class _StartSessionSheetState extends ConsumerState<StartSessionSheet> {
     }
   }
 
+  Future<void> _checkHierarchyAvailability(Subject subject) async {
+    if (subject.hierarchyMode == HierarchyMode.flat) {
+      setState(() {
+        _hasTopics = false;
+        _hasChapters = false;
+      });
+      return;
+    }
+
+    final db = ref.read(appDatabaseProvider);
+    final topicQuery = db.select(db.topics)
+      ..where((t) => t.subjectId.equals(subject.id));
+    final topics = await topicQuery.get();
+    final hasTopics = topics.isNotEmpty;
+
+    if (!mounted) return;
+
+    bool hasChapters = false;
+    if (subject.hierarchyMode == HierarchyMode.threeLevel && hasTopics) {
+      final chapterQuery = db.select(db.chapters)
+        ..where((t) => t.topicId.isIn(topics.map((t) => t.id)));
+      final chapters = await chapterQuery.get();
+      hasChapters = chapters.isNotEmpty;
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _hasTopics = hasTopics;
+      _hasChapters = hasChapters;
+    });
+  }
+
   bool _canProceed() {
-    return switch (_step) {
-      0 => _selectedSubject != null,
-      1 =>
-        _selectedSubject!.hierarchyMode == HierarchyMode.flat ||
-            _topicChoiceMade,
-      2 => _chapterChoiceMade,
-      3 => true,
-      _ => false,
-    };
+    if (_step == 0) return _selectedSubject != null;
+    if (_isTopicStep()) {
+      return _selectedSubject!.hierarchyMode == HierarchyMode.flat ||
+          _topicChoiceMade;
+    }
+    if (_isChapterStep()) return _chapterChoiceMade;
+    return true;
+  }
+
+  bool _isTopicStep() {
+    if (_selectedSubject == null) return false;
+    final mode = _selectedSubject!.hierarchyMode;
+    if (mode == HierarchyMode.flat || !_hasTopics) return false;
+    return _step == 1;
+  }
+
+  bool _isChapterStep() {
+    if (_selectedSubject == null) return false;
+    final mode = _selectedSubject!.hierarchyMode;
+    if (mode != HierarchyMode.threeLevel || !_hasChapters) return false;
+    if (_hasTopics) return _step == 2;
+    return _step == 1;
   }
 
   void _startSession(BuildContext context, WidgetRef ref) {

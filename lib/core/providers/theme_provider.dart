@@ -28,6 +28,8 @@ class ThemeSettings extends _$ThemeSettings {
   static const _dailyReminderEnabledKey = 'notifications.dailyReminderEnabled';
   static const _gracePeriodKey = 'streak.gracePeriod';
   static const _continuousFocusKey = 'pomodoro.continuousFocus';
+  static const _dailyGoalMinutesKey = 'goal.dailyMinutes';
+  static const _lastDailyGoalAwardDateKey = 'goal.lastAwardDate';
 
 
   late SharedPreferences _prefs;
@@ -72,6 +74,8 @@ class ThemeSettings extends _$ThemeSettings {
     final dailyReminderEnabled = _prefs.getBool(_dailyReminderEnabledKey) ?? false;
     final gracePeriod = _prefs.getDouble(_gracePeriodKey) ?? 2.0;
     final continuousFocus = _prefs.getBool(_continuousFocusKey) ?? true;
+    final dailyGoalMinutes = _prefs.getInt(_dailyGoalMinutesKey) ?? 0;
+    final lastDailyGoalAwardDate = _prefs.getString(_lastDailyGoalAwardDateKey) ?? '';
 
     return ThemeSettingsState(
       seedColorIndex: seedColorIndex,
@@ -94,6 +98,8 @@ class ThemeSettings extends _$ThemeSettings {
       dailyReminderEnabled: dailyReminderEnabled,
       gracePeriodHours: gracePeriod,
       continuousFocus: continuousFocus,
+      dailyGoalMinutes: dailyGoalMinutes,
+      lastDailyGoalAwardDate: lastDailyGoalAwardDate,
     );
   }
 
@@ -309,6 +315,24 @@ class ThemeSettings extends _$ThemeSettings {
     state = AsyncValue.data(next);
     await _prefs.setBool(_continuousFocusKey, enabled);
   }
+
+  Future<void> setDailyGoalMinutes(int minutes) async {
+    final current = state.asData?.value;
+    if (current == null) return;
+
+    final next = current.copyWith(dailyGoalMinutes: minutes);
+    state = AsyncValue.data(next);
+    await _prefs.setInt(_dailyGoalMinutesKey, minutes);
+  }
+
+  Future<void> setLastDailyGoalAwardDate(String date) async {
+    final current = state.asData?.value;
+    if (current == null) return;
+
+    final next = current.copyWith(lastDailyGoalAwardDate: date);
+    state = AsyncValue.data(next);
+    await _prefs.setString(_lastDailyGoalAwardDateKey, date);
+  }
 }
 
 class ThemeSettingsState {
@@ -333,6 +357,8 @@ class ThemeSettingsState {
     required this.dailyReminderEnabled,
     required this.gracePeriodHours,
     required this.continuousFocus,
+    required this.dailyGoalMinutes,
+    required this.lastDailyGoalAwardDate,
   });
 
   final int seedColorIndex;
@@ -355,6 +381,8 @@ class ThemeSettingsState {
   final bool dailyReminderEnabled;
   final double gracePeriodHours;
   final bool continuousFocus;
+  final int dailyGoalMinutes;
+  final String lastDailyGoalAwardDate;
 
   ThemeSettingsState copyWith({
     int? seedColorIndex,
@@ -377,6 +405,8 @@ class ThemeSettingsState {
     bool? dailyReminderEnabled,
     double? gracePeriodHours,
     bool? continuousFocus,
+    int? dailyGoalMinutes,
+    String? lastDailyGoalAwardDate,
   }) {
     return ThemeSettingsState(
       seedColorIndex: seedColorIndex ?? this.seedColorIndex,
@@ -399,6 +429,8 @@ class ThemeSettingsState {
       dailyReminderEnabled: dailyReminderEnabled ?? this.dailyReminderEnabled,
       gracePeriodHours: gracePeriodHours ?? this.gracePeriodHours,
       continuousFocus: continuousFocus ?? this.continuousFocus,
+      dailyGoalMinutes: dailyGoalMinutes ?? this.dailyGoalMinutes,
+      lastDailyGoalAwardDate: lastDailyGoalAwardDate ?? this.lastDailyGoalAwardDate,
     );
   }
 }
