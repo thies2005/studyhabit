@@ -60,6 +60,19 @@ class _SettingsContent extends ConsumerWidget {
   final ThemeSettingsState settings;
   final AsyncValue<UserStats> statsAsync;
 
+  String _weekdayLabel(int weekday) {
+    return switch (weekday) {
+      DateTime.monday => 'Monday',
+      DateTime.tuesday => 'Tuesday',
+      DateTime.wednesday => 'Wednesday',
+      DateTime.thursday => 'Thursday',
+      DateTime.friday => 'Friday',
+      DateTime.saturday => 'Saturday',
+      DateTime.sunday => 'Sunday',
+      _ => 'Day',
+    };
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
@@ -198,13 +211,19 @@ class _SettingsContent extends ConsumerWidget {
                 min: 5,
                 max: 90,
                 unit: 'min',
+                divisions: 17,
                 onChanged: (value) {
                   final oldVal = settings.workDuration;
                   final currentBreak = settings.shortBreak;
                   ref
                       .read(themeSettingsProvider.notifier)
                       .setWorkDuration(value.round());
-                  _propagateWorkDuration(oldVal, value.round(), currentBreak, ref);
+                  _propagateWorkDuration(
+                    oldVal,
+                    value.round(),
+                    currentBreak,
+                    ref,
+                  );
                 },
               ),
               const Divider(height: 1),
@@ -214,13 +233,19 @@ class _SettingsContent extends ConsumerWidget {
                 min: 1,
                 max: 30,
                 unit: 'min',
+                divisions: 29,
                 onChanged: (value) {
                   final oldVal = settings.shortBreak;
                   final currentWork = settings.workDuration;
                   ref
                       .read(themeSettingsProvider.notifier)
                       .setShortBreak(value.round());
-                  _propagateShortBreak(currentWork, oldVal, value.round(), ref);
+                  _propagateShortBreak(
+                    currentWork,
+                    oldVal,
+                    value.round(),
+                    ref,
+                  );
                 },
               ),
               const Divider(height: 1),
@@ -230,6 +255,7 @@ class _SettingsContent extends ConsumerWidget {
                 min: 5,
                 max: 60,
                 unit: 'min',
+                divisions: 11,
                 onChanged: (value) {
                   ref
                       .read(themeSettingsProvider.notifier)
@@ -244,6 +270,7 @@ class _SettingsContent extends ConsumerWidget {
                 max: 8,
                 unit: '',
                 isInt: true,
+                divisions: 6,
                 onChanged: (value) {
                   ref
                       .read(themeSettingsProvider.notifier)
@@ -527,52 +554,35 @@ class _SettingsContent extends ConsumerWidget {
         ),
         const SizedBox(height: 8),
         Card(
-          child: Column(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Daily goal', style: theme.textTheme.bodyLarge),
-                    Text(
-                      settings.dailyGoalMinutes > 0
-                          ? '${settings.dailyGoalMinutes} min'
-                          : 'Off',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: settings.dailyGoalMinutes > 0
-                            ? colorScheme.primary
-                            : colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Slider(
-                value: settings.dailyGoalMinutes.toDouble(),
-                min: 0,
-                max: 240,
-                divisions: 24,
-                label: settings.dailyGoalMinutes > 0
-                    ? '${settings.dailyGoalMinutes} min'
-                    : 'Off',
-                onChanged: (value) {
-                  ref
-                      .read(themeSettingsProvider.notifier)
-                      .setDailyGoalMinutes(value.round());
-                },
-              ),
-              if (settings.dailyGoalMinutes > 0)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  child: Text(
-                    'Earn bonus XP when you reach your daily study goal',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                child: Text(
+                  'Set a different goal for each day. A goal of 0 minutes disables that day.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
                   ),
                 ),
+              ),
+              for (final weekday in ThemeSettingsState.weekdays) ...[
+                _DailyGoalSetting(
+                  label: _weekdayLabel(weekday),
+                  value: settings.goalForWeekday(weekday).toDouble(),
+                  isToday: weekday == DateTime.now().weekday,
+                  onChanged: (value) {
+                    ref
+                        .read(themeSettingsProvider.notifier)
+                        .setDailyGoalForWeekday(weekday, value.round());
+                  },
+                ),
+                if (weekday != ThemeSettingsState.weekdays.last)
+                  const Divider(height: 1),
+              ],
             ],
+            ),
           ),
         ),
         const SizedBox(height: 24),
@@ -997,6 +1007,7 @@ class _SliderSetting extends StatelessWidget {
     required this.max,
     required this.unit,
     required this.onChanged,
+    this.divisions,
     this.isInt = false,
   });
 
@@ -1006,6 +1017,7 @@ class _SliderSetting extends StatelessWidget {
   final double max;
   final String unit;
   final ValueChanged<double> onChanged;
+  final int? divisions;
   final bool isInt;
 
   @override
@@ -1013,29 +1025,95 @@ class _SliderSetting extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final displayValue = isInt ? value.round() : double.parse(value.toStringAsFixed(1));
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(label, style: Theme.of(context).textTheme.bodyLarge),
-            Text(
-              '$displayValue $unit',
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(color: colorScheme.primary),
-            ),
-          ],
-        ),
-        Slider(
-          value: value,
-          min: min,
-          max: max,
-          divisions: (max - min).toInt(),
-          onChanged: onChanged,
-        ),
-      ],
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Flexible(
+                child: Text(
+                  label,
+                  style: Theme.of(context).textTheme.bodyLarge,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                '$displayValue $unit',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(color: colorScheme.primary),
+              ),
+            ],
+          ),
+          Slider(
+            value: value,
+            min: min,
+            max: max,
+            divisions: divisions,
+            onChanged: onChanged,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DailyGoalSetting extends StatelessWidget {
+  const _DailyGoalSetting({
+    required this.label,
+    required this.value,
+    required this.isToday,
+    required this.onChanged,
+  });
+
+  final String label;
+  final double value;
+  final bool isToday;
+  final ValueChanged<double> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final displayLabel = value <= 0 ? 'Off' : '${value.round()} min';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  isToday ? '$label (Today)' : label,
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    fontWeight: isToday ? FontWeight.w600 : FontWeight.w500,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                displayLabel,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: value > 0
+                      ? colorScheme.primary
+                      : colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+          Slider(
+            value: value,
+            min: 0,
+            max: 240,
+            divisions: 24,
+            onChanged: onChanged,
+          ),
+        ],
+      ),
     );
   }
 }

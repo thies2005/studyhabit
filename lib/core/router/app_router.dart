@@ -97,7 +97,11 @@ GoRouter appRouter(Ref ref) {
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) {
           final subjectId = state.pathParameters['subjectId']!;
-          return SubjectDetailScreen(subjectId: subjectId);
+          final initialTab = state.uri.queryParameters['tab'];
+          return SubjectDetailScreen(
+            subjectId: subjectId,
+            initialTab: initialTab,
+          );
         },
       ),
       GoRoute(

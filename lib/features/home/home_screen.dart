@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../core/models/user_stats.dart';
@@ -190,8 +191,11 @@ class _FocusSection extends ConsumerWidget {
       loading: () => const SizedBox.shrink(),
       error: (_, __) => const SizedBox.shrink(),
       data: (settings) {
-        if (settings.dailyGoalMinutes > 0) {
-          return _DailyGoalCard(stats: stats, goalMinutes: settings.dailyGoalMinutes);
+        if (settings.todayGoalMinutes > 0) {
+          return _DailyGoalCard(
+            stats: stats,
+            goalMinutes: settings.todayGoalMinutes,
+          );
         }
         return _WeeklyFocusCard(stats: stats);
       },
@@ -460,7 +464,11 @@ class _SessionCard extends ConsumerWidget {
               ],
             ),
             onTap: () {
-              // No navigation — cards are informational only in home feed
+              context.pushNamed(
+                'subject-detail',
+                pathParameters: {'subjectId': subject.id},
+                queryParameters: const {'tab': 'timeline'},
+              );
             },
           ),
         );

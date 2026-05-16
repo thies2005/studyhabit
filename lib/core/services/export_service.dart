@@ -240,7 +240,12 @@ class ExportService {
       // Collect settings from SharedPreferences
       final prefs = await SharedPreferences.getInstance();
       final settingsKeys = prefs.getKeys().where(
-        (k) => k.startsWith('theme.') || k.startsWith('pomodoro.') || k.startsWith('notifications.') || k.startsWith('streak.'),
+        (k) =>
+            k.startsWith('theme.') ||
+            k.startsWith('pomodoro.') ||
+            k.startsWith('notifications.') ||
+            k.startsWith('streak.') ||
+            k.startsWith('goal.'),
       );
       final settingsMap = <String, dynamic>{};
       for (final key in settingsKeys) {

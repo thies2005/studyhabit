@@ -29,6 +29,13 @@ class ThemeSettings extends _$ThemeSettings {
   static const _gracePeriodKey = 'streak.gracePeriod';
   static const _continuousFocusKey = 'pomodoro.continuousFocus';
   static const _dailyGoalMinutesKey = 'goal.dailyMinutes';
+  static const _dailyGoalMondayKey = 'goal.monday';
+  static const _dailyGoalTuesdayKey = 'goal.tuesday';
+  static const _dailyGoalWednesdayKey = 'goal.wednesday';
+  static const _dailyGoalThursdayKey = 'goal.thursday';
+  static const _dailyGoalFridayKey = 'goal.friday';
+  static const _dailyGoalSaturdayKey = 'goal.saturday';
+  static const _dailyGoalSundayKey = 'goal.sunday';
   static const _lastDailyGoalAwardDateKey = 'goal.lastAwardDate';
 
 
@@ -75,6 +82,18 @@ class ThemeSettings extends _$ThemeSettings {
     final gracePeriod = _prefs.getDouble(_gracePeriodKey) ?? 2.0;
     final continuousFocus = _prefs.getBool(_continuousFocusKey) ?? true;
     final dailyGoalMinutes = _prefs.getInt(_dailyGoalMinutesKey) ?? 0;
+    final dailyGoalsByWeekday = <int, int>{
+      DateTime.monday: _prefs.getInt(_dailyGoalMondayKey) ?? dailyGoalMinutes,
+      DateTime.tuesday: _prefs.getInt(_dailyGoalTuesdayKey) ?? dailyGoalMinutes,
+      DateTime.wednesday:
+          _prefs.getInt(_dailyGoalWednesdayKey) ?? dailyGoalMinutes,
+      DateTime.thursday:
+          _prefs.getInt(_dailyGoalThursdayKey) ?? dailyGoalMinutes,
+      DateTime.friday: _prefs.getInt(_dailyGoalFridayKey) ?? dailyGoalMinutes,
+      DateTime.saturday:
+          _prefs.getInt(_dailyGoalSaturdayKey) ?? dailyGoalMinutes,
+      DateTime.sunday: _prefs.getInt(_dailyGoalSundayKey) ?? dailyGoalMinutes,
+    };
     final lastDailyGoalAwardDate = _prefs.getString(_lastDailyGoalAwardDateKey) ?? '';
 
     return ThemeSettingsState(
@@ -99,6 +118,7 @@ class ThemeSettings extends _$ThemeSettings {
       gracePeriodHours: gracePeriod,
       continuousFocus: continuousFocus,
       dailyGoalMinutes: dailyGoalMinutes,
+      dailyGoalsByWeekday: dailyGoalsByWeekday,
       lastDailyGoalAwardDate: lastDailyGoalAwardDate,
     );
   }
@@ -320,9 +340,31 @@ class ThemeSettings extends _$ThemeSettings {
     final current = state.asData?.value;
     if (current == null) return;
 
-    final next = current.copyWith(dailyGoalMinutes: minutes);
+    final next = current.copyWith(
+      dailyGoalMinutes: minutes,
+      dailyGoalsByWeekday: {
+        for (final weekday in ThemeSettingsState.weekdays) weekday: minutes,
+      },
+    );
     state = AsyncValue.data(next);
     await _prefs.setInt(_dailyGoalMinutesKey, minutes);
+    for (final entry in _dailyGoalPreferenceKeys.entries) {
+      await _prefs.setInt(entry.value, minutes);
+    }
+  }
+
+  Future<void> setDailyGoalForWeekday(int weekday, int minutes) async {
+    final current = state.asData?.value;
+    if (current == null) return;
+
+    final updatedGoals = Map<int, int>.from(current.dailyGoalsByWeekday)
+      ..[weekday] = minutes;
+    final next = current.copyWith(dailyGoalsByWeekday: updatedGoals);
+    state = AsyncValue.data(next);
+    final key = _dailyGoalPreferenceKeys[weekday];
+    if (key != null) {
+      await _prefs.setInt(key, minutes);
+    }
   }
 
   Future<void> setLastDailyGoalAwardDate(String date) async {
@@ -333,6 +375,16 @@ class ThemeSettings extends _$ThemeSettings {
     state = AsyncValue.data(next);
     await _prefs.setString(_lastDailyGoalAwardDateKey, date);
   }
+
+  static const Map<int, String> _dailyGoalPreferenceKeys = {
+    DateTime.monday: _dailyGoalMondayKey,
+    DateTime.tuesday: _dailyGoalTuesdayKey,
+    DateTime.wednesday: _dailyGoalWednesdayKey,
+    DateTime.thursday: _dailyGoalThursdayKey,
+    DateTime.friday: _dailyGoalFridayKey,
+    DateTime.saturday: _dailyGoalSaturdayKey,
+    DateTime.sunday: _dailyGoalSundayKey,
+  };
 }
 
 class ThemeSettingsState {
@@ -358,8 +410,19 @@ class ThemeSettingsState {
     required this.gracePeriodHours,
     required this.continuousFocus,
     required this.dailyGoalMinutes,
+    required this.dailyGoalsByWeekday,
     required this.lastDailyGoalAwardDate,
   });
+
+  static const weekdays = <int>[
+    DateTime.monday,
+    DateTime.tuesday,
+    DateTime.wednesday,
+    DateTime.thursday,
+    DateTime.friday,
+    DateTime.saturday,
+    DateTime.sunday,
+  ];
 
   final int seedColorIndex;
   final ThemeMode themeMode;
@@ -382,7 +445,14 @@ class ThemeSettingsState {
   final double gracePeriodHours;
   final bool continuousFocus;
   final int dailyGoalMinutes;
+  final Map<int, int> dailyGoalsByWeekday;
   final String lastDailyGoalAwardDate;
+
+  int goalForWeekday(int weekday) {
+    return dailyGoalsByWeekday[weekday] ?? dailyGoalMinutes;
+  }
+
+  int get todayGoalMinutes => goalForWeekday(DateTime.now().weekday);
 
   ThemeSettingsState copyWith({
     int? seedColorIndex,
@@ -406,6 +476,7 @@ class ThemeSettingsState {
     double? gracePeriodHours,
     bool? continuousFocus,
     int? dailyGoalMinutes,
+    Map<int, int>? dailyGoalsByWeekday,
     String? lastDailyGoalAwardDate,
   }) {
     return ThemeSettingsState(
@@ -430,6 +501,8 @@ class ThemeSettingsState {
       gracePeriodHours: gracePeriodHours ?? this.gracePeriodHours,
       continuousFocus: continuousFocus ?? this.continuousFocus,
       dailyGoalMinutes: dailyGoalMinutes ?? this.dailyGoalMinutes,
+      dailyGoalsByWeekday:
+          dailyGoalsByWeekday ?? this.dailyGoalsByWeekday,
       lastDailyGoalAwardDate: lastDailyGoalAwardDate ?? this.lastDailyGoalAwardDate,
     );
   }

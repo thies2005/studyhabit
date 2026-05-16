@@ -10,9 +10,14 @@ import 'timeline/timeline_tab.dart';
 import 'topics/topics_tab.dart';
 
 class SubjectDetailScreen extends ConsumerWidget {
-  const SubjectDetailScreen({super.key, required this.subjectId});
+  const SubjectDetailScreen({
+    super.key,
+    required this.subjectId,
+    this.initialTab,
+  });
 
   final String subjectId;
+  final String? initialTab;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -40,16 +45,17 @@ class SubjectDetailScreen extends ConsumerWidget {
             ),
           );
         }
-        return _SubjectDetailContent(subject: subject);
+        return _SubjectDetailContent(subject: subject, initialTab: initialTab);
       },
     );
   }
 }
 
 class _SubjectDetailContent extends ConsumerWidget {
-  const _SubjectDetailContent({required this.subject});
+  const _SubjectDetailContent({required this.subject, this.initialTab});
 
   final Subject subject;
+  final String? initialTab;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -60,6 +66,7 @@ class _SubjectDetailContent extends ConsumerWidget {
       const Tab(text: 'Sources'),
       if (showTopics) const Tab(text: 'Topics'),
     ];
+    final initialIndex = _initialTabIndex(showTopics);
 
     final statsAsync = ref.watch(subjectStatsProvider(subject.id));
 
@@ -83,6 +90,7 @@ class _SubjectDetailContent extends ConsumerWidget {
         ],
       ),
       body: DefaultTabController(
+        initialIndex: initialIndex,
         length: tabs.length,
         child: NestedScrollView(
           headerSliverBuilder: (context, innerBoxIsScrolled) => [
@@ -163,12 +171,22 @@ class _SubjectDetailContent extends ConsumerWidget {
     );
   }
 
+  int _initialTabIndex(bool showTopics) {
+    return switch (initialTab?.toLowerCase()) {
+      'sources' => 1,
+      'topics' when showTopics => 2,
+      _ => 0,
+    };
+  }
+
   Widget _buildStatCard(BuildContext context, String label, String value) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

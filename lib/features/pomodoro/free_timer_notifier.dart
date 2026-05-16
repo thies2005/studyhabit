@@ -251,7 +251,7 @@ class FreeTimerNotifier extends _$FreeTimerNotifier {
 
   Future<void> _checkDailyGoalXp() async {
     final settings = ref.read(themeSettingsProvider).value;
-    if (settings == null || settings.dailyGoalMinutes <= 0) return;
+    if (settings == null || settings.todayGoalMinutes <= 0) return;
 
     final todayStr = _todayDateString();
     if (settings.lastDailyGoalAwardDate == todayStr) return;
@@ -267,7 +267,7 @@ class FreeTimerNotifier extends _$FreeTimerNotifier {
       (sum, s) => sum + s.actualDurationMinutes,
     );
 
-    if (todayMinutes >= settings.dailyGoalMinutes) {
+    if (todayMinutes >= settings.todayGoalMinutes) {
       await ref.read(xpServiceProvider).award(ref, XpReason.dailyGoal);
       await ref
           .read(themeSettingsProvider.notifier)

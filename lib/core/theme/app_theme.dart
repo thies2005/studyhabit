@@ -137,12 +137,23 @@ class AppTheme {
       colorScheme: scheme,
       scaffoldBackgroundColor: scheme.surface,
       textTheme: _buildTextTheme(brightness),
+      sliderTheme: SliderThemeData(
+        trackHeight: 4,
+        activeTrackColor: scheme.primary,
+        inactiveTrackColor: scheme.surfaceContainerHighest,
+        thumbColor: scheme.primary,
+        overlayColor: scheme.primary.withValues(alpha: 0.12),
+        activeTickMarkColor: scheme.onPrimary,
+        inactiveTickMarkColor: scheme.outlineVariant,
+        valueIndicatorColor: scheme.primary,
+        valueIndicatorTextStyle: TextStyle(color: scheme.onPrimary),
+      ),
       cardTheme: CardThemeData(
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
           side: BorderSide(
-            color: scheme.outlineVariant.withValues(alpha: 0.5),
+            color: scheme.outlineVariant,
             width: 1,
           ),
         ),

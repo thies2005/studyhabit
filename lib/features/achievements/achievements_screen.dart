@@ -107,6 +107,7 @@ class _LevelCard extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: colorScheme.outlineVariant),
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -207,13 +208,13 @@ class _BadgeGrid extends StatelessWidget {
               borderRadius: BorderRadius.circular(16),
               side: BorderSide(
                 color: isUnlocked
-                    ? colorScheme.primary.withValues(alpha: 0.2)
-                    : Colors.transparent,
+                    ? colorScheme.primary.withValues(alpha: 0.35)
+                    : colorScheme.outlineVariant,
               ),
             ),
             color: isUnlocked
                 ? colorScheme.primaryContainer.withValues(alpha: 0.2)
-                : colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                : colorScheme.surfaceContainerHigh,
             child: Padding(
               padding: const EdgeInsets.all(12),
               child: Column(
@@ -342,7 +343,9 @@ class _BadgeGrid extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: colorScheme.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: colorScheme.primary.withValues(alpha: 0.2)),
+                    border: Border.all(
+                      color: colorScheme.primary.withValues(alpha: 0.35),
+                    ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
