@@ -633,9 +633,8 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
 
     int newXpEarned = sessionRow.xpEarned;
 
-    // Award confidence XP (only if rating is set, hasn't been awarded yet, and session is eligible)
+    // Award confidence XP (only if rating is set and session is eligible)
     if (confidenceRating != null &&
-        !state.confidenceXpAwarded &&
         sessionRow.confidenceRating == null) {
       final actual = sessionRow.actualDurationMinutes > 0
           ? sessionRow.actualDurationMinutes
@@ -649,7 +648,6 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
         try {
           await ref.read(xpServiceProvider).award(ref, XpReason.confidence);
           newXpEarned += 10;
-          state = state.copyWith(confidenceXpAwarded: true);
         } catch (e) {
           AppLogger.e('PomodoroNotifier', 'Error awarding confidence XP', e);
         }

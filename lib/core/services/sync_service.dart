@@ -39,8 +39,7 @@ class HttpSyncService implements SyncService {
 
 @Riverpod(keepAlive: true)
 SyncService syncService(Ref ref) {
-  final asyncEnabled = ref.watch(backendEnabledProvider);
-  final isEnabled = asyncEnabled.value ?? false;
+  final isEnabled = ref.watch(backendEnabledProvider);
   if (isEnabled) {
     return HttpSyncService();
   }
@@ -50,16 +49,22 @@ SyncService syncService(Ref ref) {
 @Riverpod(keepAlive: true)
 class BackendEnabled extends _$BackendEnabled {
   static const _backendEnabledKey = 'sync.backendEnabled';
-  late SharedPreferences _prefs;
 
   @override
-  Future<bool> build() async {
-    _prefs = await SharedPreferences.getInstance();
-    return _prefs.getBool(_backendEnabledKey) ?? false;
+  bool build() {
+    _loadFromPrefs();
+    return false;
+  }
+
+  Future<void> _loadFromPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    final val = prefs.getBool(_backendEnabledKey) ?? false;
+    if (val != state) state = val;
   }
 
   Future<void> setEnabled(bool value) async {
-    state = AsyncValue.data(value);
-    await _prefs.setBool(_backendEnabledKey, value);
+    state = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_backendEnabledKey, value);
   }
 }
