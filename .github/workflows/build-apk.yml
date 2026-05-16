@@ -69,7 +69,6 @@ jobs:
       - name: Auto-bump versionCode
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         run: |
-          # Read current version (e.g. "1.0.0+1")
           CURRENT=$(grep '^version:' pubspec.yaml | sed 's/version: //')
           VER_NAME=$(echo "$CURRENT" | cut -d'+' -f1)
           VER_CODE=$(echo "$CURRENT" | cut -d'+' -f2)
@@ -77,16 +76,19 @@ jobs:
           NEW_VER="${VER_NAME}+${NEW_CODE}"
           sed -i "s/^version: .*/version: ${NEW_VER}/" pubspec.yaml
           echo "Bumped versionCode: ${VER_CODE} → ${NEW_CODE}"
+          echo "version=${NEW_VER}" >> "$GITHUB_OUTPUT"
+        id: bump
 
       - name: Commit and push version bump
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "chore(ci): auto-bump versionCode to $(grep '^version:' pubspec.yaml | sed 's/version: //')"
+          commit_message: "chore(ci): auto-bump versionCode to ${{ steps.bump.outputs.version }} [skip ci]"
           file_pattern: pubspec.yaml
           commit_user_name: github-actions[bot]
           commit_user_email: github-actions[bot]@users.noreply.github.com
           commit_author: github-actions[bot] <github-actions[bot]@users.noreply.github.com>
+          push_options: --force
 
       - name: Generate code (build_runner)
         run: dart run build_runner build --delete-conflicting-outputs
