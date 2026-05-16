@@ -1108,8 +1108,8 @@ class _DailyGoalSetting extends StatelessWidget {
           Slider(
             value: value,
             min: 0,
-            max: 240,
-            divisions: 24,
+            max: 600,
+            divisions: 20,
             onChanged: onChanged,
           ),
         ],
