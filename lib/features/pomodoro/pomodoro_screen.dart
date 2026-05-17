@@ -105,76 +105,196 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
           ],
         ),
         body: SafeArea(
-          child: Column(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isLandscape = constraints.maxWidth > constraints.maxHeight;
+              if (!isLandscape) {
+                return _buildPortraitLayout(
+                  subjectAsync,
+                  pomodoroState,
+                  displaySeconds,
+                  progress,
+                  colorScheme,
+                  ringSize: math.min(320, constraints.maxWidth * 0.8),
+                );
+              }
+
+              return _buildLandscapeLayout(
+                subjectAsync,
+                pomodoroState,
+                displaySeconds,
+                progress,
+                colorScheme,
+                ringSize: math.min(280, constraints.maxHeight * 0.75),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPortraitLayout(
+    AsyncValue<Subject?> subjectAsync,
+    PomodoroState pomodoroState,
+    int displaySeconds,
+    double progress,
+    ColorScheme colorScheme, {
+    required double ringSize,
+  }) {
+    return Column(
+      children: [
+        const SizedBox(height: 16),
+        _buildHeader(),
+        const SizedBox(height: 8),
+        _buildBreadcrumb(subjectAsync),
+        const Spacer(flex: 2),
+        _buildTimerRing(
+          pomodoroState,
+          displaySeconds,
+          progress,
+          colorScheme,
+          ringSize,
+        ),
+        const Spacer(flex: 3),
+        _buildControls(pomodoroState),
+        const Spacer(),
+        _buildUpNext(pomodoroState),
+        const SizedBox(height: 32),
+      ],
+    );
+  }
+
+  Widget _buildLandscapeLayout(
+    AsyncValue<Subject?> subjectAsync,
+    PomodoroState pomodoroState,
+    int displaySeconds,
+    double progress,
+    ColorScheme colorScheme, {
+    required double ringSize,
+  }) {
+    return Column(
+      children: [
+        const SizedBox(height: 12),
+        _buildHeader(),
+        const SizedBox(height: 4),
+        _buildBreadcrumb(subjectAsync),
+        const SizedBox(height: 12),
+        Expanded(
+          child: Row(
             children: [
-              const SizedBox(height: 16),
-              Text(
-                'CURRENT SESSION',
-                style: TextStyle(
-                  fontSize: 10,
-                  letterSpacing: 2.0,
-                  fontWeight: FontWeight.w600,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 8),
-              _buildBreadcrumb(subjectAsync),
-              const Spacer(flex: 2),
-              Center(
-                child: AnimatedBuilder(
-                  animation: _pulseController,
-                  builder: (context, child) {
-                    final scale = pomodoroState.isRunning
-                        ? 1.0 + _pulseController.value * 0.015
-                        : 1.0;
-                    return Transform.scale(scale: scale, child: child);
-                  },
-                  child: SizedBox(
-                    width: 320,
-                    height: 320,
-                    child: CustomPaint(
-                      painter: TimerRingPainter(
-                        progress: progress,
-                        arcColor: pomodoroState.isOvertime ? colorScheme.secondary : colorScheme.onSurface,
-                        trackColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                        gapColor: colorScheme.surface,
-                      ),
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              _formatTime(displaySeconds),
-                              style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                                fontSize: 72,
-                                fontWeight: FontWeight.normal,
-                                color: colorScheme.onSurface,
-                                fontFeatures: const [FontFeature.tabularFigures()],
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              pomodoroState.isOvertime ? 'OVERTIME' : 'REMAINING',
-                              style: TextStyle(
-                                fontSize: 10,
-                                letterSpacing: 3.0,
-                                fontWeight: FontWeight.w600,
-                                 color: pomodoroState.isOvertime ? colorScheme.secondary : colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+              Expanded(
+                flex: 5,
+                child: Center(
+                  child: _buildTimerRing(
+                    pomodoroState,
+                    displaySeconds,
+                    progress,
+                    colorScheme,
+                    ringSize,
                   ),
                 ),
               ),
-              const Spacer(flex: 3),
-              _buildControls(pomodoroState),
-              const Spacer(),
-              _buildUpNext(pomodoroState),
-              const SizedBox(height: 32),
+              Expanded(
+                flex: 4,
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 24),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 320),
+                        child: _buildControls(
+                          pomodoroState,
+                          isLandscape: true,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 320),
+                        child: _buildUpNext(
+                          pomodoroState,
+                          margin: EdgeInsets.zero,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
+          ),
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  Widget _buildHeader() {
+    return Text(
+      'CURRENT SESSION',
+      style: TextStyle(
+        fontSize: 10,
+        letterSpacing: 2.0,
+        fontWeight: FontWeight.w600,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
+    );
+  }
+
+  Widget _buildTimerRing(
+    PomodoroState pomodoroState,
+    int displaySeconds,
+    double progress,
+    ColorScheme colorScheme,
+    double size,
+  ) {
+    return AnimatedBuilder(
+      animation: _pulseController,
+      builder: (context, child) {
+        final scale = pomodoroState.isRunning
+            ? 1.0 + _pulseController.value * 0.015
+            : 1.0;
+        return Transform.scale(scale: scale, child: child);
+      },
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: CustomPaint(
+          painter: TimerRingPainter(
+            progress: progress,
+            arcColor: pomodoroState.isOvertime
+                ? colorScheme.secondary
+                : colorScheme.onSurface,
+            trackColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+            gapColor: colorScheme.surface,
+          ),
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  _formatTime(displaySeconds),
+                  style: Theme.of(context).textTheme.displayLarge?.copyWith(
+                    fontSize: size * 0.225,
+                    fontWeight: FontWeight.normal,
+                    color: colorScheme.onSurface,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  pomodoroState.isOvertime ? 'OVERTIME' : 'REMAINING',
+                  style: TextStyle(
+                    fontSize: 10,
+                    letterSpacing: 3.0,
+                    fontWeight: FontWeight.w600,
+                    color: pomodoroState.isOvertime
+                        ? colorScheme.secondary
+                        : colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -204,7 +324,10 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
     );
   }
 
-  Widget _buildUpNext(PomodoroState pomodoroState) {
+  Widget _buildUpNext(
+    PomodoroState pomodoroState, {
+    EdgeInsetsGeometry margin = const EdgeInsets.symmetric(horizontal: 24),
+  }) {
     final colorScheme = Theme.of(context).colorScheme;
 
     final nextPhase = pomodoroState.phase == TimerPhase.work
@@ -224,7 +347,7 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
     };
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24),
+      margin: margin,
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
@@ -263,12 +386,16 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
     );
   }
 
-  Widget _buildControls(PomodoroState pomodoroState) {
+  Widget _buildControls(
+    PomodoroState pomodoroState, {
+    bool isLandscape = false,
+  }) {
     final colorScheme = Theme.of(context).colorScheme;
+    final horizontalPadding = isLandscape ? 16.0 : 32.0;
 
     if (pomodoroState.phase == TimerPhase.idle) {
       return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
+        padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -310,7 +437,7 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
     }
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
+      padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
