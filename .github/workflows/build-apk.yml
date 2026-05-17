@@ -66,17 +66,21 @@ jobs:
       - name: Get Flutter dependencies
         run: flutter pub get
 
-      # ── Auto-bump versionCode on every push ──
-      - name: Auto-bump versionCode
+      # ── Auto-bump version name + versionCode on every push ──
+      - name: Auto-bump version name and versionCode
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         run: |
           CURRENT=$(grep '^version:' pubspec.yaml | sed 's/version: //')
           VER_NAME=$(echo "$CURRENT" | cut -d'+' -f1)
           VER_CODE=$(echo "$CURRENT" | cut -d'+' -f2)
+          MAJOR=$(echo "$VER_NAME" | cut -d'.' -f1)
+          MINOR=$(echo "$VER_NAME" | cut -d'.' -f2)
+          PATCH=$(echo "$VER_NAME" | cut -d'.' -f3)
+          NEW_PATCH=$((PATCH + 1))
           NEW_CODE=$((VER_CODE + 1))
-          NEW_VER="${VER_NAME}+${NEW_CODE}"
+          NEW_VER="${MAJOR}.${MINOR}.${NEW_PATCH}+${NEW_CODE}"
           sed -i "s/^version: .*/version: ${NEW_VER}/" pubspec.yaml
-          echo "Bumped versionCode: ${VER_CODE} → ${NEW_CODE}"
+          echo "Bumped version: ${VER_NAME}+${VER_CODE} → ${MAJOR}.${MINOR}.${NEW_PATCH}+${NEW_CODE}"
           echo "version=${NEW_VER}" >> "$GITHUB_OUTPUT"
         id: bump
 
@@ -113,6 +117,23 @@ jobs:
       - name: Build APK (release, signed)
         run: flutter build apk --release
 
+      # ── Rename APKs with version, build number, and date ──
+      - name: Rename APK files
+        id: rename
+        run: |
+          PUBSPEC_VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //')
+          VERSION_NAME=$(echo "$PUBSPEC_VERSION" | cut -d'+' -f1)
+          BUILD_NUMBER=$GITHUB_RUN_NUMBER
+          BUILD_DATE=$(date +%Y%m%d)
+          APK_DIR="build/app/outputs/flutter-apk"
+          RELEASE_NAME="StudyTracker-v${VERSION_NAME}-b${BUILD_NUMBER}-${BUILD_DATE}-release.apk"
+          DEBUG_NAME="StudyTracker-v${VERSION_NAME}-b${BUILD_NUMBER}-${BUILD_DATE}-debug.apk"
+          mv "${APK_DIR}/app-release.apk" "${APK_DIR}/${RELEASE_NAME}"
+          mv "${APK_DIR}/app-debug.apk" "${APK_DIR}/${DEBUG_NAME}"
+          echo "release_apk=${APK_DIR}/${RELEASE_NAME}" >> "$GITHUB_OUTPUT"
+          echo "debug_apk=${APK_DIR}/${DEBUG_NAME}" >> "$GITHUB_OUTPUT"
+          echo "Renamed APKs: ${RELEASE_NAME}, ${DEBUG_NAME}"
+
       # ── Compute beta tag version ───────────
       - name: Compute beta version tag
         id: version
@@ -138,14 +159,14 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: studytracker-debug
-          path: build/app/outputs/flutter-apk/app-debug.apk
+          path: ${{ steps.rename.outputs.debug_apk }}
           retention-days: 14
 
       - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
           name: studytracker-release
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: ${{ steps.rename.outputs.release_apk }}
           retention-days: 14
 
       # ── Create beta GitHub Release ─────────
@@ -168,13 +189,13 @@ jobs:
             | **Date** | $(date +%Y-%m-%d) |
 
             ### Downloads
-            - `app-release.apk` — signed release build
-            - `app-debug.apk` — debug build with logs
+            - `StudyTracker-v…-release.apk` — signed release build
+            - `StudyTracker-v…-debug.apk` — debug build with logs
 
             > ⚠️ This is an automated **beta** build. Not intended for production use.
           files: |
-            build/app/outputs/flutter-apk/app-release.apk
-            build/app/outputs/flutter-apk/app-debug.apk
+            ${{ steps.rename.outputs.release_apk }}
+            ${{ steps.rename.outputs.debug_apk }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
