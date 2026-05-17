@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/enums.dart';
@@ -31,6 +32,7 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
   @override
   void initState() {
     super.initState();
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
@@ -39,6 +41,7 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
 
   @override
   void dispose() {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _pulseController.dispose();
     super.dispose();
   }
@@ -585,7 +588,9 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
           ? 50 + (pomodoroState.plannedDurationMinutes >= 50 ? 120 : 0)
           : 0;
     } else {
-      // In break or idle — use values stored when the work phase ended
+      // In break — lastActualWorkMinutes already holds the running cumulative
+      // total of ALL work seconds across pomodoros in this session (set in
+      // _onPhaseCompleteImpl). Fall back to planned duration for edge cases.
       actualWorkMinutes = pomodoroState.lastActualWorkMinutes > 0
           ? pomodoroState.lastActualWorkMinutes
           : pomodoroState.plannedDurationMinutes;

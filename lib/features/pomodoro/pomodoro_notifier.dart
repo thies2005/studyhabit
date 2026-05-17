@@ -339,25 +339,28 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _onPhaseComplete() async {
+  Future<void> _onPhaseComplete({bool fromSkip = false}) async {
     if (_handlingPhaseComplete) return;
     _handlingPhaseComplete = true;
     try {
-      await _onPhaseCompleteImpl();
+      await _onPhaseCompleteImpl(fromSkip: fromSkip);
     } finally {
       _handlingPhaseComplete = false;
     }
   }
 
-  Future<void> _onPhaseCompleteImpl() async {
+  Future<void> _onPhaseCompleteImpl({bool fromSkip = false}) async {
     if (state.phase == TimerPhase.work) {
       final settings = ref.read(themeSettingsProvider).value;
       final continuousFocus = settings?.continuousFocus ?? true;
 
       // Calculate stats before any state change
-      final elapsedSeconds = state.totalSeconds - state.remainingSeconds;
+      // When in overtime, elapsed = full planned time + overtime seconds earned so far
+      final elapsedSeconds = state.isOvertime
+          ? state.totalSeconds + state.overtimeSeconds
+          : state.totalSeconds - state.remainingSeconds;
       final actualMinutes = (elapsedSeconds / 60).round();
-      final completionRatio = elapsedSeconds / state.totalSeconds;
+      final completionRatio = state.totalSeconds > 0 ? elapsedSeconds / state.totalSeconds : 0.0;
       final isEligible = completionRatio >= 0.8;
 
       if (isEligible) {
@@ -373,16 +376,21 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
       }
       await AchievementService().checkAndUnlock(ref.read(appDatabaseProvider));
 
-      if (continuousFocus) {
+      final newAccumulatedSeconds = state.accumulatedWorkSeconds + elapsedSeconds;
+      final totalActualMinutes = newAccumulatedSeconds ~/ 60;
+
+      if (continuousFocus && !fromSkip) {
         // Switch to overtime instead of break
         state = state.copyWith(
           isOvertime: true,
           overtimeSeconds: 0,
           pomodorosCompleted: state.pomodorosCompleted + 1,
+          accumulatedWorkSeconds: newAccumulatedSeconds,
+          lastActualWorkMinutes: totalActualMinutes,
         );
         _persistState();
         await _updateSessionInDb(
-          actualDurationMinutes: actualMinutes,
+          actualDurationMinutes: totalActualMinutes,
           pomodorosCompleted: state.pomodorosCompleted,
         );
         _syncForegroundTaskData();
@@ -412,7 +420,8 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
         startTimestamp: DateTime.now(),
         pausedDurationSeconds: 0,
         lastPausedAt: DateTime.now(),
-        lastActualWorkMinutes: actualMinutes,
+        accumulatedWorkSeconds: newAccumulatedSeconds,
+        lastActualWorkMinutes: totalActualMinutes,
         lastSessionXpEarned: xpEarned,
       );
 
@@ -422,7 +431,7 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
       }
 
       await _updateSessionInDb(
-        actualDurationMinutes: actualMinutes,
+        actualDurationMinutes: totalActualMinutes,
         pomodorosCompleted: newPomodoros,
       );
 
@@ -526,10 +535,15 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
     _stopLocalTimer();
     _localTimer = null;
 
-    final elapsed = state.isOvertime
-        ? state.totalSeconds + state.overtimeSeconds
-        : state.totalSeconds - state.remainingSeconds;
-    final actualMinutes = elapsed ~/ 60;
+    int currentPhaseElapsed = 0;
+    if (state.phase == TimerPhase.work) {
+      currentPhaseElapsed = state.isOvertime
+          ? state.totalSeconds + state.overtimeSeconds
+          : state.totalSeconds - state.remainingSeconds;
+    }
+    
+    final newAccumulatedSeconds = state.accumulatedWorkSeconds + currentPhaseElapsed;
+    final actualMinutes = newAccumulatedSeconds ~/ 60;
 
     if (state.pomodorosCompleted > 0 && !_studyDayRecorded) {
       await ref.read(streakServiceProvider).recordStudyDay(ref);
@@ -559,7 +573,7 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
 
   void skip() {
     if (state.phase == TimerPhase.work) {
-      _onPhaseComplete();
+      _onPhaseComplete(fromSkip: true);
     } else if (state.phase == TimerPhase.shortBreak ||
         state.phase == TimerPhase.longBreak) {
       final workSeconds = state.plannedDurationMinutes * 60;
