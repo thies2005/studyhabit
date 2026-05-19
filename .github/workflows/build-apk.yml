@@ -57,10 +57,10 @@ jobs:
       - name: Decode keystore from secrets
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/release.keystore
-          echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}"  >> android/key.properties
-          echo "keyPassword=${{ secrets.KEY_PASSWORD }}"          >> android/key.properties
-          echo "keyAlias=${{ secrets.KEY_ALIAS }}"                >> android/key.properties
-          echo "storeFile=release.keystore"                       >> android/key.properties
+          echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}"  >> android/app/key.properties
+          echo "keyPassword=${{ secrets.KEY_PASSWORD }}"          >> android/app/key.properties
+          echo "keyAlias=${{ secrets.KEY_ALIAS }}"                >> android/app/key.properties
+          echo "storeFile=release.keystore"                       >> android/app/key.properties
 
       # ── Dependencies & codegen ─────────────
       - name: Get Flutter dependencies
@@ -204,4 +204,4 @@ jobs:
         if: always()
         run: |
           rm -f android/app/release.keystore
-          rm -f android/key.properties
+          rm -f android/app/key.properties
