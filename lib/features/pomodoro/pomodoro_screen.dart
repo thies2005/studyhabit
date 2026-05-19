@@ -87,6 +87,7 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
       },
       child: Scaffold(
         backgroundColor: colorScheme.surface,
+        extendBodyBehindAppBar: true,
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
@@ -107,31 +108,29 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
             )
           ],
         ),
-        body: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final isLandscape = constraints.maxWidth > constraints.maxHeight;
-              if (!isLandscape) {
-                return _buildPortraitLayout(
-                  subjectAsync,
-                  pomodoroState,
-                  displaySeconds,
-                  progress,
-                  colorScheme,
-                  ringSize: math.min(320, constraints.maxWidth * 0.8),
-                );
-              }
-
-              return _buildLandscapeLayout(
+        body: LayoutBuilder(
+          builder: (context, constraints) {
+            final isLandscape = constraints.maxWidth > constraints.maxHeight;
+            if (!isLandscape) {
+              return _buildPortraitLayout(
                 subjectAsync,
                 pomodoroState,
                 displaySeconds,
                 progress,
                 colorScheme,
-                ringSize: math.min(280, constraints.maxHeight * 0.75),
+                ringSize: math.min(320, constraints.maxWidth * 0.8),
               );
-            },
-          ),
+            }
+
+            return _buildLandscapeLayout(
+              subjectAsync,
+              pomodoroState,
+              displaySeconds,
+              progress,
+              colorScheme,
+              ringSize: math.min(280, constraints.maxHeight * 0.75),
+            );
+          },
         ),
       ),
     );
@@ -145,25 +144,45 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
     ColorScheme colorScheme, {
     required double ringSize,
   }) {
-    return Column(
+    final topPadding = MediaQuery.paddingOf(context).top;
+    final bottomPadding = MediaQuery.paddingOf(context).bottom;
+
+    return Stack(
       children: [
-        const SizedBox(height: 16),
-        _buildHeader(),
-        const SizedBox(height: 8),
-        _buildBreadcrumb(subjectAsync),
-        const Spacer(flex: 2),
-        _buildTimerRing(
-          pomodoroState,
-          displaySeconds,
-          progress,
-          colorScheme,
-          ringSize,
+        Center(
+          child: _buildTimerRing(
+            pomodoroState,
+            displaySeconds,
+            progress,
+            colorScheme,
+            ringSize,
+          ),
         ),
-        const Spacer(flex: 3),
-        _buildControls(pomodoroState),
-        const Spacer(),
-        _buildUpNext(pomodoroState),
-        const SizedBox(height: 32),
+        Positioned(
+          top: topPadding + kToolbarHeight + 16,
+          left: 0,
+          right: 0,
+          child: Column(
+            children: [
+              _buildHeader(),
+              const SizedBox(height: 8),
+              _buildBreadcrumb(subjectAsync),
+            ],
+          ),
+        ),
+        Positioned(
+          bottom: bottomPadding + 32,
+          left: 0,
+          right: 0,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildControls(pomodoroState),
+              const SizedBox(height: 32),
+              _buildUpNext(pomodoroState),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -176,59 +195,61 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
     ColorScheme colorScheme, {
     required double ringSize,
   }) {
-    return Column(
-      children: [
-        const SizedBox(height: 12),
-        _buildHeader(),
-        const SizedBox(height: 4),
-        _buildBreadcrumb(subjectAsync),
-        const SizedBox(height: 12),
-        Expanded(
-          child: Row(
-            children: [
-              Expanded(
-                flex: 5,
-                child: Center(
-                  child: _buildTimerRing(
-                    pomodoroState,
-                    displaySeconds,
-                    progress,
-                    colorScheme,
-                    ringSize,
+    return SafeArea(
+      child: Column(
+        children: [
+          const SizedBox(height: 12),
+          _buildHeader(),
+          const SizedBox(height: 4),
+          _buildBreadcrumb(subjectAsync),
+          const SizedBox(height: 12),
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 5,
+                  child: Center(
+                    child: _buildTimerRing(
+                      pomodoroState,
+                      displaySeconds,
+                      progress,
+                      colorScheme,
+                      ringSize,
+                    ),
                   ),
                 ),
-              ),
-              Expanded(
-                flex: 4,
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 24),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 320),
-                        child: _buildControls(
-                          pomodoroState,
-                          isLandscape: true,
+                Expanded(
+                  flex: 4,
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 24),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 320),
+                          child: _buildControls(
+                            pomodoroState,
+                            isLandscape: true,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 24),
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 320),
-                        child: _buildUpNext(
-                          pomodoroState,
-                          margin: EdgeInsets.zero,
+                        const SizedBox(height: 24),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 320),
+                          child: _buildUpNext(
+                            pomodoroState,
+                            margin: EdgeInsets.zero,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 16),
-      ],
+          const SizedBox(height: 16),
+        ],
+      ),
     );
   }
 
