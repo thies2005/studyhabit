@@ -44,6 +44,10 @@ class NotificationService {
       },
     );
 
+    try {
+      await _plugin.cancelAll();
+    } catch (_) {}
+
     _initialized = true;
   }
 
