@@ -55,12 +55,19 @@ jobs:
 
       # ── Decode signing keystore ────────────
       - name: Decode keystore from secrets
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/release.keystore
-          echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}"  >> android/app/key.properties
-          echo "keyPassword=${{ secrets.KEY_PASSWORD }}"          >> android/app/key.properties
-          echo "keyAlias=${{ secrets.KEY_ALIAS }}"                >> android/app/key.properties
-          echo "storeFile=release.keystore"                       >> android/app/key.properties
+          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/release.keystore
+          echo "storePassword=$KEYSTORE_PASSWORD"  >> android/app/key.properties
+          echo "keyPassword=$KEY_PASSWORD"          >> android/app/key.properties
+          echo "keyAlias=$KEY_ALIAS"                >> android/app/key.properties
+          echo "storeFile=release.keystore"          >> android/app/key.properties
+          file android/app/release.keystore
+          keytool -list -keystore android/app/release.keystore -storepass "$KEYSTORE_PASSWORD" -noprompt || (echo "::error::Keystore validation failed — KEYSTORE_BASE64 may be corrupt" && exit 1)
 
       # ── Dependencies & codegen ─────────────
       - name: Get Flutter dependencies
