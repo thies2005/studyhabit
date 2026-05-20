@@ -66,8 +66,8 @@ jobs:
           echo "keyPassword=$KEY_PASSWORD"          >> android/app/key.properties
           echo "keyAlias=$KEY_ALIAS"                >> android/app/key.properties
           echo "storeFile=release.keystore"          >> android/app/key.properties
-          file android/app/release.keystore
-          keytool -list -keystore android/app/release.keystore -storepass "$KEYSTORE_PASSWORD" -noprompt || (echo "::error::Keystore validation failed — KEYSTORE_BASE64 may be corrupt" && exit 1)
+          echo "storeType=pkcs12"                    >> android/app/key.properties
+          keytool -list -storetype pkcs12 -keystore android/app/release.keystore -storepass "$KEYSTORE_PASSWORD" -noprompt || (echo "::error::Keystore validation failed — KEYSTORE_BASE64 may be corrupt" && exit 1)
 
       # ── Dependencies & codegen ─────────────
       - name: Get Flutter dependencies
