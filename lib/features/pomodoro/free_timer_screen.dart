@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +8,7 @@ import '../../core/models/subject.dart';
 import '../subjects/subject_providers.dart';
 import 'free_timer_notifier.dart';
 import 'free_timer_review_sheet.dart';
+import 'free_timer_state.dart';
 import 'pomodoro_screen.dart'; // To reuse TimerRingPainter if needed
 
 class FreeTimerScreen extends ConsumerStatefulWidget {
@@ -54,84 +56,204 @@ class _FreeTimerScreenState extends ConsumerState<FreeTimerScreen>
       },
       child: Scaffold(
         backgroundColor: colorScheme.surface,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.close),
-            onPressed: () => _showStopConfirmDialog(context),
-          ),
+        body: LayoutBuilder(
+          builder: (context, constraints) {
+            final isLandscape = constraints.maxWidth > constraints.maxHeight;
+            if (!isLandscape) {
+              return _buildPortraitLayout(
+                subjectAsync,
+                state,
+                colorScheme,
+                ringSize: math.min(320, constraints.maxWidth * 0.8),
+              );
+            }
+
+            return _buildLandscapeLayout(
+              subjectAsync,
+              state,
+              colorScheme,
+              ringSize: math.min(260, constraints.maxHeight * 0.65),
+            );
+          },
         ),
-        body: SafeArea(
+      ),
+    );
+  }
+
+  Widget _buildPortraitLayout(
+    AsyncValue<Subject?> subjectAsync,
+    FreeTimerState state,
+    ColorScheme colorScheme, {
+    required double ringSize,
+  }) {
+    final bottomPadding = MediaQuery.paddingOf(context).bottom;
+
+    return Stack(
+      children: [
+        Center(
+          child: _buildTimerRing(state, colorScheme, ringSize),
+        ),
+        Positioned(
+          top: 24, // Ignore top display cutout in vertical
+          left: 0,
+          right: 0,
           child: Column(
             children: [
-              const SizedBox(height: 16),
-              Text(
-                'FREE TIMER SESSION',
-                style: TextStyle(
-                  fontSize: 10,
-                  letterSpacing: 2.0,
-                  fontWeight: FontWeight.w600,
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
+              _buildHeader(state),
               const SizedBox(height: 8),
               _buildBreadcrumb(subjectAsync),
-              const Spacer(flex: 2),
-              Center(
-                child: AnimatedBuilder(
-                  animation: _pulseController,
-                  builder: (context, child) {
-                    final scale = state.isRunning
-                        ? 1.0 + _pulseController.value * 0.015
-                        : 1.0;
-                    return Transform.scale(scale: scale, child: child);
-                  },
-                  child: SizedBox(
-                    width: 320,
-                    height: 320,
-                    child: CustomPaint(
-                      painter: TimerRingPainter(
-                        // For free timer, we can show a rotating sub-progress or just a static ring
-                        progress: (state.elapsedSeconds % 60) / 60.0,
-                        arcColor: colorScheme.primary,
-                        trackColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                        gapColor: colorScheme.surface,
-                      ),
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              _formatTime(state.elapsedSeconds),
-                              style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                                fontSize: 64,
-                                fontWeight: FontWeight.normal,
-                                color: colorScheme.onSurface,
-                                fontFeatures: const [FontFeature.tabularFigures()],
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'ELAPSED',
-                              style: TextStyle(
-                                fontSize: 10,
-                                letterSpacing: 3.0,
-                                fontWeight: FontWeight.w600,
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
+            ],
+          ),
+        ),
+        Positioned(
+          bottom: bottomPadding + 32,
+          left: 0,
+          right: 0,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildControls(state),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLandscapeLayout(
+    AsyncValue<Subject?> subjectAsync,
+    FreeTimerState state,
+    ColorScheme colorScheme, {
+    required double ringSize,
+  }) {
+    return SafeArea(
+      top: false, // Ignore top cutout in landscape
+      bottom: true,
+      left: true,
+      right: true,
+      child: Column(
+        children: [
+          const SizedBox(height: 24),
+          _buildHeader(state),
+          const SizedBox(height: 4),
+          _buildBreadcrumb(subjectAsync),
+          const SizedBox(height: 12),
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 1,
+                  child: Center(
+                    child: _buildTimerRing(state, colorScheme, ringSize),
+                  ),
+                ),
+                Expanded(
+                  flex: 1,
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 320),
+                          child: _buildControls(state),
                         ),
-                      ),
+                      ],
                     ),
                   ),
                 ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader(FreeTimerState state) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: SizedBox(
+        height: 48,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: IconButton(
+                icon: const Icon(Icons.close, size: 20),
+                onPressed: () {
+                  if (!state.isRunning && state.activeSessionId == null) {
+                    Navigator.of(context).pop();
+                  } else {
+                    _showStopConfirmDialog(context);
+                  }
+                },
               ),
-              const Spacer(flex: 3),
-              _buildControls(state),
-              const Spacer(),
-            ],
+            ),
+            Text(
+              'FREE TIMER SESSION',
+              style: TextStyle(
+                fontSize: 10,
+                letterSpacing: 2.0,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const Align(
+              alignment: Alignment.centerRight,
+              child: SizedBox(width: 48, height: 48),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTimerRing(FreeTimerState state, ColorScheme colorScheme, double size) {
+    return AnimatedBuilder(
+      animation: _pulseController,
+      builder: (context, child) {
+        final scale = state.isRunning
+            ? 1.0 + _pulseController.value * 0.015
+            : 1.0;
+        return Transform.scale(scale: scale, child: child);
+      },
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: CustomPaint(
+          painter: TimerRingPainter(
+            progress: (state.elapsedSeconds % 60) / 60.0,
+            arcColor: colorScheme.primary,
+            trackColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+            gapColor: colorScheme.surface,
+          ),
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  _formatTime(state.elapsedSeconds),
+                  style: Theme.of(context).textTheme.displayLarge?.copyWith(
+                    fontSize: size * 0.2,
+                    fontWeight: FontWeight.normal,
+                    color: colorScheme.onSurface,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'ELAPSED',
+                  style: TextStyle(
+                    fontSize: 10,
+                    letterSpacing: 3.0,
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

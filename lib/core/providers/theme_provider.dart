@@ -3,6 +3,8 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../theme/app_theme.dart';
+import '../services/notification_service.dart';
+import '../services/app_logger.dart';
 
 part 'theme_provider.g.dart';
 
@@ -264,6 +266,29 @@ class ThemeSettings extends _$ThemeSettings {
     final next = current.copyWith(notificationsEnabled: enabled);
     state = AsyncValue.data(next);
     await _prefs.setBool(_notificationsKey, enabled);
+
+    // If master notifications disabled, cancel all scheduled notifications
+    final notifService = NotificationService();
+    if (!enabled) {
+      try {
+        await notifService.cancelDailyReminder();
+        await notifService.cancelReminder();
+      } catch (e) {
+        AppLogger.e('ThemeSettings', 'Error cancelling notifications', e);
+      }
+    } else {
+      // Re-schedule daily reminder if it was enabled
+      if (current.dailyReminderEnabled) {
+        try {
+          await notifService.scheduleDailyReminder(
+            hour: current.dailyReminderHour,
+            minute: current.dailyReminderMinute,
+          );
+        } catch (e) {
+          AppLogger.e('ThemeSettings', 'Error scheduling daily reminder', e);
+        }
+      }
+    }
   }
 
   Future<void> setGracePeriodHours(double hours) async {
@@ -312,6 +337,20 @@ class ThemeSettings extends _$ThemeSettings {
     state = AsyncValue.data(next);
     await _prefs.setInt(_dailyReminderHourKey, hour);
     await _prefs.setInt(_dailyReminderMinuteKey, minute);
+
+    // Re-schedule the daily reminder if it's enabled
+    if (current.notificationsEnabled && current.dailyReminderEnabled) {
+      final notifService = NotificationService();
+      try {
+        await notifService.scheduleDailyReminder(
+          hour: hour,
+          minute: minute,
+        );
+        AppLogger.i('ThemeSettings', 'Daily reminder rescheduled to $hour:${minute.toString().padLeft(2, '0')}');
+      } catch (e) {
+        AppLogger.e('ThemeSettings', 'Error rescheduling daily reminder', e);
+      }
+    }
   }
 
   Future<void> setDailyReminderEnabled(bool enabled) async {
@@ -323,6 +362,25 @@ class ThemeSettings extends _$ThemeSettings {
     final next = current.copyWith(dailyReminderEnabled: enabled);
     state = AsyncValue.data(next);
     await _prefs.setBool(_dailyReminderEnabledKey, enabled);
+
+    // Actually schedule or cancel the daily reminder
+    if (current.notificationsEnabled) {
+      final notifService = NotificationService();
+      try {
+        if (enabled) {
+          await notifService.scheduleDailyReminder(
+            hour: current.dailyReminderHour,
+            minute: current.dailyReminderMinute,
+          );
+          AppLogger.i('ThemeSettings', 'Daily reminder scheduled at ${current.dailyReminderHour}:${current.dailyReminderMinute.toString().padLeft(2, '0')}');
+        } else {
+          await notifService.cancelDailyReminder();
+          AppLogger.i('ThemeSettings', 'Daily reminder cancelled');
+        }
+      } catch (e) {
+        AppLogger.e('ThemeSettings', 'Error toggling daily reminder', e);
+      }
+    }
   }
 
   Future<void> setContinuousFocus(bool enabled) async {

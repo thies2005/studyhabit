@@ -25,6 +25,9 @@ class NotificationService {
 
     tz.initializeTimeZones();
 
+    // Set the local timezone based on the device's UTC offset
+    _setLocalTimezone();
+
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
@@ -44,11 +47,38 @@ class NotificationService {
       },
     );
 
-    try {
-      await _plugin.cancelAll();
-    } catch (_) {}
-
     _initialized = true;
+  }
+
+  /// Determines the local timezone from the device's UTC offset and sets it
+  /// for the tz library. This ensures scheduled notifications fire at the
+  /// correct local time.
+  void _setLocalTimezone() {
+    try {
+      final now = DateTime.now();
+      final offset = now.timeZoneOffset;
+
+      // Try to find a matching timezone from the database
+      String? matchedLocation;
+      for (final name in tz.timeZoneDatabase.locations.keys) {
+        final location = tz.getLocation(name);
+        final tzNow = tz.TZDateTime.now(location);
+        if (tzNow.timeZoneOffset == offset) {
+          matchedLocation = name;
+          break;
+        }
+      }
+
+      if (matchedLocation != null) {
+        tz.setLocalLocation(tz.getLocation(matchedLocation));
+        AppLogger.d('NotificationService', 'Timezone set to: $matchedLocation');
+      } else {
+        // Fallback: use UTC offset to construct a fixed-offset location
+        AppLogger.w('NotificationService', 'Could not match timezone, using UTC offset: $offset');
+      }
+    } catch (e) {
+      AppLogger.e('NotificationService', 'Error setting local timezone', e);
+    }
   }
 
   Future<void> requestPermissions() async {
@@ -56,6 +86,7 @@ class NotificationService {
       final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>();
       await androidPlugin?.requestNotificationsPermission();
+      await androidPlugin?.requestExactAlarmsPermission();
     }
   }
 

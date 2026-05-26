@@ -444,23 +444,18 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
 
         final subject = await _subjectDao?.getById(state.subjectId);
         if (subject != null) {
-          final project = await _projectDao?.getById(subject.projectId);
-          bool reminderEnabled = false;
-          int reminderMinutes = 30;
-
-          if (project != null) {
-            reminderMinutes = project.studyReminderMinutes;
-            reminderEnabled = true;
-          } else {
-            final themeSettingsAsync = ref.read(themeSettingsProvider);
-            final settings = themeSettingsAsync.value;
-            if (settings != null) {
-              reminderEnabled = settings.studyReminderEnabled;
-              reminderMinutes = settings.studyReminderMinutes;
-            }
-          }
+          // Always check the user's studyReminderEnabled setting first
+          final themeSettingsAsync = ref.read(themeSettingsProvider);
+          final settings = themeSettingsAsync.value;
+          final reminderEnabled = settings?.notificationsEnabled == true &&
+              settings?.studyReminderEnabled == true;
 
           if (reminderEnabled) {
+            // Use project-level reminder minutes if available, otherwise fall back to settings
+            final project = await _projectDao?.getById(subject.projectId);
+            final reminderMinutes = project?.studyReminderMinutes ??
+                (settings?.studyReminderMinutes ?? 30);
+
             await notifService.scheduleStudyReminder(
               delay: Duration(minutes: reminderMinutes),
               subjectName: subject.name,

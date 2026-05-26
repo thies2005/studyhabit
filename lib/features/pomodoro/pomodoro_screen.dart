@@ -87,27 +87,6 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
       },
       child: Scaffold(
         backgroundColor: colorScheme.surface,
-        extendBodyBehindAppBar: true,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.close),
-            onPressed: () {
-              if (pomodoroState.phase == TimerPhase.idle) {
-                Navigator.of(context).pop();
-              } else {
-                _showStopConfirmDialog(context);
-              }
-            },
-          ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.settings_outlined),
-              onPressed: () => _showTimerSettings(context),
-            )
-          ],
-        ),
         body: LayoutBuilder(
           builder: (context, constraints) {
             final isLandscape = constraints.maxWidth > constraints.maxHeight;
@@ -128,7 +107,7 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
               displaySeconds,
               progress,
               colorScheme,
-              ringSize: math.min(280, constraints.maxHeight * 0.75),
+              ringSize: math.min(260, constraints.maxHeight * 0.65), // slightly smaller to avoid vertical cutoff
             );
           },
         ),
@@ -144,7 +123,6 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
     ColorScheme colorScheme, {
     required double ringSize,
   }) {
-    final topPadding = MediaQuery.paddingOf(context).top;
     final bottomPadding = MediaQuery.paddingOf(context).bottom;
 
     return Stack(
@@ -159,12 +137,12 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
           ),
         ),
         Positioned(
-          top: topPadding + kToolbarHeight + 16,
+          top: 24, // Ignore top display cutout in vertical
           left: 0,
           right: 0,
           child: Column(
             children: [
-              _buildHeader(),
+              _buildHeader(pomodoroState),
               const SizedBox(height: 8),
               _buildBreadcrumb(subjectAsync),
             ],
@@ -196,10 +174,14 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
     required double ringSize,
   }) {
     return SafeArea(
+      top: false, // Ignore top cutout in landscape
+      bottom: true,
+      left: true,
+      right: true,
       child: Column(
         children: [
-          const SizedBox(height: 12),
-          _buildHeader(),
+          const SizedBox(height: 24),
+          _buildHeader(pomodoroState),
           const SizedBox(height: 4),
           _buildBreadcrumb(subjectAsync),
           const SizedBox(height: 12),
@@ -207,7 +189,7 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
             child: Row(
               children: [
                 Expanded(
-                  flex: 5,
+                  flex: 1,
                   child: Center(
                     child: _buildTimerRing(
                       pomodoroState,
@@ -219,9 +201,8 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
                   ),
                 ),
                 Expanded(
-                  flex: 4,
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 24),
+                  flex: 1,
+                  child: Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -253,14 +234,42 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
     );
   }
 
-  Widget _buildHeader() {
-    return Text(
-      'CURRENT SESSION',
-      style: TextStyle(
-        fontSize: 10,
-        letterSpacing: 2.0,
-        fontWeight: FontWeight.w600,
-        color: Theme.of(context).colorScheme.onSurfaceVariant,
+  Widget _buildHeader(PomodoroState pomodoroState) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: SizedBox(
+        height: 48,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: IconButton(
+                icon: const Icon(Icons.close, size: 20),
+                onPressed: () {
+                  if (pomodoroState.phase == TimerPhase.idle) {
+                    Navigator.of(context).pop();
+                  } else {
+                    _showStopConfirmDialog(context);
+                  }
+                },
+              ),
+            ),
+            Text(
+              'CURRENT SESSION',
+              style: TextStyle(
+                fontSize: 10,
+                letterSpacing: 2.0,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const Align(
+              alignment: Alignment.centerRight,
+              child: SizedBox(width: 48, height: 48),
+            ),
+          ],
+        ),
       ),
     );
   }
