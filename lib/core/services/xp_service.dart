@@ -2,9 +2,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../database/app_database.dart';
-import '../models/user_stats.dart';
 import '../providers/database_provider.dart';
-import '../providers/user_stats_provider.dart';
+import '../database/daos/stats_dao.dart';
+import '../models/model_mapper.dart';
 import 'achievement_service.dart';
 
 part 'xp_service.g.dart';
@@ -39,42 +39,36 @@ class XpService {
   }
 
   Future<void> _applyAward({
-    required UserStatsNotifier notifier,
-    required UserStats currentStats,
     required AppDatabase db,
     required XpReason reason,
   }) async {
+    final statsDao = StatsDao(db);
+    final row = await statsDao.getStats();
+    final currentStats = mapUserStats(row);
+
     final xp = xpForReason(reason);
     final newTotalXp = currentStats.totalXp + xp;
     final newLevel = calculateLevel(newTotalXp);
 
-    await notifier.upsert(
+    await statsDao.upsertStats(toUserStatsCompanion(
       currentStats.copyWith(totalXp: newTotalXp, currentLevel: newLevel),
-    );
+    ));
 
     final achievementService = AchievementService();
     await achievementService.checkAndUnlock(db);
   }
 
   Future<void> award(Ref ref, XpReason reason) async {
-    final notifier = ref.read(userStatsProvider.notifier);
-    final stats = await ref.read(userStatsProvider.future);
     final db = ref.read(appDatabaseProvider);
     await _applyAward(
-      notifier: notifier,
-      currentStats: stats,
       db: db,
       reason: reason,
     );
   }
 
   Future<void> awardFromWidget(WidgetRef ref, XpReason reason) async {
-    final notifier = ref.read(userStatsProvider.notifier);
-    final stats = await ref.read(userStatsProvider.future);
     final db = ref.read(appDatabaseProvider);
     await _applyAward(
-      notifier: notifier,
-      currentStats: stats,
       db: db,
       reason: reason,
     );

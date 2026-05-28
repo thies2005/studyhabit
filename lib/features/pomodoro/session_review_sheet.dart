@@ -158,13 +158,18 @@ class _SessionReviewSheetState extends State<SessionReviewSheet> {
 
   Future<void> _handleSave() async {
     setState(() => _saved = true);
-    await widget.onSave(
-      _confidence,
-      _notesController.text.trim().isEmpty
-          ? null
-          : _notesController.text.trim(),
-    );
-    if (mounted) Navigator.of(context).pop();
+    try {
+      await widget.onSave(
+        _confidence,
+        _notesController.text.trim().isEmpty
+            ? null
+            : _notesController.text.trim(),
+      );
+    } catch (e, stack) {
+      debugPrint('Error during onSave: $e\n$stack');
+    } finally {
+      if (mounted) Navigator.of(context).pop();
+    }
   }
 }
 
