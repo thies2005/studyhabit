@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/models/enums.dart';
 import '../../core/models/subject.dart';
@@ -248,7 +249,11 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
                 icon: const Icon(Icons.close, size: 20),
                 onPressed: () {
                   if (pomodoroState.phase == TimerPhase.idle) {
-                    Navigator.of(context).pop();
+                    if (context.canPop()) {
+                      context.pop();
+                    } else {
+                      context.go('/home');
+                    }
                   } else {
                     _showStopConfirmDialog(context);
                   }
@@ -649,7 +654,13 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
 
     if (mounted) {
       await notifier.stop();
-      if (mounted) Navigator.of(context).pop();
+      if (mounted) {
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.go('/home');
+        }
+      }
     }
   }
 

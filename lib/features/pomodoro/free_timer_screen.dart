@@ -184,7 +184,11 @@ class _FreeTimerScreenState extends ConsumerState<FreeTimerScreen>
                 icon: const Icon(Icons.close, size: 20),
                 onPressed: () {
                   if (!state.isRunning && state.activeSessionId == null) {
-                    Navigator.of(context).pop();
+                    if (context.canPop()) {
+                      context.pop();
+                    } else {
+                      context.go('/home');
+                    }
                   } else {
                     _showStopConfirmDialog(context);
                   }
@@ -416,7 +420,11 @@ class _FreeTimerScreenState extends ConsumerState<FreeTimerScreen>
 
     await notifier.stop();
     if (mounted) {
-      context.pop(); // Go back from timer screen
+      if (context.canPop()) {
+        context.pop(); // Go back from timer screen
+      } else {
+        context.go('/home');
+      }
     }
   }
 
