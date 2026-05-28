@@ -42,6 +42,9 @@ router.post('/push', async (req, res, next) => {
 router.get('/pull', async (req, res, next) => {
   try {
     const since = req.query.since ? String(req.query.since) : undefined;
+    if (!since) {
+      return res.status(400).json({ error: 'Missing "since" query parameter for sync pull' });
+    }
     const data = await SyncService.fullPull(req.user.userId, since);
     res.json({ data });
   } catch (error: unknown) {
@@ -66,6 +69,9 @@ router.post('/full', async (req, res, next) => {
     const pushResult = await SyncService.pushChanges(req.user.userId, payload as any);
 
     const since = req.query.since ? String(req.query.since) : undefined;
+    if (!since) {
+      return res.status(400).json({ error: 'Missing "since" query parameter for sync pull' });
+    }
     const pullData = await SyncService.fullPull(req.user.userId, since);
 
     res.json({

@@ -1,11 +1,53 @@
 import 'package:drift/drift.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../app_database.dart';
+import '../../services/timer_persistence_service.dart';
 
 class SessionDao {
   SessionDao(this._db);
 
   final AppDatabase _db;
+
+  Future<void> cleanupOrphanedSessions() async {
+    final orphanedQuery = _db.select(_db.studySessions)
+      ..where((table) => table.endedAt.isNull());
+    final orphaned = await orphanedQuery.get();
+
+    if (orphaned.isEmpty) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    final persistence = TimerPersistenceService(prefs);
+    final savedPomodoro = await persistence.loadPomodoro();
+    final savedFreeTimer = await persistence.loadFreeTimer();
+
+    final activeSessionIds = {
+      if (savedPomodoro?.activeSessionId != null) savedPomodoro!.activeSessionId!,
+      if (savedFreeTimer?.activeSessionId != null) savedFreeTimer!.activeSessionId!,
+    };
+
+    for (final session in orphaned) {
+      if (activeSessionIds.contains(session.id)) {
+        continue; // Skip the currently active session
+      }
+
+      // Reconstruct durations for the orphaned session
+      final startedAt = session.startedAt;
+      final planned = session.plannedDurationMinutes;
+      final endedAt = startedAt.add(Duration(minutes: planned > 0 ? planned : 25));
+      final finalEndedAt = endedAt.isAfter(DateTime.now()) ? DateTime.now() : endedAt;
+
+      final durationMinutes = finalEndedAt.difference(startedAt).inMinutes;
+      final clampedDuration = durationMinutes.clamp(1, 999999);
+
+      await (_db.update(_db.studySessions)..where((t) => t.id.equals(session.id))).write(
+        StudySessionsCompanion(
+          endedAt: Value(finalEndedAt),
+          actualDurationMinutes: Value(clampedDuration),
+        ),
+      );
+    }
+  }
 
   Stream<List<StudySessionRow>> watchBySubject(String subjectId) {
     final query = _db.select(_db.studySessions)

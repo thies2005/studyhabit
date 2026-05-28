@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { prisma } from './db.js';
+import { prisma } from '../db.js';
 import { config } from '../config.js';
 import { TokenPair, DeviceInfo } from '../types/index.js';
 

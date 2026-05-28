@@ -12,7 +12,6 @@ import {
   LineChart,
   Line,
   ResponsiveContainer,
-  TooltipProps,
 } from 'recharts';
 
 // Mock data for demo purposes
@@ -61,14 +60,14 @@ const subjectBreakdownData = [
   { name: 'Biology', hours: 15, sessions: 12, avgConfidence: 4.0, skillLevel: 'Intermediate', color: '#5D9ECE' },
 ];
 
-type TooltipRendererProps = TooltipProps<any, any>;
+type TooltipRendererProps = any;
 
 const CustomTooltip = ({ active, payload, label }: TooltipRendererProps) => {
   if (active && payload && payload.length) {
     return (
       <div className="bg-surfaceHigh border border-gray-700 rounded-lg p-3 shadow-lg">
         <p className="text-sm font-medium text-onSurface font-heading mb-1">{label}</p>
-        {payload.map((entry, index: number) => (
+        {payload.map((entry: any, index: number) => (
           <p key={index} className="text-sm text-gray-300 font-body" style={{ color: entry.color }}>
             {entry.name}: {entry.value}
           </p>

@@ -199,7 +199,6 @@ router.patch('/:id', async (req, res, next) => {
     }
 
     // Destructure data to exclude any fields that shouldn't be updated
-    const { subjectId: _unusedSubjectId, ...dataWithoutSubjectId } = data;
     const updateData: {
       topicId?: string | null;
       chapterId?: string | null;

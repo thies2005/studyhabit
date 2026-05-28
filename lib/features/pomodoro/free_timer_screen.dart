@@ -385,7 +385,21 @@ class _FreeTimerScreenState extends ConsumerState<FreeTimerScreen>
     final state = ref.read(freeTimerProvider);
     final notifier = ref.read(freeTimerProvider.notifier);
     
-    final elapsedMinutes = state.elapsedSeconds ~/ 60;
+    // Calculate elapsed minutes accurately from timestamps to prevent stale values (Finding 7 & 2)
+    final now = DateTime.now();
+    int actualElapsedSeconds = 0;
+    if (state.startedAt != null) {
+      if (state.isRunning) {
+        actualElapsedSeconds = now.difference(state.startedAt!).inSeconds -
+            state.pausedDurationSeconds;
+      } else {
+        final pauseTime = state.lastPausedAt ?? now;
+        actualElapsedSeconds = pauseTime.difference(state.startedAt!).inSeconds -
+            state.pausedDurationSeconds;
+      }
+    }
+    actualElapsedSeconds = actualElapsedSeconds.clamp(0, double.maxFinite.toInt());
+    final elapsedMinutes = (actualElapsedSeconds / 60.0).round();
 
     if (elapsedMinutes > 0) {
       await FreeTimerReviewSheet.show(

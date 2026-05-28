@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:drift/drift.dart';
+import 'package:flutter/material.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:uuid/uuid.dart';
 
@@ -12,43 +13,104 @@ import '../../core/services/streak_service.dart';
 import '../../core/services/xp_service.dart';
 import 'free_timer_state.dart';
 import '../../core/services/timer_persistence_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 
 
 part 'free_timer_notifier.g.dart';
 
 @Riverpod(keepAlive: true)
-class FreeTimerNotifier extends _$FreeTimerNotifier {
+class FreeTimerNotifier extends _$FreeTimerNotifier with WidgetsBindingObserver {
   SessionDao? _sessionDao;
   Timer? _tickTimer;
   TimerPersistenceService? _persistence;
+  bool _listenerRegistered = false;
+  int? _lastDbMinutesUpdate;
 
   @override
   FreeTimerState build() {
     final db = ref.watch(appDatabaseProvider);
     _sessionDao = SessionDao(db);
 
-    _initPersistence();
+    _persistence = TimerPersistenceService(TimerPersistenceService.prefs);
+
+    WidgetsBinding.instance.addObserver(this);
 
     ref.onDispose(() {
       _tickTimer?.cancel();
+      WidgetsBinding.instance.removeObserver(this);
+      if (_listenerRegistered) {
+        FlutterForegroundTask.removeTaskDataCallback(_onReceiveTaskData);
+        _listenerRegistered = false;
+      }
     });
+
+    final saved = _persistence!.loadFreeTimerSync();
+    if (saved != null && saved.activeSessionId != null) {
+      if (saved.isRunning) {
+        _startTickingDelayed();
+        _startForegroundServiceDelayed();
+      }
+      return saved;
+    }
 
     return FreeTimerState.initial();
   }
 
-  Future<void> _initPersistence() async {
-    final prefs = await SharedPreferences.getInstance();
-    _persistence = TimerPersistenceService(prefs);
+  void _startTickingDelayed() {
+    Future.microtask(() {
+      _startTicking();
+    });
+  }
 
-    final saved = await _persistence!.loadFreeTimer();
-    if (saved != null && saved.activeSessionId != null) {
-      state = saved;
-      if (state.isRunning) {
-        _startTicking();
-        _startForegroundService();
-      }
+  void _startForegroundServiceDelayed() {
+    Future.microtask(() {
+      _startForegroundService();
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _syncTimeFromTimestamps();
+    }
+  }
+
+  void _syncTimeFromTimestamps() {
+    if (state.activeSessionId == null || state.startedAt == null) return;
+
+    final now = DateTime.now();
+    int actualElapsedSeconds;
+
+    if (state.isRunning) {
+      actualElapsedSeconds = now.difference(state.startedAt!).inSeconds -
+          state.pausedDurationSeconds;
+    } else {
+      final pauseTime = state.lastPausedAt ?? now;
+      actualElapsedSeconds = pauseTime.difference(state.startedAt!).inSeconds -
+          state.pausedDurationSeconds;
+    }
+
+    final elapsed = actualElapsedSeconds.clamp(0, double.maxFinite.toInt());
+    if (state.elapsedSeconds != elapsed) {
+      state = state.copyWith(elapsedSeconds: elapsed);
+      _persistState();
+      _checkAndUpdateDbDuration(elapsed);
+    }
+  }
+
+  Future<void> _checkAndUpdateDbDuration(int elapsedSeconds) async {
+    if (state.activeSessionId == null) return;
+    final newMinutes = (elapsedSeconds / 60.0).round();
+    if (_lastDbMinutesUpdate == newMinutes) return;
+
+    _lastDbMinutesUpdate = newMinutes;
+    final session = await _sessionDao?.getById(state.activeSessionId!);
+    if (session != null) {
+      await _sessionDao?.updateRow(
+        session.copyWith(
+          actualDurationMinutes: newMinutes,
+        ),
+      );
     }
   }
 
@@ -63,7 +125,9 @@ class FreeTimerNotifier extends _$FreeTimerNotifier {
         final now = DateTime.now();
         final effectiveElapsed = now.difference(state.startedAt!).inSeconds -
             state.pausedDurationSeconds;
-        state = state.copyWith(elapsedSeconds: effectiveElapsed.clamp(0, double.maxFinite.toInt()));
+        final elapsed = effectiveElapsed.clamp(0, double.maxFinite.toInt());
+        state = state.copyWith(elapsedSeconds: elapsed);
+        _checkAndUpdateDbDuration(elapsed);
       }
     });
   }
@@ -76,6 +140,8 @@ class FreeTimerNotifier extends _$FreeTimerNotifier {
     const uuid = Uuid();
     final sessionId = uuid.v4();
     final now = DateTime.now();
+
+    _lastDbMinutesUpdate = 0;
 
     state = FreeTimerState(
       isRunning: true,
@@ -136,27 +202,46 @@ class FreeTimerNotifier extends _$FreeTimerNotifier {
     _tickTimer?.cancel();
     _tickTimer = null;
 
-    final elapsedMinutes = state.elapsedSeconds ~/ 60;
-    final endedAt = DateTime.now();
-
-    // Award streak if >= 1 min
-    if (elapsedMinutes >= 1) {
-      await ref.read(streakServiceProvider).recordStudyDay(ref);
+    // Recalculate accurately from timestamps to prevent stale values (Finding 2)
+    final now = DateTime.now();
+    int actualElapsedSeconds = 0;
+    if (state.startedAt != null) {
+      if (state.isRunning) {
+        actualElapsedSeconds = now.difference(state.startedAt!).inSeconds -
+            state.pausedDurationSeconds;
+      } else {
+        final pauseTime = state.lastPausedAt ?? now;
+        actualElapsedSeconds = pauseTime.difference(state.startedAt!).inSeconds -
+            state.pausedDurationSeconds;
+      }
     }
+    actualElapsedSeconds = actualElapsedSeconds.clamp(0, double.maxFinite.toInt());
+    final elapsedMinutes = (actualElapsedSeconds / 60.0).round(); // round to avoid truncation (Finding 8)
+    final endedAt = now;
 
-    // Award achievements
-    await AchievementService().checkAndUnlock(ref.read(appDatabaseProvider));
-    await _checkDailyGoalXp();
+    // Delete dummy session from DB if <= 0 minutes (Finding 9)
+    if (elapsedMinutes <= 0) {
+      await _sessionDao?.delete(state.activeSessionId!);
+    } else {
+      // Award streak if >= 1 min
+      if (elapsedMinutes >= 1) {
+        await ref.read(streakServiceProvider).recordStudyDay(ref);
+      }
 
-    // Update session in DB
-    final session = await _sessionDao?.getById(state.activeSessionId!);
-    if (session != null) {
-      await _sessionDao?.updateRow(
-        session.copyWith(
-          actualDurationMinutes: elapsedMinutes,
-          endedAt: Value(endedAt),
-        ),
-      );
+      // Award achievements
+      await AchievementService().checkAndUnlock(ref.read(appDatabaseProvider));
+      await _checkDailyGoalXp();
+
+      // Update session in DB
+      final session = await _sessionDao?.getById(state.activeSessionId!);
+      if (session != null) {
+        await _sessionDao?.updateRow(
+          session.copyWith(
+            actualDurationMinutes: elapsedMinutes,
+            endedAt: Value(endedAt),
+          ),
+        );
+      }
     }
 
     // Note: XP is handled by review sheet if confidence is given
@@ -204,6 +289,7 @@ class FreeTimerNotifier extends _$FreeTimerNotifier {
       _syncForegroundTaskData();
       return;
     }
+    _ensureListener();
 
     FlutterForegroundTask.init(
       androidNotificationOptions: AndroidNotificationOptions(
@@ -235,6 +321,25 @@ class FreeTimerNotifier extends _$FreeTimerNotifier {
 
   Future<void> _stopForegroundService() async {
     await FlutterForegroundTask.stopService();
+  }
+
+  void _ensureListener() {
+    if (!_listenerRegistered) {
+      FlutterForegroundTask.addTaskDataCallback(_onReceiveTaskData);
+      _listenerRegistered = true;
+    }
+  }
+
+  void _onReceiveTaskData(Object data) {
+    if (data is int) {
+      if (state.isRunning && state.activeSessionId != null) {
+        if ((state.elapsedSeconds - data).abs() > 1) {
+          state = state.copyWith(elapsedSeconds: data);
+          _persistState();
+          _checkAndUpdateDbDuration(data);
+        }
+      }
+    }
   }
 
   void _syncForegroundTaskData() {
@@ -288,16 +393,47 @@ void freeTimerCallback() {
 }
 
 class FreeTimerTaskHandler extends TaskHandler {
+  DateTime? _startedAt;
+  int _pausedDurationSeconds = 0;
+  bool _isRunning = false;
+  int _lastElapsed = -1;
+
   @override
   Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
-    // Initial data handled via sendDataToTask
+    final startedAtStr = await FlutterForegroundTask.getData<String>(key: 'startedAt');
+    if (startedAtStr != null) {
+      _startedAt = DateTime.parse(startedAtStr);
+    }
+    _pausedDurationSeconds = await FlutterForegroundTask.getData<int>(key: 'pausedDurationSeconds') ?? 0;
+    _isRunning = await FlutterForegroundTask.getData<bool>(key: 'isRunning') ?? false;
   }
 
   @override
   void onRepeatEvent(DateTime timestamp) {
-    // Background ticking is handled via data sync to main UI
-    // and calculation on return. 
-    // Usually we update notification here.
+    if (_isRunning && _startedAt != null) {
+      final now = DateTime.now();
+      final elapsed = now.difference(_startedAt!).inSeconds - _pausedDurationSeconds;
+      final elapsedSeconds = elapsed.clamp(0, double.maxFinite.toInt());
+
+      if (elapsedSeconds != _lastElapsed) {
+        _lastElapsed = elapsedSeconds;
+
+        final hours = elapsedSeconds ~/ 3600;
+        final mins = (elapsedSeconds % 3600) ~/ 60;
+        final secs = elapsedSeconds % 60;
+
+        final timeStr = hours > 0 
+          ? '${hours.toString().padLeft(2, '0')}:${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}'
+          : '${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
+
+        FlutterForegroundTask.updateService(
+          notificationTitle: 'Focused Session',
+          notificationText: '$timeStr elapsed',
+        );
+
+        FlutterForegroundTask.sendDataToMain(elapsedSeconds);
+      }
+    }
   }
 
   @override
@@ -308,14 +444,25 @@ class FreeTimerTaskHandler extends TaskHandler {
     if (data is Map) {
       final startedAtStr = data['startedAt'] as String?;
       final pausedSeconds = data['pausedDurationSeconds'] as int? ?? 0;
+      final isRunning = data['isRunning'] as bool? ?? false;
       
+      _pausedDurationSeconds = pausedSeconds;
+      _isRunning = isRunning;
       if (startedAtStr != null) {
-        final startedAt = DateTime.parse(startedAtStr);
-        final elapsed = DateTime.now().difference(startedAt).inSeconds - pausedSeconds;
+        _startedAt = DateTime.parse(startedAtStr);
+        FlutterForegroundTask.saveData(key: 'startedAt', value: startedAtStr);
+      }
+      FlutterForegroundTask.saveData(key: 'pausedDurationSeconds', value: _pausedDurationSeconds);
+      FlutterForegroundTask.saveData(key: 'isRunning', value: _isRunning);
+
+      if (_startedAt != null) {
+        final elapsed = DateTime.now().difference(_startedAt!).inSeconds - _pausedDurationSeconds;
+        final elapsedSeconds = elapsed.clamp(0, double.maxFinite.toInt());
+        _lastElapsed = elapsedSeconds;
         
-        final hours = elapsed ~/ 3600;
-        final mins = (elapsed % 3600) ~/ 60;
-        final secs = elapsed % 60;
+        final hours = elapsedSeconds ~/ 3600;
+        final mins = (elapsedSeconds % 3600) ~/ 60;
+        final secs = elapsedSeconds % 60;
         
         final timeStr = hours > 0 
           ? '${hours.toString().padLeft(2, '0')}:${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}'

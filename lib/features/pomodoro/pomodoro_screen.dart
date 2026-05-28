@@ -590,6 +590,7 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
 
   Future<void> _stopAndReview() async {
     final notifier = ref.read(pomodoroProvider.notifier);
+    notifier.syncTimeFromTimestamps();
     final pomodoroState = ref.read(pomodoroProvider);
 
     // Determine the actual work minutes:

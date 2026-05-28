@@ -23,7 +23,6 @@ import '../../core/services/app_logger.dart';
 import 'pomodoro_state.dart';
 import 'pomodoro_task_handler.dart';
 import '../../core/services/timer_persistence_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 
 part 'pomodoro_notifier.g.dart';
@@ -59,8 +58,9 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
   TimerPersistenceService? _persistence;
   bool _listenerRegistered = false;
   Timer? _localTimer;
-  bool _handlingPhaseComplete = false;
   bool _studyDayRecorded = false;
+  bool _handlingPhaseComplete = false;
+  int? _lastDbMinutesUpdate;
 
   @override
   PomodoroState build() {
@@ -69,7 +69,7 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
     _subjectDao = SubjectDao(_db!);
     _projectDao = ProjectDao(_db!);
 
-    _initPersistence();
+    _persistence = TimerPersistenceService(TimerPersistenceService.prefs);
 
     WidgetsBinding.instance.addObserver(this);
 
@@ -83,17 +83,46 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
       }
     });
 
+    // Load state completely synchronously!
+    final savedState = _persistence!.loadPomodoroSync();
+    if (savedState != null && savedState.phase != TimerPhase.idle) {
+      if (savedState.isRunning) {
+        _syncTimeDelayed();
+        _startLocalTimerDelayed();
+        _startForegroundServiceDelayed();
+      }
+      return savedState;
+    }
+
     return PomodoroState.initial(subjectId: '');
+  }
+
+  void _syncTimeDelayed() {
+    Future.microtask(() {
+      syncTimeFromTimestamps();
+    });
+  }
+
+  void _startLocalTimerDelayed() {
+    Future.microtask(() {
+      _startLocalTimer();
+    });
+  }
+
+  void _startForegroundServiceDelayed() {
+    Future.microtask(() {
+      _startForegroundService();
+    });
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _syncTimeFromTimestamps();
+      syncTimeFromTimestamps();
     }
   }
 
-  void _syncTimeFromTimestamps() {
+  void syncTimeFromTimestamps() {
     if (state.phase == TimerPhase.idle || state.startTimestamp == null) return;
 
     final now = DateTime.now();
@@ -127,19 +156,21 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
         _onPhaseComplete();
       }
     }
-  }
 
-  Future<void> _initPersistence() async {
-    final prefs = await SharedPreferences.getInstance();
-    _persistence = TimerPersistenceService(prefs);
-    
-    final savedState = await _persistence!.loadPomodoro();
-    if (savedState != null && savedState.phase != TimerPhase.idle) {
-      state = savedState;
-      if (state.isRunning) {
-        _syncTimeFromTimestamps();
-        _startLocalTimer();
-        _startForegroundService();
+    // Periodically update actualDurationMinutes in DB during work phase (Finding 4)
+    if (state.phase == TimerPhase.work && state.activeSessionId != null) {
+      int currentPhaseElapsed = state.isOvertime
+          ? state.totalSeconds + state.overtimeSeconds
+          : state.totalSeconds - state.remainingSeconds;
+      final currentAccumulatedSeconds = state.accumulatedWorkSeconds + currentPhaseElapsed;
+      final currentMinutes = (currentAccumulatedSeconds / 60.0).round();
+      
+      if (_lastDbMinutesUpdate != currentMinutes) {
+        _lastDbMinutesUpdate = currentMinutes;
+        _updateSessionInDb(
+          actualDurationMinutes: currentMinutes,
+          pomodorosCompleted: state.pomodorosCompleted,
+        );
       }
     }
   }
@@ -159,7 +190,7 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
     _localTimer?.cancel();
     _localTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (state.isRunning) {
-        _syncTimeFromTimestamps();
+        syncTimeFromTimestamps();
 
         String notifTitle;
         String notifText;
@@ -270,6 +301,7 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
 
   Future<void> start(PomodoroConfig config) async {
     _studyDayRecorded = false;
+    _lastDbMinutesUpdate = 0;
     const uuid = Uuid();
     final sessionId = uuid.v4();
     final now = DateTime.now();
@@ -377,7 +409,7 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
       await AchievementService().checkAndUnlock(ref.read(appDatabaseProvider));
 
       final newAccumulatedSeconds = state.accumulatedWorkSeconds + elapsedSeconds;
-      final totalActualMinutes = newAccumulatedSeconds ~/ 60;
+      final totalActualMinutes = (newAccumulatedSeconds / 60.0).round();
 
       if (continuousFocus && !fromSkip) {
         // Switch to overtime instead of break
@@ -530,6 +562,8 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
     _stopLocalTimer();
     _localTimer = null;
 
+    syncTimeFromTimestamps(); // Force sync first to get up-to-date values
+
     int currentPhaseElapsed = 0;
     if (state.phase == TimerPhase.work) {
       currentPhaseElapsed = state.isOvertime
@@ -538,7 +572,7 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
     }
     
     final newAccumulatedSeconds = state.accumulatedWorkSeconds + currentPhaseElapsed;
-    final actualMinutes = newAccumulatedSeconds ~/ 60;
+    final actualMinutes = (newAccumulatedSeconds / 60.0).round();
 
     if (state.pomodorosCompleted > 0 && !_studyDayRecorded) {
       await ref.read(streakServiceProvider).recordStudyDay(ref);

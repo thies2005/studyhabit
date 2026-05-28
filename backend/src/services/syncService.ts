@@ -1,4 +1,4 @@
-import { prisma } from './db.js';
+import { prisma } from '../db.js';
 import {
   SyncPushPayload,
   SyncPullResponse,
@@ -13,6 +13,7 @@ import {
   SyncUserStats,
 } from '../types/index.js';
 import { z } from 'zod';
+import { AchievementService } from './achievementService.js';
 
 // Define Zod schemas for each entity type to validate and strip unknown fields
 const projectSchema = z.object({
@@ -143,16 +144,20 @@ function lastWriteWins(incoming: TimestampedEntity, existing: TimestampedEntity 
 }
 
 export class SyncService {
-  static async fullPull(userId: string, since?: string): Promise<SyncPullResponse> {
-    const whereClause = since
-      ? { updatedAt: { gt: new Date(since) } }
-      : {};
+  static async fullPull(userId: string, since: string): Promise<SyncPullResponse> {
+    const whereClause = { updatedAt: { gt: new Date(since) } };
 
     const projects = await prisma.project.findMany({
       where: { userId, ...whereClause },
     });
 
     const projectIds = projects.map((p: SyncProject) => p.id);
+
+    const subjects = projectIds.length
+      ? (await prisma.subject.findMany({
+          where: { projectId: { in: projectIds }, ...whereClause },
+        })) as any as SyncSubject[]
+      : [];
 
     const subjectIds = subjects.map((s: SyncSubject) => s.id);
 
@@ -201,8 +206,8 @@ export class SyncService {
       topics,
       chapters,
       sessions,
-      sources,
-      skillLabels,
+      sources: sources as any as SyncSource[],
+      skillLabels: skillLabels as any as SyncSkillLabel[],
       achievements,
       userStats,
     };
@@ -316,7 +321,7 @@ export class SyncService {
           });
           a++;
         } catch (e: unknown) {
-          errors.push({ entity: 'subject', id: item.id, error: e.message });
+          errors.push({ entity: 'subject', id: item.id, error: e instanceof Error ? e.message : String(e) });
         }
       }
       applied.subjects = a;
@@ -353,7 +358,7 @@ export class SyncService {
           });
           a++;
         } catch (e: unknown) {
-          errors.push({ entity: 'topic', id: item.id, error: e.message });
+          errors.push({ entity: 'topic', id: item.id, error: e instanceof Error ? e.message : String(e) });
         }
       }
       applied.topics = a;
@@ -390,7 +395,7 @@ export class SyncService {
           });
           a++;
         } catch (e: unknown) {
-          errors.push({ entity: 'chapter', id: item.id, error: e.message });
+          errors.push({ entity: 'chapter', id: item.id, error: e instanceof Error ? e.message : String(e) });
         }
       }
       applied.chapters = a;
@@ -465,7 +470,7 @@ export class SyncService {
           });
           a++;
         } catch (e: unknown) {
-          errors.push({ entity: 'source', id: item.id, error: e.message });
+          errors.push({ entity: 'source', id: item.id, error: e instanceof Error ? e.message : String(e) });
         }
       }
       applied.sources = a;
@@ -502,7 +507,7 @@ export class SyncService {
           });
           a++;
         } catch (e: unknown) {
-          errors.push({ entity: 'skillLabel', id: item.id, error: e.message });
+          errors.push({ entity: 'skillLabel', id: item.id, error: e instanceof Error ? e.message : String(e) });
         }
       }
       applied.skillLabels = a;
@@ -537,7 +542,7 @@ export class SyncService {
           });
           a++;
         } catch (e: unknown) {
-          errors.push({ entity: 'achievement', id: item.key, error: e.message });
+          errors.push({ entity: 'achievement', id: item.key, error: e instanceof Error ? e.message : String(e) });
         }
       }
       applied.achievements = a;
@@ -591,7 +596,24 @@ export class SyncService {
           }
         }
       } catch (e: unknown) {
-        errors.push({ entity: 'userStats', id: userId, error: e.message });
+        errors.push({ entity: 'userStats', id: userId, error: e instanceof Error ? e.message : String(e) });
+      }
+    }
+
+    if (
+      (applied.sessions ?? 0) > 0 ||
+      (applied.skillLabels ?? 0) > 0 ||
+      (applied.sources ?? 0) > 0 ||
+      (applied.userStats ?? 0) > 0
+    ) {
+      try {
+        await AchievementService.checkAndUnlock(userId);
+      } catch (e: unknown) {
+        errors.push({
+          entity: 'achievement',
+          id: 'server_check',
+          error: e instanceof Error ? e.message : String(e),
+        });
       }
     }
 

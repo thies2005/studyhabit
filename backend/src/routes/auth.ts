@@ -3,6 +3,7 @@ import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { ZodError } from 'zod';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { prisma } from '../db.js';
 import { AuthService } from '../services/authService.js';
 import { authMiddleware } from '../middleware/auth.js';
@@ -49,7 +50,11 @@ router.post('/register', async (req, res, next) => {
       await bcrypt.hash('dummy', 12);
       return res.status(201).json({
         data: {
-          user: { id: existing.id, email: existing.email, createdAt: existing.createdAt },
+          user: {
+            id: crypto.randomUUID(),
+            email: existing.email,
+            createdAt: new Date().toISOString(),
+          },
           accessToken: '',
           refreshToken: '',
         },

@@ -8,6 +8,19 @@ class TimerPersistenceService {
   static const String _pomodoroStateKey = 'pomodoro_state_json';
   static const String _freeTimerStateKey = 'free_timer_state_json';
 
+  static SharedPreferences? _cachedPrefs;
+
+  static Future<void> init() async {
+    _cachedPrefs = await SharedPreferences.getInstance();
+  }
+
+  static SharedPreferences get prefs {
+    if (_cachedPrefs == null) {
+      throw StateError('TimerPersistenceService not initialized');
+    }
+    return _cachedPrefs!;
+  }
+
   final SharedPreferences _prefs;
 
   TimerPersistenceService(this._prefs);
@@ -28,12 +41,34 @@ class TimerPersistenceService {
     }
   }
 
+  PomodoroState? loadPomodoroSync() {
+    final jsonStr = _prefs.getString(_pomodoroStateKey);
+    if (jsonStr == null) return null;
+    try {
+      final map = jsonDecode(jsonStr) as Map<String, dynamic>;
+      return PomodoroState.fromJson(map);
+    } catch (e) {
+      return null;
+    }
+  }
+
   Future<void> saveFreeTimer(FreeTimerState state) async {
     await _prefs.setString(_activeTimerKey, 'free');
     await _prefs.setString(_freeTimerStateKey, jsonEncode(state.toJson()));
   }
 
   Future<FreeTimerState?> loadFreeTimer() async {
+    final jsonStr = _prefs.getString(_freeTimerStateKey);
+    if (jsonStr == null) return null;
+    try {
+      final map = jsonDecode(jsonStr) as Map<String, dynamic>;
+      return FreeTimerState.fromJson(map);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  FreeTimerState? loadFreeTimerSync() {
     final jsonStr = _prefs.getString(_freeTimerStateKey);
     if (jsonStr == null) return null;
     try {

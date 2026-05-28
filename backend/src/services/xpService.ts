@@ -1,4 +1,4 @@
-import { prisma } from './db.js';
+import { prisma } from '../db.js';
 
 export class XpService {
   static calculateLevel(totalXp: number): number {

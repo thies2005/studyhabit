@@ -233,7 +233,7 @@ class _SessionCardState extends ConsumerState<SessionCard> {
     final durationText = actualMinutes > 0
         ? '${actualMinutes}m'
         : endedAt != null
-        ? '${endedAt.difference(startedAt).inMinutes}m'
+        ? '${(endedAt.difference(startedAt).inSeconds / 60.0).round().clamp(1, 999999)}m'
         : '0m';
 
     return GestureDetector(
