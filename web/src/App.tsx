@@ -11,6 +11,7 @@ const Stats = lazy(() => import('./pages/Stats'));
 const Achievements = lazy(() => import('./pages/Achievements'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Layout = lazy(() => import('./components/Layout'));
+import { useThemeSettings } from './hooks/useThemeSettings';
 
 // Error Boundary Component
 interface ErrorBoundaryProps {
@@ -94,7 +95,11 @@ const ProtectedRoute = ({ children }: { children: ReactNode }) => {
 };
 
 function App() {
-  // Set dark mode on mount
+  // Apply theme settings on load
+  useThemeSettings();
+
+  // Set dark mode on mount initially as fallback, 
+  // but useThemeSettings will override it based on user preferences.
   useEffect(() => {
     document.documentElement.classList.add('dark');
   }, []);

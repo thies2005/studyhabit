@@ -156,6 +156,7 @@ export interface SyncPushPayload {
   achievements?: SyncAchievement[];
   userStats?: SyncUserStats;
   subjectMilestones?: SyncSubjectMilestone[];
+  userSettings?: { settings: unknown; updatedAt: string | Date };
 }
 
 export interface SyncSubjectMilestone {
@@ -181,6 +182,7 @@ export interface SyncPullResponse {
   achievements: SyncAchievement[];
   userStats: SyncUserStats | null;
   subjectMilestones: SyncSubjectMilestone[];
+  userSettings?: { settings: unknown; updatedAt: string | Date };
 }
 
 export interface ApiResponse<T> {

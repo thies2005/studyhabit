@@ -16,6 +16,7 @@ model User {
   projects     Project[]
   achievements Achievement[]
   userStats    UserStats?
+  userSettings UserSettings?
   refreshTokens RefreshToken[]
 }
 
@@ -220,4 +221,13 @@ model SubjectMilestone {
   updatedAt   DateTime  @updatedAt
 
   @@index([subjectId])
+}
+
+model UserSettings {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  settings  Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

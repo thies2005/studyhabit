@@ -149,6 +149,11 @@ const subjectMilestoneSchema = z.object({
   updatedAt: z.string().or(z.date()),
 });
 
+const userSettingsSchema = z.object({
+  settings: z.record(z.unknown()),
+  updatedAt: z.string().or(z.date()),
+});
+
 interface ConflictResult {
   accepted: boolean;
   reason?: string;
@@ -236,6 +241,15 @@ export class SyncService {
         : [],
     ]);
 
+    const userSettings = await prisma.userSettings.findUnique({ where: { userId } });
+    let userSettingsPayload;
+    if (userSettings && new Date(userSettings.updatedAt) > new Date(since)) {
+      userSettingsPayload = {
+        settings: userSettings.settings,
+        updatedAt: userSettings.updatedAt,
+      };
+    }
+
     return {
       serverTime: new Date().toISOString(),
       projects,
@@ -248,6 +262,7 @@ export class SyncService {
       achievements,
       userStats,
       subjectMilestones,
+      userSettings: userSettingsPayload,
     };
   }
 
@@ -650,6 +665,37 @@ export class SyncService {
       }
     }
 
+    if (payload.userSettings) {
+      try {
+        const validated = userSettingsSchema.parse(payload.userSettings);
+        const existing = await prisma.userSettings.findUnique({
+          where: { userId },
+        });
+
+        const incoming = { updatedAt: validated.updatedAt };
+        const current = existing ? { updatedAt: existing.updatedAt } : null;
+        
+        const result = lastWriteWins(incoming, current);
+        if (result.accepted) {
+          await prisma.userSettings.upsert({
+            where: { userId },
+            create: {
+              userId,
+              settings: validated.settings as any,
+            },
+            update: {
+              settings: validated.settings as any,
+            },
+          });
+          applied.userSettings = 1;
+        } else {
+          conflicts.userSettings = 1;
+        }
+      } catch (e: unknown) {
+        errors.push({ entity: 'userSettings', id: userId, error: e instanceof Error ? e.message : String(e) });
+      }
+    }
+
     if (payload.subjectMilestones?.length) {
       let a = 0;
       let c = 0;
@@ -691,6 +737,7 @@ export class SyncService {
       (applied.skillLabels ?? 0) > 0 ||
       (applied.sources ?? 0) > 0 ||
       (applied.userStats ?? 0) > 0 ||
+      (applied.userSettings ?? 0) > 0 ||
       (applied.subjectMilestones ?? 0) > 0
     ) {
       try {

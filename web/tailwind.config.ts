@@ -14,8 +14,8 @@ export default {
         surface: '#1C2021',
         surfaceHigh: '#323536',
         primary: {
-          DEFAULT: '#85D2E0',
-          container: '#006874',
+          DEFAULT: 'var(--color-primary, #85D2E0)',
+          container: 'var(--color-primary-container, #006874)',
         },
         tertiary: '#FDB87C',
         onSurface: '#E0E3E3',

@@ -15,6 +15,10 @@ const pushSchema = z.object({
   achievements: z.array(z.record(z.unknown())).max(1000).optional(),
   userStats: z.record(z.unknown()).optional(),
   subjectMilestones: z.array(z.record(z.unknown())).max(1000).optional(),
+  userSettings: z.object({
+    settings: z.record(z.unknown()),
+    updatedAt: z.string().or(z.date()),
+  }).optional(),
 });
 
 router.post('/push', async (req, res, next) => {
@@ -30,6 +34,7 @@ router.post('/push', async (req, res, next) => {
       achievements?: unknown[];
       userStats?: unknown;
       subjectMilestones?: unknown[];
+      userSettings?: { settings: unknown; updatedAt: string | Date };
     };
     const result = await SyncService.pushChanges(req.user.userId, payload as any);
     res.json({ data: result });
@@ -67,6 +72,7 @@ router.post('/full', async (req, res, next) => {
       achievements?: unknown[];
       userStats?: unknown;
       subjectMilestones?: unknown[];
+      userSettings?: { settings: unknown; updatedAt: string | Date };
     };
 
     const pushResult = await SyncService.pushChanges(req.user.userId, payload as any);

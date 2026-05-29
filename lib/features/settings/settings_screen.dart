@@ -848,7 +848,10 @@ class _SettingsContent extends ConsumerWidget {
 
     try {
       final db = ref.read(appDatabaseProvider);
-      final importService = ImportService(db);
+      final importService = ImportService(
+        db,
+        onImportComplete: () => ref.invalidate(themeSettingsProvider),
+      );
 
       final importResult = await importService.importFromJson(file, mode);
 

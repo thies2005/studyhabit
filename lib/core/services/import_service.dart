@@ -9,6 +9,7 @@ import '../database/app_database.dart';
 import '../services/app_logger.dart';
 import '../models/enums.dart';
 import '../providers/database_provider.dart';
+import '../providers/theme_provider.dart';
 import 'export_service.dart';
 
 part 'import_service.g.dart';
@@ -58,13 +59,17 @@ class ImportResult {
 @Riverpod(keepAlive: true)
 ImportService importService(Ref ref) {
   final db = ref.watch(appDatabaseProvider);
-  return ImportService(db);
+  return ImportService(
+    db,
+    onImportComplete: () => ref.invalidate(themeSettingsProvider),
+  );
 }
 
 class ImportService {
-  ImportService(this._db);
+  ImportService(this._db, {this.onImportComplete});
 
   final AppDatabase _db;
+  final void Function()? onImportComplete;
 
   Future<ImportResult> importFromJson(File file, ImportMode mode) async {
     final errors = <String>[];
@@ -265,6 +270,7 @@ class ImportService {
               await prefs.setString(entry.key, value);
             }
           }
+          onImportComplete?.call();
         }
       });
     } catch (e, st) {

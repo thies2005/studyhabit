@@ -10,6 +10,7 @@ import '../providers/server_url_provider.dart';
 import 'auth_service.dart';
 import 'app_logger.dart';
 import '../models/enums.dart';
+import '../providers/theme_provider.dart';
 
 part 'sync_service.g.dart';
 
@@ -127,6 +128,32 @@ class SyncEngine extends _$SyncEngine {
       };
     }
 
+    final settingsUpdatedAtMs = _prefs.getInt('theme.settingsUpdatedAt') ?? 0;
+    final settingsUpdatedAt = DateTime.fromMillisecondsSinceEpoch(settingsUpdatedAtMs);
+    Map<String, dynamic>? settingsPayload;
+    if (settingsUpdatedAt.isAfter(since)) {
+      final settingsKeys = _prefs.getKeys().where(
+        (k) =>
+            k.startsWith('theme.') ||
+            k.startsWith('pomodoro.') ||
+            k.startsWith('notifications.') ||
+            k.startsWith('streak.') ||
+            k.startsWith('goal.'),
+      );
+      final settingsMap = <String, dynamic>{};
+      for (final key in settingsKeys) {
+        if (key == 'theme.settingsUpdatedAt') continue;
+        final value = _prefs.get(key);
+        if (value != null) settingsMap[key] = value;
+      }
+      if (settingsMap.isNotEmpty) {
+        settingsPayload = {
+          'settings': settingsMap,
+          'updatedAt': settingsUpdatedAt.toUtc().toIso8601String(),
+        };
+      }
+    }
+
     return {
       if (projects.isNotEmpty) 'projects': projects.map((p) => _projectToJson(p)).toList(),
       if (subjects.isNotEmpty) 'subjects': subjects.map((s) => _subjectToJson(s)).toList(),
@@ -138,6 +165,7 @@ class SyncEngine extends _$SyncEngine {
       if (milestones.isNotEmpty) 'subjectMilestones': milestones.map((m) => _milestoneToJson(m)).toList(),
       if (achievements.isNotEmpty) 'achievements': achievements.map((a) => _achievementToJson(a)).toList(),
       if (statsJson != null) 'userStats': statsJson,
+      if (settingsPayload != null) 'userSettings': settingsPayload,
     };
   }
 
@@ -265,6 +293,19 @@ class SyncEngine extends _$SyncEngine {
           updatedAt: DateTime.now(),
         );
         await _db.into(_db.userStatsTable).insertOnConflictUpdate(updatedStats);
+      }
+    }
+
+    // 10. User Settings
+    final userSettingsPayload = pull['userSettings'] as Map<String, dynamic>?;
+    if (userSettingsPayload != null) {
+      final settingsJson = userSettingsPayload['settings'] as Map<String, dynamic>?;
+      final serverUpdatedAt = DateTime.parse(userSettingsPayload['updatedAt'] as String);
+      final localUpdatedAtMs = _prefs.getInt('theme.settingsUpdatedAt') ?? 0;
+      final localUpdatedAt = DateTime.fromMillisecondsSinceEpoch(localUpdatedAtMs);
+
+      if (settingsJson != null && serverUpdatedAt.isAfter(localUpdatedAt)) {
+        await ref.read(themeSettingsProvider.notifier).loadSettings(settingsJson);
       }
     }
   }

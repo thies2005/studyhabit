@@ -21,6 +21,7 @@ import skillLabelRoutes from './routes/skill-labels.js';
 import milestoneRoutes from './routes/milestones.js';
 import { AuthService } from './services/authService.js';
 import docsRoutes from './routes/docs.js';
+import settingsRoutes from './routes/settings.js';
 
 const app = express();
 
@@ -75,6 +76,7 @@ app.use('/api/v1/sources', apiLimiter, authMiddleware, sourceRoutes);
 app.use('/api/v1/milestones', apiLimiter, authMiddleware, milestoneRoutes);
 app.use('/api/v1/stats', apiLimiter, authMiddleware, statsRoutes);
 app.use('/api/v1/achievements', apiLimiter, authMiddleware, achievementRoutes);
+app.use('/api/v1/settings', apiLimiter, authMiddleware, settingsRoutes);
 
 app.use((_req, res) => {
   res.status(404).json({ error: 'Not found' });

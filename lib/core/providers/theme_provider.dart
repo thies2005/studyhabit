@@ -39,6 +39,7 @@ class ThemeSettings extends _$ThemeSettings {
   static const _dailyGoalSaturdayKey = 'goal.saturday';
   static const _dailyGoalSundayKey = 'goal.sunday';
   static const _lastDailyGoalAwardDateKey = 'goal.lastAwardDate';
+  static const _settingsUpdatedAtKey = 'theme.settingsUpdatedAt';
 
 
   late SharedPreferences _prefs;
@@ -125,6 +126,28 @@ class ThemeSettings extends _$ThemeSettings {
     );
   }
 
+  Future<void> loadSettings(Map<String, dynamic> settings) async {
+    for (final entry in settings.entries) {
+      final value = entry.value;
+      if (value is int) {
+        await _prefs.setInt(entry.key, value);
+      } else if (value is double) {
+        await _prefs.setDouble(entry.key, value);
+      } else if (value is bool) {
+        await _prefs.setBool(entry.key, value);
+      } else if (value is String) {
+        await _prefs.setString(entry.key, value);
+      }
+    }
+    await _markSettingsUpdated();
+    // Re-build state by forcing a new read from SharedPreferences
+    ref.invalidateSelf();
+  }
+
+  Future<void> _markSettingsUpdated() async {
+    await _prefs.setInt(_settingsUpdatedAtKey, DateTime.now().millisecondsSinceEpoch);
+  }
+
   Future<void> setSeedColor(int index) async {
     final current = state.asData?.value;
     if (current == null) {
@@ -134,6 +157,7 @@ class ThemeSettings extends _$ThemeSettings {
     final next = current.copyWith(seedColorIndex: index);
     state = AsyncValue.data(next);
     await _prefs.setInt(_seedColorKey, index);
+    await _markSettingsUpdated();
   }
 
   Future<void> setThemeMode(ThemeMode mode) async {
@@ -145,6 +169,7 @@ class ThemeSettings extends _$ThemeSettings {
     final next = current.copyWith(themeMode: mode);
     state = AsyncValue.data(next);
     await _prefs.setInt(_themeModeKey, mode.index);
+    await _markSettingsUpdated();
   }
 
   Future<void> setThemeStyle(AppThemeStyle style) async {
@@ -156,6 +181,7 @@ class ThemeSettings extends _$ThemeSettings {
     final next = current.copyWith(themeStyle: style);
     state = AsyncValue.data(next);
     await _prefs.setInt(_themeStyleKey, style.index);
+    await _markSettingsUpdated();
   }
 
   Future<void> setUseDynamicColor(bool enabled) async {
@@ -167,6 +193,7 @@ class ThemeSettings extends _$ThemeSettings {
     final next = current.copyWith(useDynamicColor: enabled);
     state = AsyncValue.data(next);
     await _prefs.setBool(_dynamicColorKey, enabled);
+    await _markSettingsUpdated();
   }
 
   Future<void> setFontScale(double scale) async {
@@ -178,6 +205,7 @@ class ThemeSettings extends _$ThemeSettings {
     final next = current.copyWith(fontScale: scale);
     state = AsyncValue.data(next);
     await _prefs.setDouble(_fontScaleKey, scale);
+    await _markSettingsUpdated();
   }
 
   Future<void> setWorkDuration(int minutes) async {
@@ -189,6 +217,7 @@ class ThemeSettings extends _$ThemeSettings {
     final next = current.copyWith(workDuration: minutes);
     state = AsyncValue.data(next);
     await _prefs.setInt(_workDurationKey, minutes);
+    await _markSettingsUpdated();
   }
 
   Future<void> setShortBreak(int minutes) async {
@@ -200,6 +229,7 @@ class ThemeSettings extends _$ThemeSettings {
     final next = current.copyWith(shortBreak: minutes);
     state = AsyncValue.data(next);
     await _prefs.setInt(_shortBreakKey, minutes);
+    await _markSettingsUpdated();
   }
 
   Future<void> setLongBreak(int minutes) async {
@@ -211,6 +241,7 @@ class ThemeSettings extends _$ThemeSettings {
     final next = current.copyWith(longBreak: minutes);
     state = AsyncValue.data(next);
     await _prefs.setInt(_longBreakKey, minutes);
+    await _markSettingsUpdated();
   }
 
   Future<void> setLongBreakEvery(int count) async {
@@ -222,6 +253,7 @@ class ThemeSettings extends _$ThemeSettings {
     final next = current.copyWith(longBreakEvery: count);
     state = AsyncValue.data(next);
     await _prefs.setInt(_longBreakEveryKey, count);
+    await _markSettingsUpdated();
   }
 
   Future<void> setAutoStartBreaks(bool enabled) async {
@@ -233,6 +265,7 @@ class ThemeSettings extends _$ThemeSettings {
     final next = current.copyWith(autoStartBreaks: enabled);
     state = AsyncValue.data(next);
     await _prefs.setBool(_autoStartBreaksKey, enabled);
+    await _markSettingsUpdated();
   }
 
   Future<void> setAutoStartWork(bool enabled) async {
@@ -244,6 +277,7 @@ class ThemeSettings extends _$ThemeSettings {
     final next = current.copyWith(autoStartWork: enabled);
     state = AsyncValue.data(next);
     await _prefs.setBool(_autoStartWorkKey, enabled);
+    await _markSettingsUpdated();
   }
 
   Future<void> setVibration(bool enabled) async {
@@ -255,6 +289,7 @@ class ThemeSettings extends _$ThemeSettings {
     final next = current.copyWith(vibration: enabled);
     state = AsyncValue.data(next);
     await _prefs.setBool(_vibrationKey, enabled);
+    await _markSettingsUpdated();
   }
 
   Future<void> setNotificationsEnabled(bool enabled) async {
@@ -266,6 +301,7 @@ class ThemeSettings extends _$ThemeSettings {
     final next = current.copyWith(notificationsEnabled: enabled);
     state = AsyncValue.data(next);
     await _prefs.setBool(_notificationsKey, enabled);
+    await _markSettingsUpdated();
 
     // If master notifications disabled, cancel all scheduled notifications
     final notifService = NotificationService();
@@ -300,6 +336,7 @@ class ThemeSettings extends _$ThemeSettings {
     final next = current.copyWith(gracePeriodHours: hours);
     state = AsyncValue.data(next);
     await _prefs.setDouble(_gracePeriodKey, hours);
+    await _markSettingsUpdated();
   }
 
   Future<void> setStudyReminderEnabled(bool enabled) async {
@@ -311,6 +348,7 @@ class ThemeSettings extends _$ThemeSettings {
     final next = current.copyWith(studyReminderEnabled: enabled);
     state = AsyncValue.data(next);
     await _prefs.setBool(_studyReminderEnabledKey, enabled);
+    await _markSettingsUpdated();
   }
 
   Future<void> setStudyReminderMinutes(int minutes) async {
@@ -322,6 +360,7 @@ class ThemeSettings extends _$ThemeSettings {
     final next = current.copyWith(studyReminderMinutes: minutes);
     state = AsyncValue.data(next);
     await _prefs.setInt(_studyReminderMinutesKey, minutes);
+    await _markSettingsUpdated();
   }
 
   Future<void> setDailyReminderTime({required int hour, required int minute}) async {
@@ -337,6 +376,7 @@ class ThemeSettings extends _$ThemeSettings {
     state = AsyncValue.data(next);
     await _prefs.setInt(_dailyReminderHourKey, hour);
     await _prefs.setInt(_dailyReminderMinuteKey, minute);
+    await _markSettingsUpdated();
 
     // Re-schedule the daily reminder if it's enabled
     if (current.notificationsEnabled && current.dailyReminderEnabled) {
@@ -362,6 +402,7 @@ class ThemeSettings extends _$ThemeSettings {
     final next = current.copyWith(dailyReminderEnabled: enabled);
     state = AsyncValue.data(next);
     await _prefs.setBool(_dailyReminderEnabledKey, enabled);
+    await _markSettingsUpdated();
 
     // Actually schedule or cancel the daily reminder
     if (current.notificationsEnabled) {
@@ -392,6 +433,7 @@ class ThemeSettings extends _$ThemeSettings {
     final next = current.copyWith(continuousFocus: enabled);
     state = AsyncValue.data(next);
     await _prefs.setBool(_continuousFocusKey, enabled);
+    await _markSettingsUpdated();
   }
 
   Future<void> setDailyGoalMinutes(int minutes) async {
@@ -409,6 +451,7 @@ class ThemeSettings extends _$ThemeSettings {
     for (final entry in _dailyGoalPreferenceKeys.entries) {
       await _prefs.setInt(entry.value, minutes);
     }
+    await _markSettingsUpdated();
   }
 
   Future<void> setDailyGoalForWeekday(int weekday, int minutes) async {
@@ -423,6 +466,7 @@ class ThemeSettings extends _$ThemeSettings {
     if (key != null) {
       await _prefs.setInt(key, minutes);
     }
+    await _markSettingsUpdated();
   }
 
   Future<void> setLastDailyGoalAwardDate(String date) async {
@@ -432,6 +476,7 @@ class ThemeSettings extends _$ThemeSettings {
     final next = current.copyWith(lastDailyGoalAwardDate: date);
     state = AsyncValue.data(next);
     await _prefs.setString(_lastDailyGoalAwardDateKey, date);
+    await _markSettingsUpdated();
   }
 
   static const Map<int, String> _dailyGoalPreferenceKeys = {
