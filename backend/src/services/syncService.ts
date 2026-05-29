@@ -758,7 +758,7 @@ export class SyncService {
       (applied.subjectMilestones ?? 0) > 0
     ) {
       try {
-        await AchievementService.checkAndUnlock(userId);
+        await AchievementService.checkAndUnlock(userId, tx);
       } catch (e: unknown) {
         errors.push({
           entity: 'achievement',

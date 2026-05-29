@@ -1,4 +1,5 @@
-import { prisma } from '../db.js';
+import { Prisma, PrismaClient } from '@prisma/client';
+import { prisma as globalPrisma } from '../db.js';
 
 interface AchievementThreshold {
   key: string;
@@ -108,12 +109,13 @@ const ACHIEVEMENT_THRESHOLDS: AchievementThreshold[] = [
 ];
 
 export class AchievementService {
-  static async checkAndUnlock(userId: string): Promise<string[]> {
-    const context = await AchievementService.buildContext(userId);
+  static async checkAndUnlock(userId: string, tx?: Prisma.TransactionClient): Promise<string[]> {
+    const client = tx || globalPrisma;
+    const context = await AchievementService.buildContext(userId, client);
     const newlyUnlocked: string[] = [];
 
     for (const threshold of ACHIEVEMENT_THRESHOLDS) {
-      const existing = await prisma.achievement.findUnique({
+      const existing = await client.achievement.findUnique({
         where: { userId_key: { userId, key: threshold.key } },
       });
 
@@ -121,7 +123,7 @@ export class AchievementService {
       const shouldUnlock = !existing?.unlockedAt && threshold.check(context);
 
       if (shouldUnlock) {
-        await prisma.achievement.upsert({
+        await client.achievement.upsert({
           where: { userId_key: { userId, key: threshold.key } },
           create: {
             userId,
@@ -137,7 +139,7 @@ export class AchievementService {
         newlyUnlocked.push(threshold.key);
         context.unlockedKeys.add(threshold.key);
       } else if (!existing || progress > (existing?.progress ?? 0)) {
-        await prisma.achievement.upsert({
+        await client.achievement.upsert({
           where: { userId_key: { userId, key: threshold.key } },
           create: { userId, key: threshold.key, progress },
           update: { progress },
@@ -148,37 +150,37 @@ export class AchievementService {
     return newlyUnlocked;
   }
 
-  private static async buildContext(userId: string): Promise<AchievementContext> {
+  private static async buildContext(userId: string, client: Prisma.TransactionClient | PrismaClient): Promise<AchievementContext> {
     const [userStats, sessionAgg, sessionMaxConfidence, sourceAgg, skillAgg, unlockedAchievements] =
       await Promise.all([
-        prisma.userStats.findUnique({ where: { userId } }),
-        prisma.studySession.aggregate({
+        client.userStats.findUnique({ where: { userId } }),
+        client.studySession.aggregate({
           _count: true,
           _sum: { pomodorosCompleted: true, actualDurationMinutes: true },
           where: { subject: { project: { userId } } },
         }),
-        prisma.studySession.aggregate({
+        client.studySession.aggregate({
           _max: { confidenceRating: true },
           where: { subject: { project: { userId } } },
         }),
-        prisma.source.findFirst({
+        client.source.findFirst({
           where: { type: 'pdf', subject: { project: { userId } } },
           select: { id: true },
         }),
-        prisma.skillLabel.findFirst({
+        client.skillLabel.findFirst({
           where: {
             label: { in: ['advanced', 'expert'] },
             subject: { project: { userId } },
           },
           select: { id: true },
         }),
-        prisma.achievement.findMany({
+        client.achievement.findMany({
           where: { userId, unlockedAt: { not: null } },
           select: { key: true },
         }),
       ]);
 
-    const subjectHours = await AchievementService.getSubjectHours(userId);
+    const subjectHours = await AchievementService.getSubjectHours(userId, client);
 
     return {
       totalSessions: sessionAgg._count,
@@ -193,15 +195,15 @@ export class AchievementService {
     };
   }
 
-  private static async getSubjectHours(userId: string): Promise<Record<string, number>> {
-    const subjectIds = await prisma.subject.findMany({
+  private static async getSubjectHours(userId: string, client: Prisma.TransactionClient | PrismaClient): Promise<Record<string, number>> {
+    const subjectIds = await client.subject.findMany({
       where: { project: { userId } },
       select: { id: true },
     });
 
     if (subjectIds.length === 0) return {};
 
-    const aggregations = await prisma.studySession.groupBy({
+    const aggregations = await client.studySession.groupBy({
       by: ['subjectId'],
       _sum: { actualDurationMinutes: true },
       where: {
