@@ -1,6 +1,11 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
+let rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
+if (import.meta.env.VITE_API_URL && !import.meta.env.VITE_API_URL.endsWith('/api/v1') && !import.meta.env.VITE_API_URL.endsWith('/api/v1/')) {
+  const base = import.meta.env.VITE_API_URL.replace(/\/$/, '');
+  rawApiUrl = `${base}/api/v1`;
+}
+const API_URL = rawApiUrl;
 
 const apiClient = axios.create({
   baseURL: API_URL,
