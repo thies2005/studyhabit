@@ -100,7 +100,7 @@ export default function Dashboard() {
               </div>
               <div className="flex items-center gap-3">
                 <span className="px-3 py-1 bg-tertiary/20 text-tertiary rounded-full text-sm font-medium font-body flex items-center gap-2">
-                  <span className="material-icons text-sm">local_fire_department</span>
+                  <span className="material-symbols-rounded text-sm">local_fire_department</span>
                   {stats.currentStreak} day streak
                 </span>
                 <span className="px-3 py-1 bg-primary/20 text-primary rounded-full text-sm font-medium font-body">
@@ -132,16 +132,16 @@ export default function Dashboard() {
               to="/subjects"
               className="flex items-center gap-2 px-8 py-4 bg-primary hover:bg-primary-container text-white rounded-2xl text-lg font-medium font-body shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
             >
-              <span className="material-icons">play_arrow</span>
+              <span className="material-symbols-rounded">play_arrow</span>
               Start Session
             </Link>
           </div>
 
           {/* Empty State */}
           {!loading && sessions && sessions.length === 0 && (
-            <div className="bg-surfaceHigh rounded-2xl p-12 mb-8 text-center">
-              <span className="material-icons text-6xl text-primary mb-4">school</span>
-              <h3 className="text-2xl font-bold text-onSurface font-heading mb-2">
+            <div className="bg-surfaceContainerHigh rounded-3xl p-12 mb-8 text-center shadow-lg border border-outlineVariant border-opacity-50">
+              <span className="material-symbols-rounded text-6xl text-primary mb-4">school</span>
+              <h3 className="text-3xl font-bold text-onSurface font-heading mb-2 tracking-tight">
                 Let's start learning!
               </h3>
               <p className="text-gray-400 font-body mb-6">
@@ -149,9 +149,9 @@ export default function Dashboard() {
               </p>
               <Link
                 to="/subjects"
-                className="inline-flex items-center gap-2 px-6 py-3 bg-primary hover:bg-primary-container text-white rounded-xl font-medium font-body transition-colors"
+                className="inline-flex items-center gap-2 px-8 py-4 bg-primary hover:bg-primary-container text-background hover:text-primary-onContainer rounded-full font-heading font-bold transition-all duration-300 hover:scale-105 active:scale-95 shadow-lg"
               >
-                <span className="material-icons">play_arrow</span>
+                <span className="material-symbols-rounded text-xl">play_arrow</span>
                 Start Your First Session
               </Link>
             </div>
@@ -159,7 +159,7 @@ export default function Dashboard() {
 
           {/* Overview Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div className="bg-surfaceHigh rounded-2xl p-6 shadow-lg">
+            <div className="bg-surfaceContainerHigh rounded-3xl p-6 shadow-md border border-transparent hover:border-outlineVariant transition-colors">
               <div className="flex items-center space-x-3">
                 <span className="text-3xl">⏱</span>
                 <div>
@@ -170,7 +170,7 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
-            <div className="bg-surfaceHigh rounded-2xl p-6 shadow-lg">
+            <div className="bg-surfaceContainerHigh rounded-3xl p-6 shadow-md border border-transparent hover:border-outlineVariant transition-colors">
               <div className="flex items-center space-x-3">
                 <span className="text-3xl">📅</span>
                 <div>
@@ -181,7 +181,7 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
-            <div className="bg-surfaceHigh rounded-2xl p-6 shadow-lg">
+            <div className="bg-surfaceContainerHigh rounded-3xl p-6 shadow-md border border-transparent hover:border-outlineVariant transition-colors">
               <div className="flex items-center space-x-3">
                 <span className="text-3xl">🔥</span>
                 <div>
@@ -192,7 +192,7 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
-            <div className="bg-surfaceHigh rounded-2xl p-6 shadow-lg">
+            <div className="bg-surfaceContainerHigh rounded-3xl p-6 shadow-md border border-transparent hover:border-outlineVariant transition-colors">
               <div className="flex items-center space-x-3">
                 <span className="text-3xl">⭐</span>
                 <div>
@@ -207,8 +207,8 @@ export default function Dashboard() {
 
           {/* Recent Sessions */}
           {sessions && sessions.length > 0 && (
-            <div className="bg-surfaceHigh rounded-2xl shadow-lg mb-6">
-              <div className="px-6 py-5 border-b border-gray-200 dark:border-[#1C2021]">
+            <div className="bg-surfaceContainerHigh rounded-3xl shadow-lg mb-6 border border-outlineVariant border-opacity-30 overflow-hidden">
+              <div className="px-6 py-5 border-b border-surfaceContainerHighest">
                 <div className="flex justify-between items-center">
                   <h3 className="text-lg font-medium text-onSurface font-heading">Recent Sessions</h3>
                   <Link to="/subjects" className="text-sm text-primary hover:text-primary-container transition-colors font-body">
@@ -221,7 +221,7 @@ export default function Dashboard() {
                   {sessions.map((session) => (
                     <div
                       key={session.id}
-                      className="flex items-center justify-between p-3 bg-surface rounded-lg hover:bg-gray-100 dark:hover:bg-[#323536] transition-colors cursor-pointer"
+                      className="flex items-center justify-between p-4 bg-surfaceContainer hover:bg-surfaceContainerHighest rounded-2xl transition-all duration-300 cursor-pointer mb-2 last:mb-0"
                       onClick={() => navigate(`/subjects/${session.subjectId}`)}
                     >
                       <div className="flex items-center space-x-3">
@@ -238,8 +238,8 @@ export default function Dashboard() {
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center space-x-3">
-                        <span className="px-2 py-1 text-xs font-medium bg-[#FDB87C] text-black rounded font-body">
+                      <div className="flex items-center space-x-4">
+                        <span className="px-3 py-1 text-xs font-bold bg-tertiary/20 text-tertiary rounded-full font-heading tracking-wide">
                           +{session.xpEarned} XP
                         </span>
                         <span className="text-sm text-gray-400 font-body">{session.actualDurationMinutes} min</span>
@@ -253,8 +253,11 @@ export default function Dashboard() {
 
           {/* Streak Card */}
           {stats.currentStreak > 0 && (
-            <div className="bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl p-6 text-white mb-6 shadow-lg">
-              <div className="flex items-center justify-between">
+            <div className="bg-gradient-to-r from-tertiary-container to-error-container rounded-3xl p-8 text-white mb-6 shadow-xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 -mr-8 -mt-8 opacity-20 pointer-events-none">
+                <span className="material-symbols-rounded text-[150px]">local_fire_department</span>
+              </div>
+              <div className="flex items-center justify-between relative z-10">
                 <div className="flex items-center space-x-4">
                   <span className="text-4xl">🔥</span>
                   <div>

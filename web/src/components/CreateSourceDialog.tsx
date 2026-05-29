@@ -44,14 +44,14 @@ export default function CreateSourceDialog({ isOpen, onClose, onSubmit, topics }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
-      <div className="bg-surfaceHigh border border-gray-800 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-scaleUp">
-        <div className="px-6 py-5 border-b border-gray-800 flex justify-between items-center">
+      <div className="bg-surfaceContainerHighest border border-outlineVariant rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-scaleUp">
+        <div className="px-6 py-5 border-b border-outlineVariant flex justify-between items-center">
           <h2 className="text-xl font-bold text-onSurface font-heading">Add Source</h2>
           <button
             onClick={onClose}
             className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-surface hover:text-white transition-colors"
           >
-            <span className="material-icons text-lg">close</span>
+            <span className="material-symbols-rounded text-lg">close</span>
           </button>
         </div>
 
@@ -64,7 +64,7 @@ export default function CreateSourceDialog({ isOpen, onClose, onSubmit, topics }
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-4 py-3 bg-surface border border-gray-800 focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors"
+              className="w-full px-4 py-3 bg-surface border border-outlineVariant focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors"
               placeholder="e.g., Chapter 4: Neural Networks"
               required
             />
@@ -77,7 +77,7 @@ export default function CreateSourceDialog({ isOpen, onClose, onSubmit, topics }
             <select
               value={type}
               onChange={(e) => setType(e.target.value as any)}
-              className="w-full px-4 py-3 bg-surface border border-gray-800 focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors"
+              className="w-full px-4 py-3 bg-surface border border-outlineVariant focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors"
             >
               <option value="url">Website / Article</option>
               <option value="videoUrl">Video</option>
@@ -94,7 +94,7 @@ export default function CreateSourceDialog({ isOpen, onClose, onSubmit, topics }
                 type="url"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                className="w-full px-4 py-3 bg-surface border border-gray-800 focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors"
+                className="w-full px-4 py-3 bg-surface border border-outlineVariant focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors"
                 placeholder="https://..."
               />
             </div>
@@ -110,7 +110,7 @@ export default function CreateSourceDialog({ isOpen, onClose, onSubmit, topics }
                 min="1"
                 value={totalPages}
                 onChange={(e) => setTotalPages(e.target.value)}
-                className="w-full px-4 py-3 bg-surface border border-gray-800 focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors"
+                className="w-full px-4 py-3 bg-surface border border-outlineVariant focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors"
                 placeholder="e.g., 345"
               />
             </div>
@@ -123,7 +123,7 @@ export default function CreateSourceDialog({ isOpen, onClose, onSubmit, topics }
             <select
               value={topicId}
               onChange={(e) => setTopicId(e.target.value)}
-              className="w-full px-4 py-3 bg-surface border border-gray-800 focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors"
+              className="w-full px-4 py-3 bg-surface border border-outlineVariant focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors"
             >
               <option value="">No specific topic</option>
               {topics.map(t => (
@@ -132,7 +132,7 @@ export default function CreateSourceDialog({ isOpen, onClose, onSubmit, topics }
             </select>
           </div>
 
-          <div className="flex gap-3 pt-4 border-t border-gray-800">
+          <div className="flex gap-3 pt-4 border-t border-outlineVariant">
             <button
               type="button"
               onClick={onClose}

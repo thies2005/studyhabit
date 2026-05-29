@@ -150,9 +150,9 @@ export default function Settings() {
           </div>
 
           {/* Appearance Card */}
-          <div className="bg-surfaceHigh rounded-2xl p-6 mb-6">
+          <div className="bg-surfaceContainerHigh rounded-3xl p-6 mb-6">
             <h3 className="text-lg font-medium text-onSurface font-heading mb-4 flex items-center gap-2">
-              <span className="material-icons text-primary">palette</span>
+              <span className="material-symbols-rounded text-primary">palette</span>
               Appearance
             </h3>
 
@@ -200,9 +200,9 @@ export default function Settings() {
           </div>
 
           {/* Pomodoro Card */}
-          <div className="bg-surfaceHigh rounded-2xl p-6 mb-6">
+          <div className="bg-surfaceContainerHigh rounded-3xl p-6 mb-6">
             <h3 className="text-lg font-medium text-onSurface font-heading mb-4 flex items-center gap-2">
-              <span className="material-icons text-primary">timer</span>
+              <span className="material-symbols-rounded text-primary">timer</span>
               Pomodoro Timer
             </h3>
 
@@ -334,9 +334,9 @@ export default function Settings() {
           </div>
 
           {/* Notifications Card */}
-          <div className="bg-surfaceHigh rounded-2xl p-6 mb-6">
+          <div className="bg-surfaceContainerHigh rounded-3xl p-6 mb-6">
             <h3 className="text-lg font-medium text-onSurface font-heading mb-4 flex items-center gap-2">
-              <span className="material-icons text-primary">notifications</span>
+              <span className="material-symbols-rounded text-primary">notifications</span>
               Notifications
             </h3>
 
@@ -360,9 +360,9 @@ export default function Settings() {
           </div>
 
           {/* Streak Card */}
-          <div className="bg-surfaceHigh rounded-2xl p-6 mb-6">
+          <div className="bg-surfaceContainerHigh rounded-3xl p-6 mb-6">
             <h3 className="text-lg font-medium text-onSurface font-heading mb-4 flex items-center gap-2">
-              <span className="material-icons text-tertiary">local_fire_department</span>
+              <span className="material-symbols-rounded text-tertiary">local_fire_department</span>
               Streak Settings
             </h3>
 
@@ -406,14 +406,14 @@ export default function Settings() {
           </div>
 
           {/* Data Management Card */}
-          <div className="bg-surfaceHigh rounded-2xl p-6 mb-6">
+          <div className="bg-surfaceContainerHigh rounded-3xl p-6 mb-6">
             <h3 className="text-lg font-medium text-onSurface font-heading mb-4 flex items-center gap-2">
-              <span className="material-icons text-primary">storage</span>
+              <span className="material-symbols-rounded text-primary">storage</span>
               Data Management
             </h3>
 
             <div className="w-full flex items-start gap-3 p-4 bg-primary/10 border border-primary/20 rounded-xl">
-              <span className="material-icons text-primary mt-0.5">info</span>
+              <span className="material-symbols-rounded text-primary mt-0.5">info</span>
               <div>
                 <h4 className="text-sm font-bold text-primary font-heading mb-1">Mobile App Required</h4>
                 <p className="text-sm text-primary/80 font-body">
@@ -424,16 +424,16 @@ export default function Settings() {
           </div>
 
           {/* Sync Account Management */}
-          <div className="bg-surfaceHigh rounded-2xl p-6">
+          <div className="bg-surfaceContainerHigh rounded-3xl p-6">
             <h3 className="text-lg font-medium text-onSurface font-heading mb-4 flex items-center gap-2">
-              <span className="material-icons text-primary">cloud_sync</span>
+              <span className="material-symbols-rounded text-primary">cloud_sync</span>
               Sync & Account
             </h3>
             
             <div className="p-4 bg-surface rounded-xl flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
-                  <span className="material-icons text-green-400">cloud_done</span>
+                  <span className="material-symbols-rounded text-green-400">cloud_done</span>
                 </div>
                 <div>
                   <p className="text-sm font-bold text-onSurface font-heading">Cloud Sync Active</p>
@@ -449,7 +449,7 @@ export default function Settings() {
               onClick={handleLogout}
               className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-500/20 text-red-400 rounded-xl text-sm font-medium hover:bg-red-500/30 transition-colors font-body"
             >
-              <span className="material-icons text-sm">logout</span>
+              <span className="material-symbols-rounded text-sm">logout</span>
               Disconnect & Sign Out
             </button>
           </div>

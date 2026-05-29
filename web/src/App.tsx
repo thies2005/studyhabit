@@ -42,7 +42,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
     if (this.state.hasError) {
       return (
         <div className="min-h-screen bg-background flex items-center justify-center p-4">
-          <div className="bg-surfaceHigh rounded-2xl p-8 max-w-md w-full shadow-lg">
+          <div className="bg-surfaceContainerHighest rounded-2xl p-8 max-w-md w-full shadow-lg">
             <div className="text-center mb-6">
               <span className="text-6xl mb-4 block">⚠️</span>
               <h1 className="text-2xl font-bold text-onSurface font-heading mb-2">

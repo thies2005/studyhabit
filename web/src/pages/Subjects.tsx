@@ -92,9 +92,9 @@ export default function Subjects() {
             </div>
             <button
               onClick={() => setIsCreateDialogOpen(true)}
-              className="flex items-center space-x-2 px-4 py-2 bg-primary hover:bg-primary-container text-white rounded-lg font-medium transition-colors"
+              className="flex items-center space-x-2 px-6 py-3 bg-primary hover:bg-primary-container text-background hover:text-primary-onContainer rounded-full font-heading font-bold transition-all duration-300 hover:scale-105 active:scale-95 shadow-lg shadow-primary/20"
             >
-              <span className="text-xl">add_circle</span>
+              <span className="material-symbols-rounded text-xl">add_circle</span>
               <span>New Subject</span>
             </button>
           </div>
@@ -114,7 +114,7 @@ export default function Subjects() {
                 <div
                   key={subject.id}
                   onClick={() => navigate(`/subjects/${subject.id}`)}
-                  className="bg-surfaceHigh rounded-2xl p-6 hover:brightness-110 transition-all cursor-pointer shadow-lg"
+                  className="bg-surfaceContainerHigh rounded-3xl p-6 hover:bg-surfaceContainerHighest hover:-translate-y-1 transition-all duration-300 cursor-pointer shadow-md hover:shadow-xl border border-transparent hover:border-outlineVariant"
                 >
                   {/* Subject Icon */}
                   <div className="flex items-center justify-between mb-4">
@@ -122,7 +122,7 @@ export default function Subjects() {
                       className="w-14 h-14 rounded-full flex items-center justify-center text-3xl text-white"
                       style={{ backgroundColor: formatColor(subject.colorValue) }}
                     >
-                      <span className="material-icons">{getSubjectIcon(index)}</span>
+                      <span className="material-symbols-rounded">{getSubjectIcon(index)}</span>
                     </div>
                     <span className="px-3 py-1 bg-primary/20 text-primary text-sm font-medium rounded-full">
                       Lvl {getLevel(subject.xpTotal)}
@@ -142,7 +142,7 @@ export default function Subjects() {
                   )}
 
                   {/* Stats */}
-                  <div className="space-y-2 pt-4 border-t border-gray-700">
+                  <div className="space-y-3 pt-4 border-t border-surfaceContainerHighest">
                     <div className="flex justify-between">
                       <span className="text-sm text-gray-400 font-body">Time Invested</span>
                       <span className="text-sm font-medium text-onSurface font-data">
@@ -162,10 +162,13 @@ export default function Subjects() {
           )}
 
           {/* Upcoming Milestone Card */}
-          <div className="bg-surfaceHigh rounded-2xl p-6 shadow-lg border-l-4 border-tertiary">
-            <div className="flex items-center space-x-2 mb-4">
-              <span className="text-tertiary text-2xl">emoji_events</span>
-              <span className="px-2 py-1 text-xs font-medium bg-tertiary/20 text-tertiary rounded">
+          <div className="bg-surfaceContainerHigh rounded-3xl p-8 shadow-xl border-l-8 border-tertiary relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity duration-500">
+              <span className="material-symbols-rounded text-8xl text-tertiary">emoji_events</span>
+            </div>
+            <div className="flex items-center space-x-3 mb-4 relative z-10">
+              <span className="material-symbols-rounded text-tertiary text-2xl">emoji_events</span>
+              <span className="px-3 py-1.5 text-xs font-bold bg-tertiary/10 text-tertiary rounded-full tracking-wider">
                 UPCOMING MILESTONE
               </span>
             </div>
@@ -173,10 +176,10 @@ export default function Subjects() {
             <p className="text-sm text-gray-400 font-body mb-4">
               Complete advanced exercises in Logic and Reasoning to earn this prestigious badge.
             </p>
-            <div className="w-full bg-gray-700 rounded-full h-2 mb-2">
-              <div className="bg-tertiary h-2 rounded-full transition-all" style={{ width: '95%' }}></div>
+            <div className="w-full bg-surfaceContainerHighest rounded-full h-3 mb-3 relative z-10">
+              <div className="bg-tertiary h-3 rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(253,184,124,0.5)]" style={{ width: '95%' }}></div>
             </div>
-            <p className="text-xs text-gray-400 font-body">
+            <p className="text-sm text-onSurfaceVariant font-body relative z-10">
               Finish today's module to earn the 'Precisionist' badge
             </p>
           </div>

@@ -9,16 +9,36 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Stitch Design System Colors
-        background: '#101415',
-        surface: '#1C2021',
-        surfaceHigh: '#323536',
+        // Material 3 Expressive Colors
+        background: '#0F1416',
+        surface: '#111416',
+        surfaceContainerLowest: '#070F11',
+        surfaceContainerLow: '#151C1F',
+        surfaceContainer: '#192023',
+        surfaceContainerHigh: '#232A2E',
+        surfaceContainerHighest: '#2E3539',
+        surfaceHigh: '#2E3539', // Keeping for backwards compatibility
         primary: {
           DEFAULT: 'var(--color-primary, #85D2E0)',
-          container: 'var(--color-primary-container, #006874)',
+          container: 'var(--color-primary-container, #004F58)',
+          onContainer: '#A1EFFF',
         },
-        tertiary: '#FDB87C',
-        onSurface: '#E0E3E3',
+        secondary: {
+          DEFAULT: '#B1CBD0',
+          container: '#334A4F',
+        },
+        tertiary: {
+          DEFAULT: '#FDB87C',
+          container: '#663D16',
+        },
+        error: {
+          DEFAULT: '#FFB4AB',
+          container: '#93000A',
+        },
+        onSurface: '#E1E3E4',
+        onSurfaceVariant: '#BFC8CA',
+        outline: '#899295',
+        outlineVariant: '#3F484B',
       },
       fontFamily: {
         heading: ['"Plus Jakarta Sans"', 'sans-serif'],
@@ -26,7 +46,9 @@ export default {
         data: ['"Space Grotesk"', 'monospace'],
       },
       borderRadius: {
-        '2xl': '1rem', // 16dp as per Stitch design
+        'xl': '1rem', // 16px
+        '2xl': '1.5rem', // 24px
+        '3xl': '2rem', // 32px for expressive cards
       },
     },
   },

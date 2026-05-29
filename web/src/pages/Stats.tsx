@@ -20,7 +20,7 @@ type TooltipRendererProps = any;
 const CustomTooltip = ({ active, payload, label }: TooltipRendererProps) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-surfaceHigh border border-gray-700 rounded-lg p-3 shadow-lg">
+      <div className="bg-surfaceContainerHigh border border-outlineVariant rounded-xl p-3 shadow-lg">
         <p className="text-sm font-medium text-onSurface font-heading mb-1">{label}</p>
         {payload.map((entry: any, index: number) => (
           <p key={index} className="text-sm text-gray-300 font-body" style={{ color: entry.color }}>
@@ -36,7 +36,7 @@ const CustomTooltip = ({ active, payload, label }: TooltipRendererProps) => {
 const WeeklyChartTooltip = ({ active, payload, label }: TooltipRendererProps) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-surfaceHigh border border-gray-700 rounded-lg p-3 shadow-lg">
+      <div className="bg-surfaceContainerHigh border border-outlineVariant rounded-xl p-3 shadow-lg">
         <p className="text-sm font-medium text-onSurface font-heading mb-1">{label}</p>
         <p className="text-sm text-primary font-body">
           {payload[0]?.payload?.minutes ?? 0} minutes
@@ -50,7 +50,7 @@ const WeeklyChartTooltip = ({ active, payload, label }: TooltipRendererProps) =>
 const XpChartTooltip = ({ active, payload, label }: TooltipRendererProps) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-surfaceHigh border border-gray-700 rounded-lg p-3 shadow-lg">
+      <div className="bg-surfaceContainerHigh border border-outlineVariant rounded-xl p-3 shadow-lg">
         <p className="text-sm font-medium text-onSurface font-heading mb-1">{label}</p>
         <p className="text-sm text-primary font-data">
           {(payload[0]?.value ?? 0).toLocaleString()} XP
@@ -182,12 +182,12 @@ export default function Stats() {
 
   const getHeatmapColor = (intensity: number) => {
     switch (intensity) {
-      case 0: return 'bg-[#1C2021]';
+      case 0: return 'bg-surfaceContainerLowest';
       case 1: return 'bg-primary/20';
       case 2: return 'bg-primary/40';
       case 3: return 'bg-primary/60';
       case 4: return 'bg-primary';
-      default: return 'bg-[#1C2021]';
+      default: return 'bg-surfaceContainerLowest';
     }
   };
 
@@ -195,7 +195,7 @@ export default function Stats() {
     return Array.from({ length: 5 }, (_, i) => (
       <span
         key={i}
-        className="material-icons text-sm"
+        className="material-symbols-rounded text-sm"
         style={{ color: i < rating ? '#FDB87C' : '#323536' }}
       >
         star
@@ -223,36 +223,36 @@ export default function Stats() {
             <>
               {/* Overview Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                <div className="bg-surfaceHigh rounded-2xl p-6">
+                <div className="bg-surfaceContainerHigh rounded-3xl p-6 shadow-md border border-transparent hover:border-outlineVariant transition-colors">
                   <div className="flex items-center justify-between mb-3">
-                    <span className="material-icons text-3xl text-primary">schedule</span>
+                    <span className="material-symbols-rounded text-3xl text-primary">schedule</span>
                     <span className="text-xs text-green-400 font-body">Active study time</span>
                   </div>
                   <p className="text-2xl font-bold text-onSurface font-data">{overview.totalHours.toFixed(1)}h</p>
                   <p className="text-sm text-gray-400 font-body">Total Study Hours</p>
                 </div>
 
-                <div className="bg-surfaceHigh rounded-2xl p-6">
+                <div className="bg-surfaceContainerHigh rounded-3xl p-6 shadow-md border border-transparent hover:border-outlineVariant transition-colors">
                   <div className="flex items-center justify-between mb-3">
-                    <span className="material-icons text-3xl text-primary">calendar_today</span>
+                    <span className="material-symbols-rounded text-3xl text-primary">calendar_today</span>
                     <span className="text-xs text-green-400 font-body">Past 7 days</span>
                   </div>
                   <p className="text-2xl font-bold text-onSurface font-data">{overview.weekHours.toFixed(1)}h</p>
                   <p className="text-sm text-gray-400 font-body">Weekly Average</p>
                 </div>
 
-                <div className="bg-surfaceHigh rounded-2xl p-6">
+                <div className="bg-surfaceContainerHigh rounded-3xl p-6 shadow-md border border-transparent hover:border-outlineVariant transition-colors">
                   <div className="flex items-center justify-between mb-3">
-                    <span className="material-icons text-3xl text-tertiary">local_fire_department</span>
+                    <span className="material-symbols-rounded text-3xl text-tertiary">local_fire_department</span>
                     <span className="text-xs text-gray-400 font-body">Daily commitment</span>
                   </div>
                   <p className="text-2xl font-bold text-onSurface font-data">{overview.currentStreak}d</p>
                   <p className="text-sm text-gray-400 font-body">Current Streak</p>
                 </div>
 
-                <div className="bg-surfaceHigh rounded-2xl p-6">
+                <div className="bg-surfaceContainerHigh rounded-3xl p-6 shadow-md border border-transparent hover:border-outlineVariant transition-colors">
                   <div className="flex items-center justify-between mb-3">
-                    <span className="material-icons text-3xl text-primary">emoji_events</span>
+                    <span className="material-symbols-rounded text-3xl text-primary">emoji_events</span>
                     <span className="text-xs text-gray-400 font-body">{overview.totalXp.toLocaleString()} XP total</span>
                   </div>
                   <p className="text-2xl font-bold text-onSurface font-data">{overview.currentLevel}</p>
@@ -262,7 +262,7 @@ export default function Stats() {
 
               {/* Weekly Activity Bar Chart */}
               {weeklyActivity.length > 0 && (
-                <div className="bg-surfaceHigh rounded-2xl p-6 mb-6">
+                <div className="bg-surfaceContainerHigh rounded-3xl p-6 mb-6 shadow-md">
                   <h3 className="text-lg font-medium text-onSurface font-heading mb-4">Weekly Activity</h3>
                   <ResponsiveContainer width="100%" height={300}>
                     <BarChart data={weeklyActivity}>
@@ -290,7 +290,7 @@ export default function Stats() {
 
               {/* Subject Distribution Pie Chart */}
               {subjectDistribution.length > 0 && (
-                <div className="bg-surfaceHigh rounded-2xl p-6 mb-6">
+                <div className="bg-surfaceContainerHigh rounded-3xl p-6 mb-6 shadow-md">
                   <h3 className="text-lg font-medium text-onSurface font-heading mb-4">Subject Distribution</h3>
                   <div className="flex flex-col md:flex-row items-center gap-6">
                     <div className="flex-1 w-full">
@@ -333,7 +333,7 @@ export default function Stats() {
 
               {/* XP Progress Line Chart */}
               {xpProgress.length > 0 && (
-                <div className="bg-surfaceHigh rounded-2xl p-6 mb-6">
+                <div className="bg-surfaceContainerHigh rounded-3xl p-6 mb-6 shadow-md">
                   <h3 className="text-lg font-medium text-onSurface font-heading mb-4">XP Progress</h3>
                   <ResponsiveContainer width="100%" height={300}>
                     <LineChart data={xpProgress}>
@@ -375,7 +375,7 @@ export default function Stats() {
 
               {/* Activity Heatmap */}
               {heatmap.length > 0 && (
-                <div className="bg-surfaceHigh rounded-2xl p-6 mb-6">
+                <div className="bg-surfaceContainerHigh rounded-3xl p-6 mb-6 shadow-md">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-medium text-onSurface font-heading">Activity Heatmap</h3>
                     <span className="text-xs text-gray-400 font-body">Last 12 weeks</span>
@@ -420,12 +420,12 @@ export default function Stats() {
 
               {/* Subject Breakdown Table */}
               {subjectBreakdown.length > 0 && (
-                <div className="bg-surfaceHigh rounded-2xl p-6">
+                <div className="bg-surfaceContainerHigh rounded-3xl p-6 shadow-md">
                   <h3 className="text-lg font-medium text-onSurface font-heading mb-4">Subject Breakdown</h3>
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead>
-                        <tr className="border-b border-gray-700">
+                        <tr className="border-b border-outlineVariant">
                           <th className="text-left py-3 px-2 text-sm font-medium text-gray-400 font-body">
                             Subject
                           </th>
@@ -447,7 +447,7 @@ export default function Stats() {
                         {subjectBreakdown
                           .sort((a, b) => b.hours - a.hours)
                           .map((subject) => (
-                            <tr key={subject.name} className="border-b border-gray-700/50 hover:bg-gray-700/20">
+                            <tr key={subject.name} className="border-b border-outlineVariant/50 hover:bg-gray-700/20">
                               <td className="py-3 px-2">
                                 <div className="flex items-center gap-2">
                                   <div

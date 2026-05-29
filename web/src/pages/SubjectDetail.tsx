@@ -104,21 +104,21 @@ export default function SubjectDetail() {
           <div className="space-y-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-medium text-onSurface font-heading flex items-center gap-2">
-                <span className="material-icons">filter_list</span>
+                <span className="material-symbols-rounded">filter_list</span>
                 Study Sessions
               </h3>
               <button
                 onClick={() => setIsSessionDialogOpen(true)}
                 className="text-xs flex items-center gap-1 bg-primary hover:bg-primary-container px-3 py-1.5 rounded-lg text-white font-medium transition-colors font-body"
               >
-                <span className="material-icons text-sm">add</span>
+                <span className="material-symbols-rounded text-sm">add</span>
                 Log Session
               </button>
             </div>
             {displaySessions.length === 0 ? (
               <div className="text-center py-8 text-gray-400 font-body">No study sessions logged yet.</div>
             ) : displaySessions.map((session) => (
-              <div key={session.id} className="bg-[#323536] rounded-xl p-4">
+              <div key={session.id} className="bg-surfaceContainerHigh rounded-3xl p-6 shadow-sm hover:shadow-md transition-shadow border border-transparent hover:border-outlineVariant">
                 <div className="text-xs text-primary font-body font-medium mb-2">
                   {session.date}
                 </div>
@@ -140,20 +140,20 @@ export default function SubjectDetail() {
                 </div>
                 <div className="flex items-center gap-4 text-sm text-gray-400 font-body">
                   <span className="flex items-center gap-1">
-                    <span className="material-icons text-base">schedule</span>
+                    <span className="material-symbols-rounded text-base">schedule</span>
                     {session.duration}
                   </span>
                   <span className="flex items-center gap-1">
-                    <span className="material-icons text-base">star</span>
+                    <span className="material-symbols-rounded text-base">star</span>
                     {session.confidence}/5
                   </span>
                   <span className="flex items-center gap-1 text-primary">
-                    <span className="material-icons text-base">bolt</span>
+                    <span className="material-symbols-rounded text-base">bolt</span>
                     +{session.xp} XP
                   </span>
                   {session.isLab && (
                     <span className="flex items-center gap-1 text-tertiary">
-                      <span className="material-icons text-base">biotech</span>
+                      <span className="material-symbols-rounded text-base">biotech</span>
                       Lab • Score: {session.score}
                     </span>
                   )}
@@ -168,7 +168,7 @@ export default function SubjectDetail() {
           <div className="space-y-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-medium text-onSurface font-heading flex items-center gap-2">
-                <span className="material-icons">folder_open</span>
+                <span className="material-symbols-rounded">folder_open</span>
                 Primary Sources
               </h3>
               <div className="flex items-center gap-4">
@@ -176,7 +176,7 @@ export default function SubjectDetail() {
                   onClick={() => setIsSourceDialogOpen(true)}
                   className="text-xs flex items-center gap-1 text-primary hover:text-primary/80 font-medium transition-colors font-body"
                 >
-                  <span className="material-icons text-sm">add</span>
+                  <span className="material-symbols-rounded text-sm">add</span>
                   Add Source
                 </button>
               </div>
@@ -184,13 +184,13 @@ export default function SubjectDetail() {
             {displaySources.length === 0 ? (
               <div className="text-center py-8 text-gray-400 font-body">No sources added yet.</div>
             ) : displaySources.map((source) => (
-              <div key={source.id} className="bg-[#323536] rounded-xl p-4 flex items-start gap-4">
+              <div key={source.id} className="bg-surfaceContainerHigh rounded-3xl p-6 flex items-start gap-4 shadow-sm hover:shadow-md transition-shadow border border-transparent hover:border-outlineVariant">
                 <div className={`flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center ${
                   source.type === 'pdf' ? 'bg-red-500/20' :
                   source.type === 'video' ? 'bg-purple-500/20' :
                   'bg-blue-500/20'
                 }`}>
-                  <span className={`material-icons text-2xl ${
+                  <span className={`material-symbols-rounded text-2xl ${
                     source.type === 'pdf' ? 'text-red-400' :
                     source.type === 'video' ? 'text-purple-400' :
                     'text-blue-400'
@@ -234,7 +234,7 @@ export default function SubjectDetail() {
           <div className="space-y-3">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-medium text-onSurface font-heading flex items-center gap-2">
-                <span className="material-icons">schema</span>
+                <span className="material-symbols-rounded">schema</span>
                 Topics
               </h3>
               <div className="flex items-center gap-4">
@@ -243,7 +243,7 @@ export default function SubjectDetail() {
                   onClick={() => setIsTopicDialogOpen(true)}
                   className="text-xs flex items-center gap-1 text-primary hover:text-primary/80 font-medium transition-colors font-body"
                 >
-                  <span className="material-icons text-sm">add</span>
+                  <span className="material-symbols-rounded text-sm">add</span>
                   Add Topic
                 </button>
               </div>
@@ -251,9 +251,9 @@ export default function SubjectDetail() {
             {displayTopics.length === 0 ? (
               <div className="text-center py-8 text-gray-400 font-body">No topics added yet.</div>
             ) : displayTopics.map((topic) => (
-              <div key={topic.id} className="bg-[#323536] rounded-xl overflow-hidden">
+              <div key={topic.id} className="bg-surfaceContainerHigh rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-shadow border border-transparent hover:border-outlineVariant">
                 <div
-                  className="p-4 cursor-pointer hover:bg-[#3A3E40] transition-colors"
+                  className="p-6 flex items-center justify-between cursor-pointer hover:bg-surfaceContainerHighest transition-colors"
                   onClick={() => toggleTopic(topic.id)}
                 >
                   <div className="flex items-center justify-between">
@@ -265,21 +265,26 @@ export default function SubjectDetail() {
                         {topic.taskCount} tasks
                       </p>
                     </div>
-                    <span className="material-icons text-gray-400">
+                  <span className="material-symbols-rounded text-onSurfaceVariant transition-transform duration-300">
                       {expandedTopics.has(topic.id) ? 'expand_less' : 'expand_more'}
                     </span>
                   </div>
                 </div>
                 {expandedTopics.has(topic.id) && topic.subtopics && (
-                  <div className="px-4 pb-4 border-t border-gray-700/50">
-                    {topic.subtopics.map((subtopic: string, idx: number) => (
+                  <div className="bg-surfaceContainer border-t border-surfaceContainerHighest">
+                    {topic.subtopics.map((sub: string, i: number) => (
                       <div
-                        key={idx}
-                        className="py-2 px-3 text-sm text-gray-300 font-body hover:bg-gray-700/50 rounded-lg"
+                        key={i}
+                        className="px-6 py-4 flex items-center gap-3 text-sm text-onSurfaceVariant font-body border-b border-surfaceContainerHighest last:border-0 hover:bg-surfaceContainerHigh transition-colors cursor-pointer"
                       >
-                        {subtopic}
+                        <span className="w-1.5 h-1.5 rounded-full bg-primary/50"></span>
+                        {sub}
                       </div>
                     ))}
+                    <button className="w-full p-4 text-sm text-primary hover:bg-primary/10 transition-colors font-medium font-body flex items-center justify-center gap-2">
+                      <span className="material-symbols-rounded text-sm">add</span>
+                      Add Subtopic
+                    </button>
                   </div>
                 )}
               </div>
@@ -298,7 +303,7 @@ export default function SubjectDetail() {
             to="/subjects"
             className="text-primary hover:underline mb-4 inline-block font-body flex items-center gap-2"
           >
-            <span className="material-icons text-xl">arrow_back</span>
+            <span className="material-symbols-rounded text-xl">arrow_back</span>
             Back to Subjects
           </Link>
 
@@ -306,7 +311,7 @@ export default function SubjectDetail() {
           <div className="mb-6">
             <div className="flex items-center gap-2 mb-3">
               <span className="px-3 py-1 bg-primary/20 text-primary text-xs font-medium rounded-full flex items-center gap-1 font-body">
-                <span className="material-icons text-sm">event</span>
+                <span className="material-symbols-rounded text-sm">event</span>
                 In Progress
               </span>
               <span className="text-sm text-gray-400 font-body">
@@ -322,7 +327,7 @@ export default function SubjectDetail() {
           </div>
 
           {/* Tab Buttons */}
-          <div className="flex gap-6 mb-6 border-b border-gray-700">
+          <div className="flex gap-6 mb-6 border-b border-outlineVariant">
             {(['timeline', 'sources', ...(displaySubject.hierarchyMode !== 'flat' ? ['topics'] : [])] as Tab[]).map((tab) => (
               <button
                 key={tab}
@@ -333,7 +338,7 @@ export default function SubjectDetail() {
                     : 'text-gray-400 border-transparent hover:text-gray-300'
                 }`}
               >
-                <span className="material-icons text-lg">
+                <span className="material-symbols-rounded text-lg">
                   {tab === 'timeline' ? 'event_note' :
                    tab === 'sources' ? 'folder_open' : 'schema'}
                 </span>
@@ -353,24 +358,24 @@ export default function SubjectDetail() {
             {/* Sidebar (1/3 width) */}
             <div className="space-y-4">
               {/* Stats Cards */}
-              <div className="bg-[#323536] rounded-xl p-4">
+              <div className="bg-surfaceContainerHigh rounded-3xl p-6">
                 <div className="flex items-center gap-4 mb-4">
                   <div className="flex-1">
                     <div className="text-sm text-gray-400 font-body mb-1">XP Level</div>
                     <div className="text-2xl font-bold text-onSurface font-data">{stats?.currentLevel || 1}</div>
                   </div>
                   <div className="w-12 h-12 rounded-full border-4 border-primary flex items-center justify-center">
-                    <span className="material-icons text-primary">emoji_events</span>
+                    <span className="material-symbols-rounded text-primary">emoji_events</span>
                   </div>
                 </div>
-                <div className="w-full bg-gray-700 rounded-full h-2">
+                <div className="w-full bg-surfaceContainerHighest rounded-full h-2">
                   <div className="bg-primary h-2 rounded-full" style={{ width: `${Math.min(((stats?.totalXp || 0) % 1000) / 10, 100)}%` }} />
                 </div>
               </div>
 
-              <div className="bg-[#323536] rounded-xl p-4 flex items-center gap-4">
+              <div className="bg-surfaceContainerHigh rounded-3xl p-6 flex items-center gap-4">
                 <div className="w-12 h-12 rounded-full bg-tertiary/20 flex items-center justify-center">
-                  <span className="material-icons text-tertiary text-2xl">local_fire_department</span>
+                  <span className="material-symbols-rounded text-tertiary text-2xl">local_fire_department</span>
                 </div>
                 <div>
                   <div className="text-sm text-gray-400 font-body mb-1">Current Streak</div>
@@ -379,7 +384,11 @@ export default function SubjectDetail() {
               </div>
 
               {/* Next Milestone Card */}
-              <div className="bg-[#323536] rounded-xl p-4">
+              <div className="bg-surfaceContainerHigh rounded-3xl p-6 shadow-md border-l-4 border-tertiary relative overflow-hidden group">
+              <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity duration-500">
+                <span className="material-symbols-rounded text-6xl text-tertiary">local_fire_department</span>
+              </div>
+              <div className="relative z-10">
                 <div className="flex items-center justify-between mb-2">
                   <h4 className="text-sm text-gray-400 font-body">Next Milestone</h4>
                   <button onClick={() => setIsMilestonesDialogOpen(true)} className="text-xs text-primary hover:underline">Manage</button>
@@ -402,6 +411,7 @@ export default function SubjectDetail() {
                   Plan Study Block
                 </button>
               </div>
+            </div>
             </div>
           </div>
         </div>

@@ -31,14 +31,14 @@ export default function CreateTopicDialog({ isOpen, onClose, onSubmit, currentTo
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
-      <div className="bg-surfaceHigh border border-gray-800 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-scaleUp">
-        <div className="px-6 py-5 border-b border-gray-800 flex justify-between items-center">
+      <div className="bg-surfaceContainerHighest border border-outlineVariant rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-scaleUp">
+        <div className="px-6 py-5 border-b border-outlineVariant flex justify-between items-center">
           <h2 className="text-xl font-bold text-onSurface font-heading">Create Topic</h2>
           <button
             onClick={onClose}
             className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-surface hover:text-white transition-colors"
           >
-            <span className="material-icons text-lg">close</span>
+            <span className="material-symbols-rounded text-lg">close</span>
           </button>
         </div>
 
@@ -51,14 +51,14 @@ export default function CreateTopicDialog({ isOpen, onClose, onSubmit, currentTo
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-4 py-3 bg-surface border border-gray-800 focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors"
+              className="w-full px-4 py-3 bg-surface border border-outlineVariant focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors"
               placeholder="e.g., Data Structures"
               autoFocus
               required
             />
           </div>
 
-          <div className="flex gap-3 pt-4 border-t border-gray-800">
+          <div className="flex gap-3 pt-4 border-t border-outlineVariant">
             <button
               type="button"
               onClick={onClose}

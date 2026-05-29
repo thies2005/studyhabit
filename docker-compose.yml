@@ -18,8 +18,8 @@ services:
   api:
     build: ./backend
     restart: unless-stopped
-    expose:
-      - "3001"
+    ports:
+      - "3001:3001"
     environment:
       DATABASE_URL: postgresql://${DB_USER:-studytracker}:${DB_PASSWORD}@db:5432/${DB_NAME:-studytracker}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
@@ -51,8 +51,8 @@ services:
       args:
         VITE_API_URL: ${API_URL:-http://localhost:3001}
     restart: unless-stopped
-    expose:
-      - "3000"
+    ports:
+      - "3000:3000"
     depends_on:
       api:
         condition: service_healthy

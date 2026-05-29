@@ -127,18 +127,18 @@ export default function CreateSessionDialog({ isOpen, onClose, subjects, onSubmi
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
-      <div className="bg-surfaceHigh border border-gray-800 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl animate-scaleUp">
+      <div className="bg-surfaceContainerHighest border border-outlineVariant rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl animate-scaleUp">
         {/* Header */}
-        <div className="px-6 py-5 border-b border-gray-800 flex justify-between items-center">
+        <div className="px-6 py-5 border-b border-outlineVariant flex justify-between items-center">
           <h2 className="text-xl font-bold text-onSurface font-heading flex items-center gap-2">
-            <span className="material-icons text-primary">history_edu</span>
+            <span className="material-symbols-rounded text-primary">history_edu</span>
             Log Study Session Manually
           </h2>
           <button
             onClick={onClose}
             className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-surface hover:text-white transition-colors"
           >
-            <span className="material-icons text-lg">close</span>
+            <span className="material-symbols-rounded text-lg">close</span>
           </button>
         </div>
 
@@ -159,7 +159,7 @@ export default function CreateSessionDialog({ isOpen, onClose, subjects, onSubmi
               required
               value={selectedSubjectId}
               onChange={(e) => setSelectedSubjectId(e.target.value)}
-              className="w-full px-4 py-3 bg-surface border border-gray-800 focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors"
+              className="w-full px-4 py-3 bg-surface border border-outlineVariant focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors"
             >
               <option value="" disabled>Select a subject...</option>
               {subjects.map((s) => (
@@ -181,7 +181,7 @@ export default function CreateSessionDialog({ isOpen, onClose, subjects, onSubmi
                 <select
                   value={selectedTopicId}
                   onChange={(e) => setSelectedTopicId(e.target.value)}
-                  className="w-full px-4 py-3 bg-surface border border-gray-800 focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors"
+                  className="w-full px-4 py-3 bg-surface border border-outlineVariant focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors"
                 >
                   <option value="">None</option>
                   {topics.map((t) => (
@@ -202,7 +202,7 @@ export default function CreateSessionDialog({ isOpen, onClose, subjects, onSubmi
                     value={selectedChapterId}
                     onChange={(e) => setSelectedChapterId(e.target.value)}
                     disabled={!selectedTopicId || availableChapters.length === 0}
-                    className="w-full px-4 py-3 bg-surface border border-gray-800 focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors disabled:opacity-50"
+                    className="w-full px-4 py-3 bg-surface border border-outlineVariant focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors disabled:opacity-50"
                   >
                     <option value="">None</option>
                     {availableChapters.map((c) => (
@@ -227,7 +227,7 @@ export default function CreateSessionDialog({ isOpen, onClose, subjects, onSubmi
                 required
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="w-full px-4 py-3 bg-surface border border-gray-800 focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors"
+                className="w-full px-4 py-3 bg-surface border border-outlineVariant focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors"
               />
             </div>
             <div>
@@ -239,7 +239,7 @@ export default function CreateSessionDialog({ isOpen, onClose, subjects, onSubmi
                 required
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
-                className="w-full px-4 py-3 bg-surface border border-gray-800 focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors"
+                className="w-full px-4 py-3 bg-surface border border-outlineVariant focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors"
               />
             </div>
           </div>
@@ -256,7 +256,7 @@ export default function CreateSessionDialog({ isOpen, onClose, subjects, onSubmi
                 max="480"
                 value={plannedDuration}
                 onChange={(e) => setPlannedDuration(Number(e.target.value))}
-                className="w-full px-4 py-3 bg-surface border border-gray-800 focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors"
+                className="w-full px-4 py-3 bg-surface border border-outlineVariant focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors"
               />
             </div>
             <div>
@@ -269,7 +269,7 @@ export default function CreateSessionDialog({ isOpen, onClose, subjects, onSubmi
                 max="480"
                 value={actualDuration}
                 onChange={(e) => setActualDuration(Number(e.target.value))}
-                className="w-full px-4 py-3 bg-surface border border-gray-800 focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors"
+                className="w-full px-4 py-3 bg-surface border border-outlineVariant focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors"
               />
             </div>
           </div>
@@ -287,7 +287,7 @@ export default function CreateSessionDialog({ isOpen, onClose, subjects, onSubmi
                   onClick={() => setConfidence(star === confidence ? null : star)}
                   className="focus:outline-none transition-transform hover:scale-125"
                 >
-                  <span className={`material-icons text-2xl ${
+                  <span className={`material-symbols-rounded text-2xl ${
                     confidence && star <= confidence ? 'text-yellow-500' : 'text-gray-600'
                   }`}>
                     star
@@ -310,12 +310,12 @@ export default function CreateSessionDialog({ isOpen, onClose, subjects, onSubmi
               onChange={(e) => setNotes(e.target.value)}
               placeholder="What did you study? Write any takeaways, concepts, or reminders..."
               rows={3}
-              className="w-full px-4 py-3 bg-surface border border-gray-800 focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors placeholder:text-gray-600 resize-none"
+              className="w-full px-4 py-3 bg-surface border border-outlineVariant focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors placeholder:text-gray-600 resize-none"
             />
           </div>
 
           {/* Footer Actions */}
-          <div className="flex gap-3 pt-4 border-t border-gray-800">
+          <div className="flex gap-3 pt-4 border-t border-outlineVariant">
             <button
               type="button"
               onClick={onClose}

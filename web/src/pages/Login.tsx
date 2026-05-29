@@ -48,7 +48,7 @@ export default function Login() {
                 id="email"
                 type="email"
                 required
-                className="appearance-none relative block w-full px-4 py-3 bg-surfaceHigh border border-gray-700 rounded-lg placeholder-gray-500 text-onSurface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-body"
+                className="appearance-none relative block w-full px-4 py-3 bg-surfaceContainerHighest border border-outlineVariant rounded-lg placeholder-gray-500 text-onSurface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-body"
                 placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -62,7 +62,7 @@ export default function Login() {
                 id="password"
                 type="password"
                 required
-                className="appearance-none relative block w-full px-4 py-3 bg-surfaceHigh border border-gray-700 rounded-lg placeholder-gray-500 text-onSurface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-body"
+                className="appearance-none relative block w-full px-4 py-3 bg-surfaceContainerHighest border border-outlineVariant rounded-lg placeholder-gray-500 text-onSurface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-body"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

@@ -43,21 +43,21 @@ export default function ProjectSwitcher() {
     <div className="relative z-50" ref={containerRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-2 bg-surface hover:bg-surfaceHigh rounded-lg transition-colors border border-gray-800"
+        className="flex items-center gap-3 px-4 py-2.5 bg-surfaceContainer hover:bg-surfaceContainerHigh rounded-full transition-all duration-300 border border-outlineVariant shadow-sm"
       >
-        <span className="material-icons text-primary text-sm">
+        <span className="material-symbols-rounded text-primary text-xl">
           {currentProject ? 'work' : 'error_outline'}
         </span>
         <span className="font-heading font-medium text-sm truncate max-w-[120px]">
           {currentProject ? currentProject.name : 'No Project'}
         </span>
-        <span className="material-icons text-gray-400 text-sm">
+        <span className="material-symbols-rounded text-onSurfaceVariant text-xl">
           expand_more
         </span>
       </button>
 
       {isOpen && (
-        <div className="absolute top-full left-0 mt-2 w-64 bg-surfaceHigh border border-gray-800 rounded-xl shadow-xl overflow-hidden">
+        <div className="absolute top-full left-0 mt-3 w-64 bg-surfaceContainerHigh border border-outlineVariant rounded-3xl shadow-xl overflow-hidden glass">
           <div className="p-2 max-h-60 overflow-y-auto space-y-1">
             {projects.map(project => (
               <button
@@ -80,13 +80,13 @@ export default function ProjectSwitcher() {
                   {project.name}
                 </span>
                 {project.id === currentProjectId && (
-                  <span className="material-icons text-sm">check</span>
+                  <span className="material-symbols-rounded text-xl">check</span>
                 )}
               </button>
             ))}
           </div>
           
-          <div className="p-2 border-t border-gray-800 bg-surface/50">
+          <div className="p-3 border-t border-outlineVariant bg-surfaceContainerLowest">
             {isCreating ? (
               <form onSubmit={handleCreateProject} className="flex gap-2">
                 <input
@@ -95,23 +95,23 @@ export default function ProjectSwitcher() {
                   value={newProjectName}
                   onChange={e => setNewProjectName(e.target.value)}
                   placeholder="Project name..."
-                  className="flex-1 bg-background border border-gray-700 rounded px-2 py-1 text-sm font-body focus:border-primary outline-none"
+                  className="flex-1 bg-background border border-outlineVariant rounded px-2 py-1 text-sm font-body focus:border-primary outline-none"
                 />
                 <button
                   type="submit"
                   disabled={!newProjectName.trim()}
                   className="text-primary disabled:opacity-50 hover:bg-primary/10 p-1 rounded"
                 >
-                  <span className="material-icons text-sm">check</span>
+                  <span className="material-symbols-rounded text-xl">check</span>
                 </button>
               </form>
             ) : (
               <button
                 onClick={() => setIsCreating(true)}
-                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-400 hover:text-white hover:bg-surface rounded-lg transition-colors"
+                className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-onSurfaceVariant hover:text-onSurface hover:bg-surfaceContainer rounded-xl transition-colors"
               >
-                <span className="material-icons text-sm">add</span>
-                <span className="font-body font-medium">New Project</span>
+                <span className="material-symbols-rounded text-xl">add</span>
+                <span className="font-heading font-medium">New Project</span>
               </button>
             )}
           </div>

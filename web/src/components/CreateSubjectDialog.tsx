@@ -79,18 +79,18 @@ export default function CreateSubjectDialog({ isOpen, onClose, onSubmit }: Creat
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
-      <div className="bg-surfaceHigh border border-gray-800 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl animate-scaleUp">
+      <div className="bg-surfaceContainerHighest border border-outlineVariant rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl animate-scaleUp">
         {/* Header */}
-        <div className="px-6 py-5 border-b border-gray-800 flex justify-between items-center">
+        <div className="px-6 py-5 border-b border-outlineVariant flex justify-between items-center">
           <h2 className="text-xl font-bold text-onSurface font-heading flex items-center gap-2">
-            <span className="material-icons text-primary">book</span>
+            <span className="material-symbols-rounded text-primary">book</span>
             Create New Subject
           </h2>
           <button
             onClick={onClose}
             className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-surface hover:text-white transition-colors"
           >
-            <span className="material-icons text-lg">close</span>
+            <span className="material-symbols-rounded text-lg">close</span>
           </button>
         </div>
 
@@ -113,7 +113,7 @@ export default function CreateSubjectDialog({ isOpen, onClose, onSubmit }: Creat
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Organic Chemistry, Algorithms & Data Structures"
-              className="w-full px-4 py-3 bg-surface border border-gray-800 focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors placeholder:text-gray-600"
+              className="w-full px-4 py-3 bg-surface border border-outlineVariant focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors placeholder:text-gray-600"
             />
           </div>
 
@@ -127,7 +127,7 @@ export default function CreateSubjectDialog({ isOpen, onClose, onSubmit }: Creat
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Provide a brief description of what this subject covers..."
               rows={3}
-              className="w-full px-4 py-3 bg-surface border border-gray-800 focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors placeholder:text-gray-600 resize-none"
+              className="w-full px-4 py-3 bg-surface border border-outlineVariant focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors placeholder:text-gray-600 resize-none"
             />
           </div>
 
@@ -149,7 +149,7 @@ export default function CreateSubjectDialog({ isOpen, onClose, onSubmit }: Creat
                   title={color}
                 >
                   {selectedColor === color && (
-                    <span className="material-icons text-white text-base">check</span>
+                    <span className="material-symbols-rounded text-white text-base">check</span>
                   )}
                 </button>
               ))}
@@ -174,7 +174,7 @@ export default function CreateSubjectDialog({ isOpen, onClose, onSubmit }: Creat
                   className={`p-3 border rounded-xl flex flex-col text-left transition-all ${
                     hierarchyMode === mode.id
                       ? 'bg-primary/10 border-primary text-primary'
-                      : 'bg-surface border-gray-800 hover:border-gray-700 text-gray-400'
+                      : 'bg-surface border-outlineVariant hover:border-outlineVariant text-gray-400'
                   }`}
                 >
                   <span className="font-bold text-sm font-heading">{mode.label}</span>
@@ -225,7 +225,7 @@ export default function CreateSubjectDialog({ isOpen, onClose, onSubmit }: Creat
           </div>
 
           {/* Footer Actions */}
-          <div className="flex gap-3 pt-4 border-t border-gray-800">
+          <div className="flex gap-3 pt-4 border-t border-outlineVariant">
             <button
               type="button"
               onClick={onClose}

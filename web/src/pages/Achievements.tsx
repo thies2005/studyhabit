@@ -178,7 +178,7 @@ export default function Achievements() {
           ) : (
             <>
               {/* Level Card */}
-              <div className="bg-surfaceHigh rounded-2xl p-6 mb-8">
+              <div className="bg-surfaceContainerHigh rounded-3xl p-8 mb-8 shadow-md">
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <div className="flex items-center gap-3 mb-2">
@@ -210,9 +210,9 @@ export default function Achievements() {
 
               {/* Achievement Stats */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-                <div className="bg-surfaceHigh rounded-xl p-4 flex items-center gap-4">
+                <div className="bg-surfaceContainerHigh rounded-3xl p-6 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow">
                   <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
-                    <span className="material-icons text-primary text-2xl">emoji_events</span>
+                    <span className="material-symbols-rounded text-primary text-2xl">emoji_events</span>
                   </div>
                   <div>
                     <p className="text-2xl font-bold text-onSurface font-data">
@@ -222,9 +222,9 @@ export default function Achievements() {
                   </div>
                 </div>
 
-                <div className="bg-surfaceHigh rounded-xl p-4 flex items-center gap-4">
+                <div className="bg-surfaceContainerHigh rounded-3xl p-6 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow">
                   <div className="w-12 h-12 rounded-full bg-gray-700 flex items-center justify-center">
-                    <span className="material-icons text-gray-400 text-2xl">lock</span>
+                    <span className="material-symbols-rounded text-gray-400 text-2xl">lock</span>
                   </div>
                   <div>
                     <p className="text-2xl font-bold text-onSurface font-data">
@@ -234,9 +234,9 @@ export default function Achievements() {
                   </div>
                 </div>
 
-                <div className="bg-surfaceHigh rounded-xl p-4 flex items-center gap-4">
+                <div className="bg-surfaceContainerHigh rounded-3xl p-6 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow">
                   <div className="w-12 h-12 rounded-full bg-tertiary/20 flex items-center justify-center">
-                    <span className="material-icons text-tertiary text-2xl">bolt</span>
+                    <span className="material-symbols-rounded text-tertiary text-2xl">bolt</span>
                   </div>
                   <div>
                     <p className="text-2xl font-bold text-onSurface font-data">
@@ -249,9 +249,9 @@ export default function Achievements() {
 
               {/* Achievements Grid */}
               {achievements.length === 0 ? (
-                <div className="bg-surfaceHigh rounded-2xl p-12 text-center">
+                <div className="bg-surfaceContainerHigh rounded-3xl p-12 text-center shadow-md">
                   <div className="w-16 h-16 bg-surface/50 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <span className="material-icons text-gray-500 text-3xl">emoji_events</span>
+                    <span className="material-symbols-rounded text-gray-500 text-3xl">emoji_events</span>
                   </div>
                   <h3 className="text-xl font-bold text-onSurface font-heading mb-2">No achievements yet</h3>
                   <p className="text-gray-400 font-body">
@@ -270,8 +270,8 @@ export default function Achievements() {
                   return (
                     <div
                       key={achievement.id}
-                      className={`bg-surfaceHigh rounded-2xl p-6 transition-all hover:brightness-110 cursor-pointer ${
-                        isUnlocked ? '' : 'grayscale opacity-70'
+                      className={`bg-surfaceContainerHigh rounded-3xl p-6 transition-all hover:-translate-y-1 hover:shadow-xl cursor-pointer border border-transparent hover:border-outlineVariant ${
+                        isUnlocked ? 'shadow-md' : 'grayscale opacity-70 shadow-sm'
                       }`}
                       onClick={() => setSelectedAchievement(achievement)}
                     >
@@ -279,11 +279,11 @@ export default function Achievements() {
                         <div
                           className="w-16 h-16 rounded-2xl flex items-center justify-center"
                           style={{
-                            backgroundColor: isUnlocked ? `${color}20` : '#323536',
+                            backgroundColor: isUnlocked ? `${color}20` : 'rgba(46, 53, 57, 0.5)',
                           }}
                         >
                           <span
-                            className="material-icons text-4xl"
+                            className="material-symbols-rounded text-4xl"
                             style={{
                               color: isUnlocked ? color : '#6B7280',
                             }}
@@ -308,7 +308,7 @@ export default function Achievements() {
 
                       {isUnlocked ? (
                         <p className="text-xs text-gray-500 font-body flex items-center gap-1">
-                          <span className="material-icons text-sm">event</span>
+                          <span className="material-symbols-rounded text-sm">event</span>
                           {new Date(achievement.unlockedAt!).toLocaleDateString()}
                         </p>
                       ) : (
@@ -341,7 +341,7 @@ export default function Achievements() {
           onClick={() => setSelectedAchievement(null)}
         >
           <div
-            className="bg-surfaceHigh rounded-2xl p-8 max-w-md w-full"
+            className="bg-surfaceContainerHighest rounded-3xl p-8 max-w-md w-full shadow-2xl glass"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between mb-6">
@@ -351,11 +351,11 @@ export default function Achievements() {
                   style={{
                     backgroundColor: selectedAchievement.unlockedAt
                       ? `${achievementColors[selectedAchievement.key] || '#85D2E0'}20`
-                      : '#323536',
+                      : 'rgba(46, 53, 57, 0.5)',
                   }}
                 >
                   <span
-                    className="material-icons text-5xl"
+                    className="material-symbols-rounded text-5xl"
                     style={{
                       color: selectedAchievement.unlockedAt
                         ? achievementColors[selectedAchievement.key] || '#85D2E0'
@@ -380,7 +380,7 @@ export default function Achievements() {
                 onClick={() => setSelectedAchievement(null)}
                 className="text-gray-400 hover:text-gray-200"
               >
-                <span className="material-icons">close</span>
+                <span className="material-symbols-rounded">close</span>
               </button>
             </div>
 
@@ -407,7 +407,7 @@ export default function Achievements() {
 
             {selectedAchievement.unlockedAt && (
               <div className="flex items-center gap-2 text-sm text-gray-400 font-body">
-                <span className="material-icons">event</span>
+                <span className="material-symbols-rounded">event</span>
                 Unlocked on {new Date(selectedAchievement.unlockedAt!).toLocaleDateString()}
               </div>
             )}
