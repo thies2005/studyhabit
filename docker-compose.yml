@@ -19,7 +19,7 @@ services:
     build: ./backend
     restart: unless-stopped
     ports:
-      - "${API_PORT:-3001}:3001"
+      - "3001:3001"
     environment:
       DATABASE_URL: postgresql://${DB_USER:-studytracker}:${DB_PASSWORD}@db:5432/${DB_NAME:-studytracker}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
@@ -52,7 +52,7 @@ services:
         VITE_API_URL: ${API_URL:-http://localhost:3001}
     restart: unless-stopped
     ports:
-      - "${WEB_PORT:-3000}:3000"
+      - "3000:3000"
     depends_on:
       api:
         condition: service_healthy
