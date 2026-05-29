@@ -7,6 +7,8 @@ FROM node:22-alpine AS build
 WORKDIR /app
 COPY . .
 COPY --from=deps /app/node_modules ./node_modules
+# Provide a mock DATABASE_URL so Prisma can generate the client during build time
+ENV DATABASE_URL="postgresql://mock:mock@localhost:5432/mock"
 RUN npx prisma generate && npm run build
 
 FROM node:22-alpine AS production-deps
