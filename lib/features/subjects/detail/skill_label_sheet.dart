@@ -7,6 +7,7 @@ import '../../../core/database/app_database.dart';
 import '../../../core/models/enums.dart';
 import '../../../core/providers/database_provider.dart';
 import '../../../core/services/xp_service.dart';
+import '../../../core/services/sync_service.dart';
 import '../../../core/services/app_logger.dart';
 
 class SkillLabelSheet extends ConsumerStatefulWidget {
@@ -186,6 +187,8 @@ class _SkillLabelSheetState extends ConsumerState<SkillLabelSheet> {
         AppLogger.e('SkillLabelSheet', 'Error awarding skill advance XP', e);
       }
     }
+
+    ref.read(syncEngineProvider.notifier).fullSync();
 
     if (mounted) {
       Navigator.of(context).pop();

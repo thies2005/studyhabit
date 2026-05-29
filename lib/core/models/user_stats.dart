@@ -13,6 +13,7 @@ abstract class UserStats with _$UserStats {
     DateTime? lastStudyDate,
     required int totalStudyMinutes,
     required int freezeTokens,
+    DateTime? updatedAt,
   }) = _UserStats;
 
   factory UserStats.fromJson(Map<String, dynamic> json) =>

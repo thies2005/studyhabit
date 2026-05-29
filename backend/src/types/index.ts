@@ -32,6 +32,11 @@ export interface SyncProject {
   createdAt: string | Date;
   lastOpenedAt: string | Date;
   isArchived: boolean;
+  defaultWorkDuration: number;
+  defaultBreakDuration: number;
+  defaultLongBreakDuration: number;
+  defaultLongBreakEvery: number;
+  studyReminderMinutes: number;
   updatedAt: string | Date;
 }
 
@@ -44,6 +49,9 @@ export interface SyncSubject {
   hierarchyMode: 'flat' | 'twoLevel' | 'threeLevel';
   defaultDurationMinutes: number;
   defaultBreakMinutes: number;
+  completenessMode: 'none' | 'hoursGoal' | 'milestones' | 'weeklyHoursGoal';
+  targetHours: number | null;
+  targetWeeklyHours: number | null;
   xpTotal: number;
   createdAt: string | Date;
   updatedAt: string | Date;
@@ -80,6 +88,10 @@ export interface SyncSession {
   confidenceRating: number | null;
   notes: string | null;
   xpEarned: number;
+  sourceId: string | null;
+  startPage: number | null;
+  endPage: number | null;
+  isFreeTimer: boolean;
   createdAt: string | Date;
   updatedAt: string | Date;
 }
@@ -143,6 +155,18 @@ export interface SyncPushPayload {
   skillLabels?: SyncSkillLabel[];
   achievements?: SyncAchievement[];
   userStats?: SyncUserStats;
+  subjectMilestones?: SyncSubjectMilestone[];
+}
+
+export interface SyncSubjectMilestone {
+  id: string;
+  subjectId: string;
+  title: string;
+  isCompleted: boolean;
+  sortOrder: number;
+  completedAt: string | Date | null;
+  createdAt: string | Date;
+  updatedAt: string | Date;
 }
 
 export interface SyncPullResponse {
@@ -156,6 +180,7 @@ export interface SyncPullResponse {
   skillLabels: SyncSkillLabel[];
   achievements: SyncAchievement[];
   userStats: SyncUserStats | null;
+  subjectMilestones: SyncSubjectMilestone[];
 }
 
 export interface ApiResponse<T> {

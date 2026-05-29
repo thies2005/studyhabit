@@ -14,17 +14,12 @@ const apiClient = axios.create({
   },
 });
 
-// Store access token in memory (not localStorage) for security
-let accessToken: string | null = null;
-
-// Token refresh mutex - prevents concurrent refresh requests
-let refreshPromise: Promise<any> | null = null;
-
 // Request interceptor to add auth token
 apiClient.interceptors.request.use(
   (config) => {
-    if (accessToken) {
-      config.headers.Authorization = `Bearer ${accessToken}`;
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
@@ -32,6 +27,9 @@ apiClient.interceptors.request.use(
     return Promise.reject(error);
   }
 );
+
+// Token refresh mutex - prevents concurrent refresh requests
+let refreshPromise: Promise<any> | null = null;
 
 // Response interceptor to handle token refresh
 apiClient.interceptors.response.use(
@@ -52,12 +50,12 @@ apiClient.interceptors.response.use(
             });
 
             const { accessToken: newAccessToken, refreshToken: newRefreshToken } = response.data.data;
-            accessToken = newAccessToken;
+            localStorage.setItem('access_token', newAccessToken);
             localStorage.setItem('refresh_token', newRefreshToken);
 
             return newAccessToken;
           } catch (refreshError) {
-            accessToken = null;
+            localStorage.removeItem('access_token');
             localStorage.removeItem('refresh_token');
             window.location.href = '/login';
             throw refreshError;

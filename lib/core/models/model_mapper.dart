@@ -26,6 +26,7 @@ domain.Project mapProject(ProjectRow row) {
     defaultLongBreakDuration: row.defaultLongBreakDuration,
     defaultLongBreakEvery: row.defaultLongBreakEvery,
     studyReminderMinutes: row.studyReminderMinutes,
+    updatedAt: row.updatedAt,
   );
 }
 
@@ -44,6 +45,7 @@ domain.Subject mapSubject(SubjectRow row) {
     completenessMode: row.completenessMode,
     targetHours: row.targetHours,
     targetWeeklyHours: row.targetWeeklyHours,
+    updatedAt: row.updatedAt,
   );
 }
 
@@ -53,6 +55,7 @@ domain.Topic mapTopic(TopicRow row) {
     subjectId: row.subjectId,
     name: row.name,
     order: row.order,
+    updatedAt: row.updatedAt,
   );
 }
 
@@ -62,6 +65,7 @@ domain.Chapter mapChapter(ChapterRow row) {
     topicId: row.topicId,
     name: row.name,
     order: row.order,
+    updatedAt: row.updatedAt,
   );
 }
 
@@ -83,6 +87,7 @@ domain.StudySession mapStudySession(StudySessionRow row) {
     startPage: row.startPage,
     endPage: row.endPage,
     isFreeTimer: row.isFreeTimer,
+    updatedAt: row.updatedAt,
   );
 }
 
@@ -112,6 +117,7 @@ domain.Source mapSource(SourceRow row) {
     progressPercent: row.progressPercent,
     notes: row.notes,
     addedAt: row.addedAt,
+    updatedAt: row.updatedAt,
   );
 }
 
@@ -120,6 +126,7 @@ domain.Achievement mapAchievement(AchievementRow row) {
     key: row.key,
     unlockedAt: row.unlockedAt,
     progress: row.progress,
+    updatedAt: row.updatedAt,
   );
 }
 
@@ -133,6 +140,7 @@ domain.UserStats mapUserStats(UserStatsRow? row) {
       lastStudyDate: null,
       totalStudyMinutes: 0,
       freezeTokens: 0,
+      updatedAt: null,
     );
   }
   return domain.UserStats(
@@ -143,6 +151,7 @@ domain.UserStats mapUserStats(UserStatsRow? row) {
     lastStudyDate: row.lastStudyDate,
     totalStudyMinutes: row.totalStudyMinutes,
     freezeTokens: row.freezeTokens,
+    updatedAt: row.updatedAt,
   );
 }
 
@@ -156,6 +165,7 @@ UserStatsTableCompanion toUserStatsCompanion(domain.UserStats stats) {
     lastStudyDate: Value(stats.lastStudyDate),
     totalStudyMinutes: Value(stats.totalStudyMinutes),
     freezeTokens: Value(stats.freezeTokens),
+    updatedAt: stats.updatedAt == null ? const Value.absent() : Value(stats.updatedAt!),
   );
 }
 
@@ -167,5 +177,6 @@ domain.SubjectMilestone mapSubjectMilestone(SubjectMilestoneRow row) {
     isCompleted: row.isCompleted,
     sortOrder: row.sortOrder,
     completedAt: row.completedAt,
+    updatedAt: row.updatedAt,
   );
 }

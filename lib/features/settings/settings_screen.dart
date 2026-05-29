@@ -16,6 +16,7 @@ import '../../core/providers/user_stats_provider.dart';
 import '../../core/services/export_service.dart';
 import '../../core/services/import_service.dart';
 import '../../core/theme/app_theme.dart';
+import 'auth/account_card.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -658,7 +659,7 @@ class _SettingsContent extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 24),
-        _ComingSoonCard(colorScheme: colorScheme),
+        const AccountCard(),
         const SizedBox(height: 20),
       ],
     );
@@ -1220,28 +1221,6 @@ class _DeleteConfirmationDialogState extends State<_DeleteConfirmationDialog> {
   }
 }
 
-class _ComingSoonCard extends StatelessWidget {
-  const _ComingSoonCard({required this.colorScheme});
-
-  final ColorScheme colorScheme;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
-      child: ListTile(
-        enabled: false,
-        leading: const Icon(Icons.cloud_sync_outlined),
-        title: const Text('Connect to Server'),
-        subtitle: const Text('Sync across devices — Phase 7'),
-        trailing: Chip(
-          label: const Text('Coming Soon'),
-          backgroundColor: colorScheme.secondaryContainer,
-        ),
-      ),
-    );
-  }
-}
 
 class _SeedColorDot extends StatelessWidget {
   const _SeedColorDot({

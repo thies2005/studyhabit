@@ -9,6 +9,9 @@ import 'core/providers/theme_provider.dart';
 import 'core/services/app_logger.dart';
 import 'core/services/notification_service.dart';
 import 'core/services/timer_persistence_service.dart';
+import 'core/services/auth_service.dart';
+import 'core/services/sync_service.dart';
+import 'core/services/sync_timer.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -65,6 +68,23 @@ void main() async {
     } catch (e) {
       AppLogger.e('App', 'Failed to cancel daily reminder', e);
     }
+  }
+
+  // Restore session on startup
+  try {
+    await container.read(authProvider.notifier).restoreSession();
+    AppLogger.i('App', 'Session restoration completed.');
+  } catch (e) {
+    AppLogger.e('App', 'Session restoration failed', e);
+  }
+
+  // Start periodic sync timer and trigger initial sync
+  try {
+    container.read(syncTimerProvider.notifier).start();
+    // Trigger first full sync in background asynchronously
+    container.read(syncEngineProvider.notifier).fullSync();
+  } catch (e) {
+    AppLogger.e('App', 'Failed to initialize synchronization services', e);
   }
 
   runApp(UncontrolledProviderScope(

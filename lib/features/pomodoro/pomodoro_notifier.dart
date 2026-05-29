@@ -23,6 +23,7 @@ import '../../core/services/app_logger.dart';
 import 'pomodoro_state.dart';
 import 'pomodoro_task_handler.dart';
 import '../../core/services/timer_persistence_service.dart';
+import '../../core/services/sync_service.dart';
 
 
 part 'pomodoro_notifier.g.dart';
@@ -344,6 +345,7 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
           sourceId: Value(config.sourceId),
         ),
       );
+      ref.read(syncEngineProvider.notifier).fullSync();
     } catch (e) {
       AppLogger.e('PomodoroNotifier', 'Error inserting session', e);
       return;
@@ -682,6 +684,7 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
         notes: Value(notes),
       ),
     );
+    ref.read(syncEngineProvider.notifier).fullSync();
   }
 
   Future<void> awardConfidenceXpAndNotes({
@@ -729,6 +732,7 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
         xpEarned: newXpEarned,
       ),
     );
+    ref.read(syncEngineProvider.notifier).fullSync();
   }
 
   Future<void> _updateSessionInDb({
@@ -756,6 +760,7 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
         endPage: Value(endPage ?? sessionRow.endPage),
       ),
     );
+    ref.read(syncEngineProvider.notifier).fullSync();
   }
 
   Future<void> updateSessionPageRange({

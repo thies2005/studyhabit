@@ -26,6 +26,7 @@ export interface Subject {
   defaultDurationMinutes: number;
   defaultBreakMinutes: number;
   xpTotal: number;
+  totalStudyMinutes?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -145,6 +146,7 @@ export interface StatsOverview {
   totalXp: number;
   totalStudyMinutes: number;
   longestStreak: number;
+  freezeTokens: number;
 }
 
 export interface SubjectBreakdown {

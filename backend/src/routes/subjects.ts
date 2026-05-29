@@ -40,11 +40,22 @@ router.get('/', async (req, res, next) => {
         orderBy: { createdAt: 'desc' },
         skip,
         take,
+        include: {
+          sessions: {
+            select: { actualDurationMinutes: true },
+          },
+        },
       }),
       prisma.subject.count({ where }),
     ]);
+    const subjectsWithMinutes = subjects.map((sub: any) => {
+      const totalMinutes = sub.sessions?.reduce((sum: number, s: any) => sum + (s.actualDurationMinutes || 0), 0) || 0;
+      const { sessions, ...rest } = sub;
+      return { ...rest, totalStudyMinutes: totalMinutes };
+    });
+
     res.json({
-      data: subjects,
+      data: subjectsWithMinutes,
       pagination: { page, limit, total, hasMore: skip + take < total },
     });
   } catch (error: unknown) {
@@ -151,12 +162,23 @@ export function createProjectSubjectRoutes(): Router {
           orderBy: { createdAt: 'desc' },
           skip,
           take,
+          include: {
+            sessions: {
+              select: { actualDurationMinutes: true },
+            },
+          },
         }),
         prisma.subject.count({ where: { projectId } }),
       ]);
 
+      const subjectsWithMinutes = subjects.map((sub: any) => {
+        const totalMinutes = sub.sessions?.reduce((sum: number, s: any) => sum + (s.actualDurationMinutes || 0), 0) || 0;
+        const { sessions, ...rest } = sub;
+        return { ...rest, totalStudyMinutes: totalMinutes };
+      });
+
       res.json({
-        data: subjects,
+        data: subjectsWithMinutes,
         pagination: { page, limit, total, hasMore: skip + take < total },
       });
     } catch (error: unknown) {

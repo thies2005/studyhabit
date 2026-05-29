@@ -21,6 +21,7 @@ abstract class Subject with _$Subject {
     @Default(CompletenessMode.none) CompletenessMode completenessMode,
     @Default(null) int? targetHours,
     @Default(null) int? targetWeeklyHours,
+    DateTime? updatedAt,
   }) = _Subject;
 
   factory Subject.fromJson(Map<String, dynamic> json) =>

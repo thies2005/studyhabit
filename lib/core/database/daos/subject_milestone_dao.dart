@@ -15,13 +15,19 @@ class SubjectMilestoneDao {
   }
 
   Future<void> insert(SubjectMilestonesCompanion companion) {
-    return _db.into(_db.subjectMilestones).insert(companion);
+    final withUpdated = companion.updatedAt.present
+        ? companion
+        : companion.copyWith(updatedAt: Value(DateTime.now()));
+    return _db.into(_db.subjectMilestones).insert(withUpdated);
   }
 
   Future<void> update(SubjectMilestonesCompanion companion) {
+    final withUpdated = companion.updatedAt.present
+        ? companion
+        : companion.copyWith(updatedAt: Value(DateTime.now()));
     return (_db.update(_db.subjectMilestones)
           ..where((table) => table.id.equals(companion.id.value)))
-        .write(companion);
+        .write(withUpdated);
   }
 
   Future<void> updateCompletion(String id, {required bool isCompleted}) {
@@ -31,6 +37,7 @@ class SubjectMilestoneDao {
       SubjectMilestonesCompanion(
         isCompleted: Value(isCompleted),
         completedAt: Value(isCompleted ? DateTime.now() : null),
+        updatedAt: Value(DateTime.now()),
       ),
     );
   }

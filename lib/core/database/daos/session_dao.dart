@@ -44,6 +44,7 @@ class SessionDao {
         StudySessionsCompanion(
           endedAt: Value(finalEndedAt),
           actualDurationMinutes: Value(clampedDuration),
+          updatedAt: Value(DateTime.now()),
         ),
       );
     }
@@ -64,7 +65,10 @@ class SessionDao {
   }
 
   Future<void> insert(StudySessionsCompanion companion) {
-    return _db.into(_db.studySessions).insert(companion);
+    final withUpdated = companion.updatedAt.present
+        ? companion
+        : companion.copyWith(updatedAt: Value(DateTime.now()));
+    return _db.into(_db.studySessions).insert(withUpdated);
   }
 
   Future<StudySessionRow?> getById(String id) {
@@ -73,11 +77,14 @@ class SessionDao {
   }
 
   Future<void> update(StudySessionsCompanion companion) {
-    return _db.update(_db.studySessions).write(companion);
+    final withUpdated = companion.updatedAt.present
+        ? companion
+        : companion.copyWith(updatedAt: Value(DateTime.now()));
+    return _db.update(_db.studySessions).write(withUpdated);
   }
 
   Future<void> updateRow(StudySessionRow row) {
-    return _db.update(_db.studySessions).replace(row);
+    return _db.update(_db.studySessions).replace(row.copyWith(updatedAt: DateTime.now()));
   }
 
   Future<void> delete(String id) {

@@ -9,6 +9,7 @@ abstract class Achievement with _$Achievement {
     required String key,
     DateTime? unlockedAt,
     required double progress,
+    DateTime? updatedAt,
   }) = _Achievement;
 
   factory Achievement.fromJson(Map<String, dynamic> json) =>

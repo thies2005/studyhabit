@@ -45,6 +45,11 @@ model Project {
   createdAt    DateTime  @default(now())
   lastOpenedAt DateTime  @default(now())
   isArchived   Boolean   @default(false)
+  defaultWorkDuration      Int      @default(25)
+  defaultBreakDuration     Int      @default(5)
+  defaultLongBreakDuration Int      @default(15)
+  defaultLongBreakEvery    Int      @default(4)
+  studyReminderMinutes     Int      @default(30)
   updatedAt    DateTime  @updatedAt
   subjects     Subject[]
 
@@ -64,10 +69,14 @@ model Subject {
   xpTotal                Int           @default(0)
   createdAt              DateTime      @default(now())
   updatedAt              DateTime      @updatedAt
+  completenessMode       String        @default("none")
+  targetHours            Float?
+  targetWeeklyHours      Float?
   topics                 Topic[]
   sessions               StudySession[]
   sources                Source[]
   skillLabels            SkillLabel[]
+  milestones             SubjectMilestone[]
 
   @@index([projectId])
 }
@@ -119,6 +128,10 @@ model StudySession {
   confidenceRating         Int?
   notes                    String?
   xpEarned                 Int        @default(0)
+  sourceId                 String?
+  startPage                Int?
+  endPage                  Int?
+  isFreeTimer              Boolean    @default(false)
   createdAt                DateTime   @default(now())
   updatedAt                DateTime   @updatedAt
 
@@ -193,4 +206,18 @@ model UserStats {
   freezeTokens      Int       @default(0)
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
+}
+
+model SubjectMilestone {
+  id          String    @id @default(uuid())
+  subjectId   String
+  subject     Subject   @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  title       String
+  isCompleted Boolean   @default(false)
+  sortOrder   Int       @default(0)
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([subjectId])
 }

@@ -12,6 +12,7 @@ import '../../core/models/model_mapper.dart';
 import '../../core/models/subject.dart';
 import '../../core/models/subject_milestone.dart';
 import '../../core/providers/database_provider.dart';
+import '../../core/services/sync_service.dart';
 import '../projects/project_providers.dart';
 
 part 'subject_providers.g.dart';
@@ -101,6 +102,7 @@ class SubjectNotifier extends _$SubjectNotifier {
         ),
       );
       AppLogger.i('SubjectNotifier', 'Subject created successfully');
+      ref.read(syncEngineProvider.notifier).fullSync();
       return newId;
     } catch (e, stack) {
       AppLogger.e('SubjectNotifier', 'Failed to create subject', e, stack);
@@ -127,6 +129,7 @@ class SubjectNotifier extends _$SubjectNotifier {
           targetWeeklyHours: Value(updated.targetWeeklyHours),
         ),
       );
+      ref.read(syncEngineProvider.notifier).fullSync();
     } catch (e, stack) {
       AppLogger.e('SubjectNotifier', 'Failed to update subject', e, stack);
     }
@@ -138,6 +141,7 @@ class SubjectNotifier extends _$SubjectNotifier {
       final milestoneDao = SubjectMilestoneDao(_db);
       await milestoneDao.deleteAllForSubject(id);
       await _dao.delete(id);
+      ref.read(syncEngineProvider.notifier).fullSync();
     } catch (e, stack) {
       AppLogger.e('SubjectNotifier', 'Failed to delete subject', e, stack);
     }
@@ -309,6 +313,7 @@ class MilestoneNotifier extends _$MilestoneNotifier {
           sortOrder: Value(maxOrder + 1),
         ),
       );
+      ref.read(syncEngineProvider.notifier).fullSync();
     } catch (e, stack) {
       AppLogger.e('MilestoneNotifier', 'Failed to add milestone', e, stack);
     }
@@ -322,6 +327,7 @@ class MilestoneNotifier extends _$MilestoneNotifier {
           title: Value(newTitle),
         ),
       );
+      ref.read(syncEngineProvider.notifier).fullSync();
     } catch (e, stack) {
       AppLogger.e('MilestoneNotifier', 'Failed to rename milestone', e, stack);
     }
@@ -335,6 +341,7 @@ class MilestoneNotifier extends _$MilestoneNotifier {
           .getSingleOrNull();
       if (row == null) return;
       await _dao.updateCompletion(id, isCompleted: !row.isCompleted);
+      ref.read(syncEngineProvider.notifier).fullSync();
     } catch (e, stack) {
       AppLogger.e('MilestoneNotifier', 'Failed to toggle milestone', e, stack);
     }
@@ -343,6 +350,7 @@ class MilestoneNotifier extends _$MilestoneNotifier {
   Future<void> deleteMilestone(String id) async {
     try {
       await _dao.delete(id);
+      ref.read(syncEngineProvider.notifier).fullSync();
     } catch (e, stack) {
       AppLogger.e('MilestoneNotifier', 'Failed to delete milestone', e, stack);
     }
@@ -351,6 +359,7 @@ class MilestoneNotifier extends _$MilestoneNotifier {
   Future<void> reorder(String subjectId, List<({String id, int sortOrder})> items) async {
     try {
       await _dao.reorder(items);
+      ref.read(syncEngineProvider.notifier).fullSync();
     } catch (e, stack) {
       AppLogger.e('MilestoneNotifier', 'Failed to reorder milestones', e, stack);
     }

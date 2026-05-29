@@ -18,6 +18,7 @@ abstract class Project with _$Project {
     @Default(15) int defaultLongBreakDuration,
     @Default(4) int defaultLongBreakEvery,
     @Default(30) int studyReminderMinutes,
+    DateTime? updatedAt,
   }) = _Project;
 
   factory Project.fromJson(Map<String, dynamic> json) =>

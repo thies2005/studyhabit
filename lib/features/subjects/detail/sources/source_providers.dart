@@ -9,6 +9,7 @@ import '../../../../core/models/model_mapper.dart';
 import '../../../../core/models/source.dart';
 import '../../../../core/providers/database_provider.dart';
 import '../../../../core/services/xp_service.dart';
+import '../../../../core/services/sync_service.dart';
 
 part 'source_providers.g.dart';
 
@@ -77,6 +78,7 @@ class SourceNotifier extends _$SourceNotifier {
 
     final xpService = ref.read(xpServiceProvider);
     await xpService.award(ref, XpReason.addSource);
+    ref.read(syncEngineProvider.notifier).fullSync();
   }
 
   Future<void> addUrl({
@@ -106,6 +108,7 @@ class SourceNotifier extends _$SourceNotifier {
 
     final xpService = ref.read(xpServiceProvider);
     await xpService.award(ref, XpReason.addSource);
+    ref.read(syncEngineProvider.notifier).fullSync();
   }
 
   Future<void> updateProgress(
@@ -121,11 +124,13 @@ class SourceNotifier extends _$SourceNotifier {
       currentPage: currentPage,
       progressPercent: progressPercent,
     );
+    ref.read(syncEngineProvider.notifier).fullSync();
   }
 
   Future<void> delete(String id) async {
     final db = ref.read(appDatabaseProvider);
     final dao = SourceDao(db);
     await dao.delete(id);
+    ref.read(syncEngineProvider.notifier).fullSync();
   }
 }

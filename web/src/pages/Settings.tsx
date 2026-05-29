@@ -1,4 +1,8 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
+import { useApi } from '../api/hooks';
+import type { StatsOverview } from '../types';
 
 const presetSeeds = [
   '#006874', // Deep Teal
@@ -62,6 +66,32 @@ const saveSettings = (settings: SettingsState) => {
 };
 
 export default function Settings() {
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+  const { data: stats } = useApi<StatsOverview>('/stats/overview');
+
+  const getEmailFromToken = () => {
+    try {
+      const token = localStorage.getItem('access_token');
+      if (!token) return '';
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function(c) {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
+
+      const payload = JSON.parse(jsonPayload);
+      return payload.email || '';
+    } catch (e) {
+      return '';
+    }
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
+
   // Theme settings
   const [seedColor, setSeedColor] = useState(() => loadSettings().seedColor);
   const [fontScale, setFontScale] = useState<'small' | 'normal' | 'large'>(() => loadSettings().fontScale);
@@ -79,7 +109,7 @@ export default function Settings() {
 
   // Streak settings
   const [gracePeriod, setGracePeriod] = useState(() => loadSettings().gracePeriod);
-  const freezeTokens = 3;
+  const freezeTokens = stats?.freezeTokens ?? 0;
 
   // Save settings whenever they change
   useEffect(() => {
@@ -98,50 +128,7 @@ export default function Settings() {
   }, [seedColor, fontScale, workDuration, shortBreak, longBreak, longBreakEvery,
       autoStartBreaks, vibrationOnComplete, enableNotifications, gracePeriod]);
 
-  // Data management
-  const [showDeleteConfirm1, setShowDeleteConfirm1] = useState(false);
-  const [showDeleteConfirm2, setShowDeleteConfirm2] = useState(false);
-  const [deleteConfirmText, setDeleteConfirmText] = useState('');
-
-  const handleExport = () => {
-    // Mock export - would actually generate and download JSON
-    const data = {
-      exportVersion: 1,
-      exportedAt: new Date().toISOString(),
-      userStats: { totalXp: 12450, currentLevel: 4 },
-      projects: [],
-      achievements: [],
-    };
-
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `studytracker_export_${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const handleImport = () => {
-    // Mock import - would actually show file picker
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
-    input.onchange = (e: Event) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (file) {
-        // Process imported file
-      }
-    };
-    input.click();
-  };
-
-  const handleClearData = () => {
-    // Mock clear - would actually clear all data
-    setShowDeleteConfirm2(false);
-    setDeleteConfirmText('');
-    setShowDeleteConfirm1(false);
-  };
+  // Data management is mobile-only
 
   const renderFontScaleButton = (scale: 'small' | 'normal' | 'large', label: string) => (
     <button
@@ -431,109 +418,46 @@ export default function Settings() {
               Data Management
             </h3>
 
-            {/* Export */}
-            <button
-              onClick={handleExport}
-              className="w-full mb-3 flex items-center justify-center gap-2 px-4 py-3 bg-primary/20 text-primary rounded-xl text-sm font-medium hover:bg-primary/30 transition-colors font-body"
-            >
-              <span className="material-icons">upload</span>
-              Export All Data
-            </button>
-
-            {/* Import */}
-            <button
-              onClick={handleImport}
-              className="w-full mb-3 flex items-center justify-center gap-2 px-4 py-3 bg-primary/20 text-primary rounded-xl text-sm font-medium hover:bg-primary/30 transition-colors font-body"
-            >
-              <span className="material-icons">download</span>
-              Import Data
-            </button>
-
-            {/* Clear All Data */}
-            {!showDeleteConfirm1 ? (
-              <button
-                onClick={() => setShowDeleteConfirm1(true)}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-500/20 text-red-400 rounded-xl text-sm font-medium hover:bg-red-500/30 transition-colors font-body"
-              >
-                <span className="material-icons">delete_forever</span>
-                Clear All Data
-              </button>
-            ) : showDeleteConfirm1 && !showDeleteConfirm2 ? (
-              <div className="w-full p-4 bg-red-500/10 border border-red-500/30 rounded-xl">
-                <p className="text-sm text-red-400 font-body mb-4">
-                  Are you sure? This action cannot be undone.
+            <div className="w-full flex items-start gap-3 p-4 bg-primary/10 border border-primary/20 rounded-xl">
+              <span className="material-icons text-primary mt-0.5">info</span>
+              <div>
+                <h4 className="text-sm font-bold text-primary font-heading mb-1">Mobile App Required</h4>
+                <p className="text-sm text-primary/80 font-body">
+                  Features like data export, backup import, and local database management are exclusively available in the StudyTracker mobile application.
                 </p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setShowDeleteConfirm1(false)}
-                    className="flex-1 px-4 py-2 bg-surface text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-700 transition-colors font-body"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => setShowDeleteConfirm2(true)}
-                    className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition-colors font-body"
-                  >
-                    Yes, Delete
-                  </button>
-                </div>
               </div>
-            ) : (
-              <div className="w-full p-4 bg-red-500/10 border border-red-500/30 rounded-xl">
-                <p className="text-sm text-red-400 font-body mb-3">
-                  Type "DELETE" to confirm:
-                </p>
-                <input
-                  type="text"
-                  value={deleteConfirmText}
-                  onChange={(e) => setDeleteConfirmText(e.target.value)}
-                  placeholder="DELETE"
-                  className="w-full mb-3 px-4 py-2 bg-surface text-onSurface rounded-lg text-sm font-body focus:outline-none focus:ring-2 focus:ring-red-500"
-                />
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => {
-                      setShowDeleteConfirm2(false);
-                      setDeleteConfirmText('');
-                    }}
-                    className="flex-1 px-4 py-2 bg-surface text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-700 transition-colors font-body"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleClearData}
-                    disabled={deleteConfirmText !== 'DELETE'}
-                    className={`flex-1 px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium transition-colors font-body ${
-                      deleteConfirmText !== 'DELETE' ? 'opacity-50 cursor-not-allowed' : 'hover:bg-red-600'
-                    }`}
-                  >
-                    Confirm Delete
-                  </button>
-                </div>
-              </div>
-            )}
+            </div>
           </div>
 
-          {/* Connect to Server Card (Disabled) */}
-          <div className="bg-surfaceHigh rounded-2xl p-6 opacity-50">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-gray-700 flex items-center justify-center">
-                  <span className="material-icons text-gray-400 text-2xl">cloud_sync</span>
+          {/* Sync Account Management */}
+          <div className="bg-surfaceHigh rounded-2xl p-6">
+            <h3 className="text-lg font-medium text-onSurface font-heading mb-4 flex items-center gap-2">
+              <span className="material-icons text-primary">cloud_sync</span>
+              Sync & Account
+            </h3>
+            
+            <div className="p-4 bg-surface rounded-xl flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
+                  <span className="material-icons text-green-400">cloud_done</span>
                 </div>
                 <div>
-                  <h3 className="text-base font-semibold text-onSurface font-heading">
-                    Connect to Server
-                  </h3>
-                  <p className="text-sm text-gray-400 font-body">
-                    Sync across devices
-                  </p>
+                  <p className="text-sm font-bold text-onSurface font-heading">Cloud Sync Active</p>
+                  <p className="text-xs text-gray-400 font-body">{getEmailFromToken()}</p>
                 </div>
               </div>
-              <span className="px-3 py-1 bg-gray-700 text-gray-400 text-xs font-medium rounded-full font-body">
-                Coming Soon
+              <span className="px-3 py-1 bg-green-500/20 text-green-400 text-xs font-medium rounded-full font-body">
+                Connected
               </span>
             </div>
+
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-500/20 text-red-400 rounded-xl text-sm font-medium hover:bg-red-500/30 transition-colors font-body"
+            >
+              <span className="material-icons text-sm">logout</span>
+              Disconnect & Sign Out
+            </button>
           </div>
         </div>
       </main>

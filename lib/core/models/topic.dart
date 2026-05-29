@@ -10,6 +10,7 @@ abstract class Topic with _$Topic {
     required String subjectId,
     required String name,
     required int order,
+    DateTime? updatedAt,
   }) = _Topic;
 
   factory Topic.fromJson(Map<String, dynamic> json) => _$TopicFromJson(json);

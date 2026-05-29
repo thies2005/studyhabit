@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/projects/project_switcher_sheet.dart';
+import 'sync_status_icon.dart';
 
 class AppShellScaffold extends StatelessWidget {
   const AppShellScaffold({super.key, required this.navigationShell});
@@ -35,6 +36,7 @@ class AppShellScaffold extends StatelessWidget {
           icon: const Icon(Icons.menu_book),
         ),
         actions: [
+          const SyncStatusIcon(),
           IconButton(
             onPressed: () => context.pushNamed('settings'),
             icon: const Icon(Icons.settings),

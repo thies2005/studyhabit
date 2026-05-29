@@ -12,6 +12,7 @@ abstract class SubjectMilestone with _$SubjectMilestone {
     @Default(false) bool isCompleted,
     @Default(0) int sortOrder,
     @Default(null) DateTime? completedAt,
+    DateTime? updatedAt,
   }) = _SubjectMilestone;
 
   factory SubjectMilestone.fromJson(Map<String, dynamic> json) =>

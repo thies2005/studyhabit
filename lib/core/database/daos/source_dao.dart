@@ -15,7 +15,10 @@ class SourceDao {
   }
 
   Future<void> upsert(SourcesCompanion companion) {
-    return _db.into(_db.sources).insertOnConflictUpdate(companion);
+    final withUpdated = companion.updatedAt.present
+        ? companion
+        : companion.copyWith(updatedAt: Value(DateTime.now()));
+    return _db.into(_db.sources).insertOnConflictUpdate(withUpdated);
   }
 
   Future<void> updateProgress(
@@ -29,6 +32,7 @@ class SourceDao {
       SourcesCompanion(
         currentPage: currentPage != null ? Value(currentPage) : const Value.absent(),
         progressPercent: progressPercent != null ? Value(progressPercent) : const Value.absent(),
+        updatedAt: Value(DateTime.now()),
       ),
     );
   }

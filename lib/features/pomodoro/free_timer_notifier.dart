@@ -14,6 +14,7 @@ import '../../core/services/xp_service.dart';
 import 'free_timer_state.dart';
 import '../../core/services/timer_persistence_service.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import '../../core/services/sync_service.dart';
 
 
 part 'free_timer_notifier.g.dart';
@@ -170,6 +171,7 @@ class FreeTimerNotifier extends _$FreeTimerNotifier with WidgetsBindingObserver 
         isFreeTimer: const Value(true),
       ),
     );
+    ref.read(syncEngineProvider.notifier).fullSync();
   }
 
   void pause() {
@@ -223,6 +225,7 @@ class FreeTimerNotifier extends _$FreeTimerNotifier with WidgetsBindingObserver 
     if (elapsedMinutes <= 0) {
       try {
         await _sessionDao?.delete(state.activeSessionId!);
+        ref.read(syncEngineProvider.notifier).fullSync();
       } catch (e) {
         debugPrint('Error deleting dummy session: $e');
       }
@@ -258,6 +261,7 @@ class FreeTimerNotifier extends _$FreeTimerNotifier with WidgetsBindingObserver 
               endedAt: Value(endedAt),
             ),
           );
+          ref.read(syncEngineProvider.notifier).fullSync();
         }
       } catch (e) {
         debugPrint('Error updating session in DB: $e');
@@ -305,6 +309,7 @@ class FreeTimerNotifier extends _$FreeTimerNotifier with WidgetsBindingObserver 
         xpEarned: newXpEarned,
       ),
     );
+    ref.read(syncEngineProvider.notifier).fullSync();
   }
 
   Future<void> _startForegroundService() async {

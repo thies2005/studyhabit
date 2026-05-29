@@ -93,6 +93,8 @@ class Projects extends Table {
 
   IntColumn get studyReminderMinutes => integer().withDefault(const Constant(30))();
 
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+
   @override
   Set<Column<Object>> get primaryKey => {id};
 }
@@ -131,6 +133,8 @@ class Subjects extends Table {
 
   IntColumn get targetWeeklyHours => integer().nullable()();
 
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+
   @override
   Set<Column<Object>> get primaryKey => {id};
 }
@@ -145,6 +149,8 @@ class Topics extends Table {
 
   IntColumn get order => integer()();
 
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+
   @override
   Set<Column<Object>> get primaryKey => {id};
 }
@@ -158,6 +164,8 @@ class Chapters extends Table {
   TextColumn get name => text()();
 
   IntColumn get order => integer()();
+
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -198,6 +206,8 @@ class StudySessions extends Table {
   IntColumn get endPage => integer().nullable()();
 
   BoolColumn get isFreeTimer => boolean().withDefault(const Constant(false))();
+
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -249,6 +259,8 @@ class Sources extends Table {
 
   DateTimeColumn get addedAt => dateTime().withDefault(currentDateAndTime)();
 
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+
   @override
   Set<Column<Object>> get primaryKey => {id};
 }
@@ -260,6 +272,8 @@ class Achievements extends Table {
   DateTimeColumn get unlockedAt => dateTime().nullable()();
 
   RealColumn get progress => real().withDefault(const Constant(0.0))();
+
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
 
   @override
   Set<Column<Object>> get primaryKey => {key};
@@ -282,6 +296,8 @@ class UserStatsTable extends Table {
   IntColumn get totalStudyMinutes => integer().withDefault(const Constant(0))();
 
   IntColumn get freezeTokens => integer().withDefault(const Constant(0))();
+
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -319,6 +335,8 @@ class SubjectMilestones extends Table {
 
   DateTimeColumn get completedAt => dateTime().nullable()();
 
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+
   @override
   Set<Column<Object>> get primaryKey => {id};
 }
@@ -346,7 +364,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration {
@@ -380,6 +398,17 @@ class AppDatabase extends _$AppDatabase {
         }
         if (from < 7) {
           await m.addColumn(subjects, subjects.targetWeeklyHours);
+        }
+        if (from < 8) {
+          await m.addColumn(projects, projects.updatedAt);
+          await m.addColumn(subjects, subjects.updatedAt);
+          await m.addColumn(topics, topics.updatedAt);
+          await m.addColumn(chapters, chapters.updatedAt);
+          await m.addColumn(studySessions, studySessions.updatedAt);
+          await m.addColumn(sources, sources.updatedAt);
+          await m.addColumn(achievements, achievements.updatedAt);
+          await m.addColumn(userStatsTable, userStatsTable.updatedAt);
+          await m.addColumn(subjectMilestones, subjectMilestones.updatedAt);
         }
       },
     );

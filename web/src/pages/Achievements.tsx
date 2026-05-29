@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { Achievement, StatsOverview } from '../types';
 import { useApi } from '../api/hooks';
 
@@ -124,45 +124,16 @@ function getXpForLevel(level: number): number {
   return xp;
 }
 
-// Mock data for demo purposes
-const mockAchievements: Achievement[] = [
-  { id: '1', userId: 'mock-user', key: 'streak_7', unlockedAt: '2024-10-01', progress: 1, createdAt: '2024-10-01', updatedAt: '2024-10-01' },
-  { id: '2', userId: 'mock-user', key: 'pomodoro_10', unlockedAt: '2024-09-28', progress: 1, createdAt: '2024-09-28', updatedAt: '2024-09-28' },
-  { id: '3', userId: 'mock-user', key: 'hours_10', unlockedAt: '2024-09-25', progress: 1, createdAt: '2024-09-25', updatedAt: '2024-09-25' },
-  { id: '4', userId: 'mock-user', key: 'subject_5h', unlockedAt: '2024-09-20', progress: 1, createdAt: '2024-09-20', updatedAt: '2024-09-20' },
-  { id: '5', userId: 'mock-user', key: 'first_pdf', unlockedAt: '2024-09-15', progress: 1, createdAt: '2024-09-15', updatedAt: '2024-09-15' },
-  { id: '6', userId: 'mock-user', key: 'confidence_5', unlockedAt: '2024-09-12', progress: 1, createdAt: '2024-09-12', updatedAt: '2024-09-12' },
-  { id: '7', userId: 'mock-user', key: 'streak_30', unlockedAt: null, progress: 0.23, createdAt: '2024-10-01', updatedAt: '2024-10-01' },
-  { id: '8', userId: 'mock-user', key: 'pomodoro_100', unlockedAt: null, progress: 0.12, createdAt: '2024-10-01', updatedAt: '2024-10-01' },
-  { id: '9', userId: 'mock-user', key: 'hours_100', unlockedAt: null, progress: 0.42, createdAt: '2024-10-01', updatedAt: '2024-10-01' },
-  { id: '10', userId: 'mock-user', key: 'streak_3', unlockedAt: '2024-08-25', progress: 1, createdAt: '2024-08-25', updatedAt: '2024-08-25' },
-  { id: '11', userId: 'mock-user', key: 'subject_10h', unlockedAt: null, progress: 0.65, createdAt: '2024-10-01', updatedAt: '2024-10-01' },
-  { id: '12', userId: 'mock-user', key: 'skill_advanced', unlockedAt: null, progress: 0.35, createdAt: '2024-10-01', updatedAt: '2024-10-01' },
-  { id: '13', userId: 'mock-user', key: 'streak_100', unlockedAt: null, progress: 0.12, createdAt: '2024-10-01', updatedAt: '2024-10-01' },
-  { id: '14', userId: 'mock-user', key: 'pomodoro_500', unlockedAt: null, progress: 0.02, createdAt: '2024-10-01', updatedAt: '2024-10-01' },
-  { id: '15', userId: 'mock-user', key: 'all_badges', unlockedAt: null, progress: 0.40, createdAt: '2024-10-01', updatedAt: '2024-10-01' },
-];
-
 export default function Achievements() {
+  const [selectedAchievement, setSelectedAchievement] = useState<Achievement | null>(null);
   const { data: stats, loading: statsLoading } = useApi<StatsOverview>('/stats/overview');
   const { data: serverAchievements, loading: achievementsLoading } = useApi<Achievement[]>('/achievements');
-  const [selectedAchievement, setSelectedAchievement] = useState<Achievement | null>(null);
 
   const currentLevel = stats?.currentLevel || 1;
   const totalXp = stats?.totalXp || 0;
   const loading = statsLoading || achievementsLoading;
 
-  const displayAchievements = (serverAchievements && serverAchievements.length > 0)
-    ? serverAchievements
-    : mockAchievements;
-
-  const [achievements, setAchievements] = useState<Achievement[]>(mockAchievements);
-
-  useEffect(() => {
-    if (serverAchievements && serverAchievements.length > 0) {
-      setAchievements(serverAchievements);
-    }
-  }, [serverAchievements]);
+  const achievements = serverAchievements || [];
 
   const getXpInCurrentLevel = () => {
     const levelXp = getXpForLevel(currentLevel);
@@ -277,8 +248,19 @@ export default function Achievements() {
               </div>
 
               {/* Achievements Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {achievements.map((achievement) => {
+              {achievements.length === 0 ? (
+                <div className="bg-surfaceHigh rounded-2xl p-12 text-center">
+                  <div className="w-16 h-16 bg-surface/50 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span className="material-icons text-gray-500 text-3xl">emoji_events</span>
+                  </div>
+                  <h3 className="text-xl font-bold text-onSurface font-heading mb-2">No achievements yet</h3>
+                  <p className="text-gray-400 font-body">
+                    Start studying and tracking your sessions to earn achievements!
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {achievements.map((achievement) => {
                   const isUnlocked = !!achievement.unlockedAt;
                   const icon = achievementIcons[achievement.key] || 'emoji_events';
                   const color = achievementColors[achievement.key] || '#85D2E0';
@@ -345,7 +327,8 @@ export default function Achievements() {
                     </div>
                   );
                 })}
-              </div>
+                </div>
+              )}
             </>
           )}
         </div>

@@ -21,7 +21,10 @@ class SubjectDao {
   }
 
   Future<void> upsert(SubjectsCompanion companion) {
-    return _db.into(_db.subjects).insertOnConflictUpdate(companion);
+    final withUpdated = companion.updatedAt.present
+        ? companion
+        : companion.copyWith(updatedAt: Value(DateTime.now()));
+    return _db.into(_db.subjects).insertOnConflictUpdate(withUpdated);
   }
 
   Future<void> delete(String id) {

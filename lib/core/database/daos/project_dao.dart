@@ -20,7 +20,10 @@ class ProjectDao {
   }
 
   Future<void> upsert(ProjectsCompanion companion) {
-    return _db.into(_db.projects).insertOnConflictUpdate(companion);
+    final withUpdated = companion.updatedAt.present
+        ? companion
+        : companion.copyWith(updatedAt: Value(DateTime.now()));
+    return _db.into(_db.projects).insertOnConflictUpdate(withUpdated);
   }
 
   Future<void> softDelete(String id) {

@@ -5,12 +5,38 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/providers/theme_provider.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
+import 'core/services/sync_service.dart';
 
-class StudyTrackerApp extends ConsumerWidget {
+class StudyTrackerApp extends ConsumerStatefulWidget {
   const StudyTrackerApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<StudyTrackerApp> createState() => _StudyTrackerAppState();
+}
+
+class _StudyTrackerAppState extends ConsumerState<StudyTrackerApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Automatically pull/push changes when app is opened or resumed from background
+      ref.read(syncEngineProvider.notifier).fullSync();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final router = ref.watch(appRouterProvider);
     final themeSettings = ref.watch(themeSettingsProvider);
 
@@ -22,7 +48,7 @@ class StudyTrackerApp extends ConsumerWidget {
 
         return DynamicColorBuilder(
           builder: (lightDynamic, darkDynamic) {
-        final useDynamic =
+            final useDynamic =
                 settings.useDynamicColor &&
                 lightDynamic != null &&
                 darkDynamic != null;

@@ -2,117 +2,28 @@ import { useParams, Link } from 'react-router-dom';
 import { useState } from 'react';
 import { useApi } from '../api/hooks';
 import type { Subject } from '../types';
+import CreateSessionDialog from '../components/CreateSessionDialog';
+import apiClient from '../api/client';
 
 type Tab = 'timeline' | 'sources' | 'topics';
 
-// Mock data for demo purposes
-const mockSubject = {
-  id: '1',
-  name: 'Neuroscience & Synaptic Plasticity',
-  description: 'Study of brain function, neural networks, and synaptic strength changes',
-  colorValue: 85,
-  totalStudyHours: 42,
-  hierarchyMode: 'twoLevel' as const,
-};
-
-const mockSessions = [
-  {
-    id: '1',
-    date: 'TODAY · 09:15 AM',
-    title: 'Synaptic Transmission Mechanics',
-    description: 'Completed deep dive into neurotransmitter release mechanisms and receptor binding dynamics',
-    tags: ['Synapse', 'Molecular'],
-    isLab: false,
-    score: undefined,
-    duration: '45 min',
-    xp: 50,
-    confidence: 4,
-  },
-  {
-    id: '2',
-    date: 'YESTERDAY · 03:30 PM',
-    title: 'Lab Session: Neural Pathway Mapping',
-    description: 'Hands-on session mapping neural pathways in mouse brain tissue samples',
-    tags: ['Lab', 'Mapping'],
-    isLab: true,
-    score: 92,
-    duration: '90 min',
-    xp: 120,
-    confidence: 5,
-  },
-  {
-    id: '3',
-    date: 'OCT 8 · 10:00 AM',
-    title: 'Dendritic Spine Structure',
-    description: 'Analyzing morphological changes in dendritic spines during learning',
-    tags: ['Structure', 'Learning'],
-    isLab: false,
-    score: undefined,
-    duration: '30 min',
-    xp: 50,
-    confidence: 3,
-  },
-];
-
-const mockSources = [
-  {
-    id: '1',
-    type: 'pdf' as const,
-    title: 'Principles of Neural Science',
-    subtitle: 'PDF · 1,600 Pages · Chapter 3 Read',
-    pagesRead: 124,
-    totalPages: 1600,
-  },
-  {
-    id: '2',
-    type: 'url' as const,
-    title: 'Current Research on Neuroplasticity',
-    subtitle: 'WEB · Nature Neuroscience',
-  },
-  {
-    id: '3',
-    type: 'video' as const,
-    title: 'Synaptic Plasticity Explained',
-    subtitle: 'VIDEO · 45:12 / 58:00',
-    progress: 78,
-    totalDuration: 58,
-  },
-];
-
-const mockTopics = [
-  {
-    id: '1',
-    name: 'Synaptic Transmission',
-    taskCount: 8,
-    subtopics: ['Neurotransmitters', 'Receptors', 'Ion Channels'],
-  },
-  {
-    id: '2',
-    name: 'Plasticity Mechanisms',
-    taskCount: 12,
-    subtopics: ['LTP', 'LTD', 'STDP'],
-  },
-  {
-    id: '3',
-    name: 'Neural Networks',
-    taskCount: 6,
-    subtopics: ['Feedforward', 'Feedback', 'Recurrent'],
-  },
-];
+// No mock data
 
 export default function SubjectDetail() {
   const { subjectId } = useParams<{ subjectId: string }>();
-  const { data: subject, loading: subjectLoading } = useApi<Subject & { topics: any[] }>(`/subjects/${subjectId}`);
-  const { data: sessions, loading: sessionsLoading } = useApi<any[]>(`/sessions?subjectId=${subjectId}`);
+  const { data: subject, loading: subjectLoading, refetch: refetchSubject } = useApi<Subject & { topics: any[] }>(`/subjects/${subjectId}`);
+  const { data: sessions, loading: sessionsLoading, refetch: refetchSessions } = useApi<any[]>(`/sessions?subjectId=${subjectId}`);
   const { data: sources, loading: sourcesLoading } = useApi<any[]>(`/sources?subjectId=${subjectId}`);
   const [activeTab, setActiveTab] = useState<Tab>('timeline');
   const [expandedTopics, setExpandedTopics] = useState<Set<string>>(new Set());
+  const [isSessionDialogOpen, setIsSessionDialogOpen] = useState(false);
 
   const loading = subjectLoading || sessionsLoading || sourcesLoading;
 
   if (loading) return <div className="p-8 text-center text-gray-400">Loading...</div>;
+  if (!subject) return <div className="p-8 text-center text-gray-400">Subject not found</div>;
 
-  const displaySubject = subject || mockSubject;
+  const displaySubject = subject;
 
   const displaySessions = (sessions && sessions.length > 0)
     ? sessions.map((s) => ({
@@ -127,7 +38,7 @@ export default function SubjectDetail() {
         xp: s.xpEarned,
         confidence: s.confidenceRating || 3,
       }))
-    : mockSessions;
+    : [];
 
   const displaySources = (sources && sources.length > 0)
     ? sources.map((src) => ({
@@ -139,7 +50,7 @@ export default function SubjectDetail() {
         totalPages: src.totalPages || 100,
         progress: src.progressPercent || 0,
       }))
-    : mockSources;
+    : [];
 
   const displayTopics = (subject?.topics && subject.topics.length > 0)
     ? subject.topics.map((t: any) => ({
@@ -148,7 +59,13 @@ export default function SubjectDetail() {
         taskCount: t.chapters?.length || 0,
         subtopics: t.chapters?.map((c: any) => c.name) || [],
       }))
-    : mockTopics;
+    : [];
+
+  const handleCreateSession = async (sessionData: any) => {
+    await apiClient.post('/sessions', sessionData);
+    refetchSessions();
+    refetchSubject();
+  };
 
   const toggleTopic = (topicId: string) => {
     const newExpanded = new Set(expandedTopics);
@@ -170,9 +87,17 @@ export default function SubjectDetail() {
                 <span className="material-icons">filter_list</span>
                 Study Sessions
               </h3>
-              <span className="text-sm text-gray-400 font-body">{displaySessions.length} sessions</span>
+              <button
+                onClick={() => setIsSessionDialogOpen(true)}
+                className="text-xs flex items-center gap-1 bg-primary hover:bg-primary-container px-3 py-1.5 rounded-lg text-white font-medium transition-colors font-body"
+              >
+                <span className="material-icons text-sm">add</span>
+                Log Session
+              </button>
             </div>
-            {displaySessions.map((session) => (
+            {displaySessions.length === 0 ? (
+              <div className="text-center py-8 text-gray-400 font-body">No study sessions logged yet.</div>
+            ) : displaySessions.map((session) => (
               <div key={session.id} className="bg-[#323536] rounded-xl p-4">
                 <div className="text-xs text-primary font-body font-medium mb-2">
                   {session.date}
@@ -230,7 +155,9 @@ export default function SubjectDetail() {
                 View All
               </a>
             </div>
-            {displaySources.map((source) => (
+            {displaySources.length === 0 ? (
+              <div className="text-center py-8 text-gray-400 font-body">No sources added yet.</div>
+            ) : displaySources.map((source) => (
               <div key={source.id} className="bg-[#323536] rounded-xl p-4 flex items-start gap-4">
                 <div className={`flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center ${
                   source.type === 'pdf' ? 'bg-red-500/20' :
@@ -286,7 +213,9 @@ export default function SubjectDetail() {
               </h3>
               <span className="text-sm text-gray-400 font-body">{displayTopics.length} topics</span>
             </div>
-            {displayTopics.map((topic) => (
+            {displayTopics.length === 0 ? (
+              <div className="text-center py-8 text-gray-400 font-body">No topics added yet.</div>
+            ) : displayTopics.map((topic) => (
               <div key={topic.id} className="bg-[#323536] rounded-xl overflow-hidden">
                 <div
                   className="p-4 cursor-pointer hover:bg-[#3A3E40] transition-colors"
@@ -308,7 +237,7 @@ export default function SubjectDetail() {
                 </div>
                 {expandedTopics.has(topic.id) && topic.subtopics && (
                   <div className="px-4 pb-4 border-t border-gray-700/50">
-                    {topic.subtopics.map((subtopic, idx) => (
+                    {topic.subtopics.map((subtopic: string, idx: number) => (
                       <div
                         key={idx}
                         className="py-2 px-3 text-sm text-gray-300 font-body hover:bg-gray-700/50 rounded-lg"
@@ -431,6 +360,12 @@ export default function SubjectDetail() {
           </div>
         </div>
       </main>
+      <CreateSessionDialog
+        isOpen={isSessionDialogOpen}
+        onClose={() => setIsSessionDialogOpen(false)}
+        subjects={[displaySubject as Subject]}
+        onSubmit={handleCreateSession}
+      />
     </div>
   );
 }

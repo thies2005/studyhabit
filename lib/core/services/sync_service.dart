@@ -1,70 +1,509 @@
+import 'package:drift/drift.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../database/app_database.dart';
+import '../network/api_client.dart';
+import '../network/connectivity_provider.dart';
+import '../providers/database_provider.dart';
+import '../providers/server_url_provider.dart';
+import 'auth_service.dart';
+import 'app_logger.dart';
+import '../models/enums.dart';
 
 part 'sync_service.g.dart';
 
 enum SyncStatus { idle, syncing, synced, error }
 
-/// Abstract interface for sync service
-abstract class SyncService {
-  Future<void> syncPending();
-  Stream<SyncStatus> get syncStatus;
-}
-
-/// Phase 1: No-op sync service (when backend is disabled)
-class NoOpSyncService implements SyncService {
-  @override
-  Future<void> syncPending() async {}
-
-  @override
-  Stream<SyncStatus> get syncStatus => Stream.value(SyncStatus.idle);
-}
-
-/// Phase 2: HTTP sync service (when backend is enabled)
-/// This stub will be activated when backend is configured
-class HttpSyncService implements SyncService {
-  @override
-  Future<void> syncPending() async {
-    // Implementation will read from pending_sync_ops table
-    // and POST/PATCH each operation to the backend API
-    // TODO: Implement in Phase 2 activation
-  }
-
-  @override
-  Stream<SyncStatus> get syncStatus async* {
-    // TODO: Implement sync status tracking
-    yield SyncStatus.idle;
-  }
-}
-
 @Riverpod(keepAlive: true)
-SyncService syncService(Ref ref) {
-  final isEnabled = ref.watch(backendEnabledProvider);
-  if (isEnabled) {
-    return HttpSyncService();
-  }
-  return NoOpSyncService();
-}
-
-@Riverpod(keepAlive: true)
-class BackendEnabled extends _$BackendEnabled {
-  static const _backendEnabledKey = 'sync.backendEnabled';
+class SyncEngine extends _$SyncEngine {
+  static const _lastSyncedKey = 'sync.lastSyncedAt';
+  
+  late AppDatabase _db;
+  late SharedPreferences _prefs;
 
   @override
-  bool build() {
-    _loadFromPrefs();
-    return false;
+  SyncStatus build() {
+    _db = ref.watch(appDatabaseProvider);
+    _prefs = ref.watch(sharedPreferencesInstanceProvider);
+    return SyncStatus.idle;
   }
 
-  Future<void> _loadFromPrefs() async {
-    final prefs = await SharedPreferences.getInstance();
-    final val = prefs.getBool(_backendEnabledKey) ?? false;
-    if (val != state) state = val;
+  DateTime get lastSyncedAt {
+    final ms = _prefs.getInt(_lastSyncedKey) ?? 0;
+    return DateTime.fromMillisecondsSinceEpoch(ms);
   }
 
-  Future<void> setEnabled(bool value) async {
-    state = value;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_backendEnabledKey, value);
+  Future<void> setLastSyncedAt(DateTime dateTime) async {
+    await _prefs.setInt(_lastSyncedKey, dateTime.millisecondsSinceEpoch);
   }
+
+  Future<void> fullSync() async {
+    // 1. Pre-flight checks
+    final authState = ref.read(authProvider);
+    final isLoggedIn = authState.maybeWhen(
+      authenticated: (_, __) => true,
+      orElse: () => false,
+    );
+    if (!isLoggedIn) {
+      AppLogger.d('SyncEngine', 'Skipping sync: User not logged in.');
+      return;
+    }
+
+    final isOnlineVal = await ref.read(isOnlineProvider.future).catchError((_) => false);
+    if (!isOnlineVal) {
+      AppLogger.d('SyncEngine', 'Skipping sync: Device is offline.');
+      return;
+    }
+
+    if (state == SyncStatus.syncing) {
+      AppLogger.d('SyncEngine', 'Skipping sync: Sync already in progress.');
+      return;
+    }
+
+    state = SyncStatus.syncing;
+    AppLogger.i('SyncEngine', 'Starting full synchronization...');
+
+    try {
+      final since = lastSyncedAt;
+      final dio = ref.read(apiClientProvider);
+
+      // 2. Fetch local changes since lastSync
+      final pushPayload = await _collectLocalChanges(since);
+
+      // 3. Make the API call to /sync/full
+      final response = await dio.post(
+        '/sync/full',
+        queryParameters: {'since': since.toUtc().toIso8601String()},
+        data: pushPayload,
+      );
+
+      final responseData = response.data['data'];
+      final pullData = responseData['pull'] as Map<String, dynamic>;
+      final serverTimeStr = pullData['serverTime'] as String;
+      final serverTime = DateTime.parse(serverTimeStr);
+
+      // 4. Apply remote changes locally
+      await _applyRemoteChanges(pullData);
+
+      // 5. Update last synced timestamp
+      await setLastSyncedAt(serverTime);
+      state = SyncStatus.synced;
+      AppLogger.i('SyncEngine', 'Synchronization completed successfully at $serverTime');
+    } catch (e, stack) {
+      state = SyncStatus.error;
+      AppLogger.e('SyncEngine', 'Sync failed', e, stack);
+    }
+  }
+
+  Future<Map<String, dynamic>> _collectLocalChanges(DateTime since) async {
+    // Query rows modified locally since the last sync time
+    final projects = await (_db.select(_db.projects)..where((t) => t.updatedAt.isBiggerThanValue(since))).get();
+    final subjects = await (_db.select(_db.subjects)..where((t) => t.updatedAt.isBiggerThanValue(since))).get();
+    final topics = await (_db.select(_db.topics)..where((t) => t.updatedAt.isBiggerThanValue(since))).get();
+    final chapters = await (_db.select(_db.chapters)..where((t) => t.updatedAt.isBiggerThanValue(since))).get();
+    final sessions = await (_db.select(_db.studySessions)..where((t) => t.updatedAt.isBiggerThanValue(since))).get();
+    final sources = await (_db.select(_db.sources)..where((t) => t.updatedAt.isBiggerThanValue(since))).get();
+    final skillLabels = await (_db.select(_db.skillLabels)..where((t) => t.updatedAt.isBiggerThanValue(since))).get();
+    final milestones = await (_db.select(_db.subjectMilestones)..where((t) => t.updatedAt.isBiggerThanValue(since))).get();
+    final achievements = await (_db.select(_db.achievements)..where((t) => t.updatedAt.isBiggerThanValue(since))).get();
+    
+    // User stats
+    final stats = await _db.select(_db.userStatsTable).getSingleOrNull();
+    Map<String, dynamic>? statsJson;
+    if (stats != null && stats.updatedAt.isAfter(since)) {
+      final authState = ref.read(authProvider);
+      final userId = authState.maybeWhen(authenticated: (id, _) => id, orElse: () => '');
+      statsJson = {
+        'userId': userId,
+        'totalXp': stats.totalXp,
+        'currentLevel': stats.currentLevel,
+        'currentStreak': stats.currentStreak,
+        'longestStreak': stats.longestStreak,
+        'lastStudyDate': stats.lastStudyDate?.toUtc().toIso8601String(),
+        'totalStudyMinutes': stats.totalStudyMinutes,
+        'freezeTokens': stats.freezeTokens,
+        'updatedAt': stats.updatedAt.toUtc().toIso8601String(),
+      };
+    }
+
+    return {
+      if (projects.isNotEmpty) 'projects': projects.map((p) => _projectToJson(p)).toList(),
+      if (subjects.isNotEmpty) 'subjects': subjects.map((s) => _subjectToJson(s)).toList(),
+      if (topics.isNotEmpty) 'topics': topics.map((t) => _topicToJson(t)).toList(),
+      if (chapters.isNotEmpty) 'chapters': chapters.map((c) => _chapterToJson(c)).toList(),
+      if (sessions.isNotEmpty) 'sessions': sessions.map((s) => _sessionToJson(s)).toList(),
+      if (sources.isNotEmpty) 'sources': sources.map((s) => _sourceToJson(s)).toList(),
+      if (skillLabels.isNotEmpty) 'skillLabels': skillLabels.map((s) => _skillLabelToJson(s)).toList(),
+      if (milestones.isNotEmpty) 'subjectMilestones': milestones.map((m) => _milestoneToJson(m)).toList(),
+      if (achievements.isNotEmpty) 'achievements': achievements.map((a) => _achievementToJson(a)).toList(),
+      if (statsJson != null) 'userStats': statsJson,
+    };
+  }
+
+  Future<void> _applyRemoteChanges(Map<String, dynamic> pull) async {
+
+    // 1. Projects
+    final projectsJson = pull['projects'] as List? ?? [];
+    for (final item in projectsJson) {
+      final id = item['id'] as String;
+      final serverUpdatedAt = DateTime.parse(item['updatedAt']);
+      final local = await (_db.select(_db.projects)..where((t) => t.id.equals(id))).getSingleOrNull();
+      if (local == null || serverUpdatedAt.isAfter(local.updatedAt)) {
+        _db.into(_db.projects).insertOnConflictUpdate(_projectFromJson(item));
+      }
+    }
+
+    // 2. Subjects
+    final subjectsJson = pull['subjects'] as List? ?? [];
+    for (final item in subjectsJson) {
+      final id = item['id'] as String;
+      final serverUpdatedAt = DateTime.parse(item['updatedAt']);
+      final local = await (_db.select(_db.subjects)..where((t) => t.id.equals(id))).getSingleOrNull();
+      if (local == null || serverUpdatedAt.isAfter(local.updatedAt)) {
+        _db.into(_db.subjects).insertOnConflictUpdate(_subjectFromJson(item));
+      }
+    }
+
+    // 3. Topics
+    final topicsJson = pull['topics'] as List? ?? [];
+    for (final item in topicsJson) {
+      final id = item['id'] as String;
+      final serverUpdatedAt = DateTime.parse(item['updatedAt']);
+      final local = await (_db.select(_db.topics)..where((t) => t.id.equals(id))).getSingleOrNull();
+      if (local == null || serverUpdatedAt.isAfter(local.updatedAt)) {
+        _db.into(_db.topics).insertOnConflictUpdate(_topicFromJson(item));
+      }
+    }
+
+    // 4. Chapters
+    final chaptersJson = pull['chapters'] as List? ?? [];
+    for (final item in chaptersJson) {
+      final id = item['id'] as String;
+      final serverUpdatedAt = DateTime.parse(item['updatedAt']);
+      final local = await (_db.select(_db.chapters)..where((t) => t.id.equals(id))).getSingleOrNull();
+      if (local == null || serverUpdatedAt.isAfter(local.updatedAt)) {
+        _db.into(_db.chapters).insertOnConflictUpdate(_chapterFromJson(item));
+      }
+    }
+
+    // 5. Sessions
+    final sessionsJson = pull['sessions'] as List? ?? [];
+    for (final item in sessionsJson) {
+      final id = item['id'] as String;
+      final serverUpdatedAt = DateTime.parse(item['updatedAt']);
+      final local = await (_db.select(_db.studySessions)..where((t) => t.id.equals(id))).getSingleOrNull();
+      if (local == null || serverUpdatedAt.isAfter(local.updatedAt)) {
+        _db.into(_db.studySessions).insertOnConflictUpdate(_sessionFromJson(item));
+      }
+    }
+
+    // 6. Sources
+    final sourcesJson = pull['sources'] as List? ?? [];
+    for (final item in sourcesJson) {
+      final id = item['id'] as String;
+      final serverUpdatedAt = DateTime.parse(item['updatedAt']);
+      final local = await (_db.select(_db.sources)..where((t) => t.id.equals(id))).getSingleOrNull();
+      if (local == null || serverUpdatedAt.isAfter(local.updatedAt)) {
+        _db.into(_db.sources).insertOnConflictUpdate(_sourceFromJson(item));
+      }
+    }
+
+    // 7. Skill Labels
+    final skillLabelsJson = pull['skillLabels'] as List? ?? [];
+    for (final item in skillLabelsJson) {
+      final id = item['id'] as String;
+      final serverUpdatedAt = DateTime.parse(item['updatedAt']);
+      final local = await (_db.select(_db.skillLabels)..where((t) => t.id.equals(id))).getSingleOrNull();
+      if (local == null || serverUpdatedAt.isAfter(local.updatedAt)) {
+        _db.into(_db.skillLabels).insertOnConflictUpdate(_skillLabelFromJson(item));
+      }
+    }
+
+    // 8. Milestones
+    final milestonesJson = pull['subjectMilestones'] as List? ?? [];
+    for (final item in milestonesJson) {
+      final id = item['id'] as String;
+      final serverUpdatedAt = DateTime.parse(item['updatedAt']);
+      final local = await (_db.select(_db.subjectMilestones)..where((t) => t.id.equals(id))).getSingleOrNull();
+      if (local == null || serverUpdatedAt.isAfter(local.updatedAt)) {
+        _db.into(_db.subjectMilestones).insertOnConflictUpdate(_milestoneFromJson(item));
+      }
+    }
+
+    // 8.5 Achievements
+    final achievementsJson = pull['achievements'] as List? ?? [];
+    for (final item in achievementsJson) {
+      final key = item['key'] as String;
+      final serverUpdatedAt = DateTime.parse(item['updatedAt']);
+      final local = await (_db.select(_db.achievements)..where((t) => t.key.equals(key))).getSingleOrNull();
+      if (local == null || serverUpdatedAt.isAfter(local.updatedAt)) {
+        _db.into(_db.achievements).insertOnConflictUpdate(_achievementFromJson(item));
+      }
+    }
+
+    // 9. User Stats (Max-Wins Conflict Resolution)
+    final statsJson = pull['userStats'] as Map<String, dynamic>?;
+    if (statsJson != null) {
+      final local = await _db.select(_db.userStatsTable).getSingleOrNull();
+      if (local == null) {
+        await _db.into(_db.userStatsTable).insertOnConflictUpdate(_statsFromJson(statsJson));
+      } else {
+        // Apply max-wins to stats values
+        final totalXp = statsJson['totalXp'] as int;
+        final currentStreak = statsJson['currentStreak'] as int;
+        final longestStreak = statsJson['longestStreak'] as int;
+        final totalStudyMinutes = statsJson['totalStudyMinutes'] as int;
+        final freezeTokens = statsJson['freezeTokens'] as int;
+        
+        final updatedStats = local.copyWith(
+          totalXp: totalXp > local.totalXp ? totalXp : local.totalXp,
+          currentStreak: currentStreak > local.currentStreak ? currentStreak : local.currentStreak,
+          longestStreak: longestStreak > local.longestStreak ? longestStreak : local.longestStreak,
+          totalStudyMinutes: totalStudyMinutes > local.totalStudyMinutes ? totalStudyMinutes : local.totalStudyMinutes,
+          freezeTokens: freezeTokens > local.freezeTokens ? freezeTokens : local.freezeTokens,
+          updatedAt: DateTime.now(),
+        );
+        await _db.into(_db.userStatsTable).insertOnConflictUpdate(updatedStats);
+      }
+    }
+  }
+
+  // Helper converters between Drift Row and JSON
+  Map<String, dynamic> _projectToJson(ProjectRow r) => {
+        'id': r.id,
+        'userId': ref.read(authProvider).maybeWhen(authenticated: (id, _) => id, orElse: () => ''),
+        'name': r.name,
+        'icon': r.icon,
+        'colorValue': r.colorValue,
+        'createdAt': r.createdAt.toUtc().toIso8601String(),
+        'lastOpenedAt': r.lastOpenedAt.toUtc().toIso8601String(),
+        'isArchived': r.isArchived,
+        'defaultWorkDuration': r.defaultWorkDuration,
+        'defaultBreakDuration': r.defaultBreakDuration,
+        'defaultLongBreakDuration': r.defaultLongBreakDuration,
+        'defaultLongBreakEvery': r.defaultLongBreakEvery,
+        'studyReminderMinutes': r.studyReminderMinutes,
+        'updatedAt': r.updatedAt.toUtc().toIso8601String(),
+      };
+
+  ProjectRow _projectFromJson(Map<String, dynamic> j) => ProjectRow(
+        id: j['id'],
+        name: j['name'],
+        icon: j['icon'] ?? '📚',
+        colorValue: j['colorValue'],
+        createdAt: DateTime.parse(j['createdAt']),
+        lastOpenedAt: DateTime.parse(j['lastOpenedAt']),
+        isArchived: j['isArchived'] ?? false,
+        defaultWorkDuration: j['defaultWorkDuration'] ?? 25,
+        defaultBreakDuration: j['defaultBreakDuration'] ?? 5,
+        defaultLongBreakDuration: j['defaultLongBreakDuration'] ?? 15,
+        defaultLongBreakEvery: j['defaultLongBreakEvery'] ?? 4,
+        studyReminderMinutes: j['studyReminderMinutes'] ?? 30,
+        updatedAt: DateTime.parse(j['updatedAt']),
+      );
+
+  Map<String, dynamic> _subjectToJson(SubjectRow r) => {
+        'id': r.id,
+        'projectId': r.projectId,
+        'name': r.name,
+        'description': r.description,
+        'colorValue': r.colorValue,
+        'hierarchyMode': r.hierarchyMode.name,
+        'defaultDurationMinutes': r.defaultDurationMinutes,
+        'defaultBreakMinutes': r.defaultBreakMinutes,
+        'xpTotal': r.xpTotal,
+        'createdAt': r.createdAt.toUtc().toIso8601String(),
+        'completenessMode': r.completenessMode.name,
+        'targetHours': r.targetHours,
+        'targetWeeklyHours': r.targetWeeklyHours,
+        'updatedAt': r.updatedAt.toUtc().toIso8601String(),
+      };
+
+  SubjectRow _subjectFromJson(Map<String, dynamic> j) => SubjectRow(
+        id: j['id'],
+        projectId: j['projectId'],
+        name: j['name'],
+        description: j['description'],
+        colorValue: j['colorValue'],
+        hierarchyMode: HierarchyMode.values.firstWhere((e) => e.name == j['hierarchyMode'], orElse: () => HierarchyMode.flat),
+        defaultDurationMinutes: j['defaultDurationMinutes'] ?? 25,
+        defaultBreakMinutes: j['defaultBreakMinutes'] ?? 5,
+        xpTotal: j['xpTotal'] ?? 0,
+        createdAt: DateTime.parse(j['createdAt']),
+        completenessMode: CompletenessMode.values.firstWhere((e) => e.name == j['completenessMode'], orElse: () => CompletenessMode.none),
+        targetHours: j['targetHours'],
+        targetWeeklyHours: j['targetWeeklyHours'],
+        updatedAt: DateTime.parse(j['updatedAt']),
+      );
+
+  Map<String, dynamic> _topicToJson(TopicRow r) => {
+        'id': r.id,
+        'subjectId': r.subjectId,
+        'name': r.name,
+        'order': r.order,
+        'updatedAt': r.updatedAt.toUtc().toIso8601String(),
+      };
+
+  TopicRow _topicFromJson(Map<String, dynamic> j) => TopicRow(
+        id: j['id'],
+        subjectId: j['subjectId'],
+        name: j['name'],
+        order: j['order'] ?? 0,
+        updatedAt: DateTime.parse(j['updatedAt']),
+      );
+
+  Map<String, dynamic> _chapterToJson(ChapterRow r) => {
+        'id': r.id,
+        'topicId': r.topicId,
+        'name': r.name,
+        'order': r.order,
+        'updatedAt': r.updatedAt.toUtc().toIso8601String(),
+      };
+
+  ChapterRow _chapterFromJson(Map<String, dynamic> j) => ChapterRow(
+        id: j['id'],
+        topicId: j['topicId'],
+        name: j['name'],
+        order: j['order'] ?? 0,
+        updatedAt: DateTime.parse(j['updatedAt']),
+      );
+
+  Map<String, dynamic> _sessionToJson(StudySessionRow r) => {
+        'id': r.id,
+        'subjectId': r.subjectId,
+        'topicId': r.topicId,
+        'chapterId': r.chapterId,
+        'startedAt': r.startedAt.toUtc().toIso8601String(),
+        'endedAt': r.endedAt?.toUtc().toIso8601String(),
+        'plannedDurationMinutes': r.plannedDurationMinutes,
+        'actualDurationMinutes': r.actualDurationMinutes,
+        'pomodorosCompleted': r.pomodorosCompleted,
+        'confidenceRating': r.confidenceRating,
+        'notes': r.notes,
+        'xpEarned': r.xpEarned,
+        'sourceId': r.sourceId,
+        'startPage': r.startPage,
+        'endPage': r.endPage,
+        'isFreeTimer': r.isFreeTimer,
+        'updatedAt': r.updatedAt.toUtc().toIso8601String(),
+      };
+
+  StudySessionRow _sessionFromJson(Map<String, dynamic> j) => StudySessionRow(
+        id: j['id'],
+        subjectId: j['subjectId'],
+        topicId: j['topicId'],
+        chapterId: j['chapterId'],
+        startedAt: DateTime.parse(j['startedAt']),
+        endedAt: j['endedAt'] != null ? DateTime.parse(j['endedAt']) : null,
+        plannedDurationMinutes: j['plannedDurationMinutes'] ?? 25,
+        actualDurationMinutes: j['actualDurationMinutes'] ?? 0,
+        pomodorosCompleted: j['pomodorosCompleted'] ?? 0,
+        confidenceRating: j['confidenceRating'],
+        notes: j['notes'],
+        xpEarned: j['xpEarned'] ?? 0,
+        sourceId: j['sourceId'],
+        startPage: j['startPage'],
+        endPage: j['endPage'],
+        isFreeTimer: j['isFreeTimer'] ?? false,
+        updatedAt: DateTime.parse(j['updatedAt']),
+      );
+
+  Map<String, dynamic> _sourceToJson(SourceRow r) => {
+        'id': r.id,
+        'subjectId': r.subjectId,
+        'topicId': r.topicId,
+        'chapterId': r.chapterId,
+        'type': r.type.name,
+        'title': r.title,
+        'filePath': r.filePath,
+        'url': r.url,
+        'currentPage': r.currentPage,
+        'totalPages': r.totalPages,
+        'progressPercent': r.progressPercent,
+        'notes': r.notes,
+        'addedAt': r.addedAt.toUtc().toIso8601String(),
+        'updatedAt': r.updatedAt.toUtc().toIso8601String(),
+      };
+
+  SourceRow _sourceFromJson(Map<String, dynamic> j) => SourceRow(
+        id: j['id'],
+        subjectId: j['subjectId'],
+        topicId: j['topicId'],
+        chapterId: j['chapterId'],
+        type: SourceType.values.firstWhere((e) => e.name == j['type'], orElse: () => SourceType.pdf),
+        title: j['title'],
+        filePath: j['filePath'],
+        url: j['url'],
+        currentPage: j['currentPage'],
+        totalPages: j['totalPages'],
+        progressPercent: (j['progressPercent'] as num?)?.toDouble(),
+        notes: j['notes'],
+        addedAt: DateTime.parse(j['addedAt']),
+        updatedAt: DateTime.parse(j['updatedAt']),
+      );
+
+  Map<String, dynamic> _skillLabelToJson(SkillLabelRow r) => {
+        'id': r.id,
+        'subjectId': r.subjectId,
+        'topicId': r.topicId,
+        'chapterId': r.chapterId,
+        'label': r.label.name,
+        'updatedAt': r.updatedAt.toUtc().toIso8601String(),
+      };
+
+  SkillLabelRow _skillLabelFromJson(Map<String, dynamic> j) => SkillLabelRow(
+        id: j['id'],
+        subjectId: j['subjectId'],
+        topicId: j['topicId'],
+        chapterId: j['chapterId'],
+        label: SkillLevel.values.firstWhere((e) => e.name == j['label'], orElse: () => SkillLevel.beginner),
+        updatedAt: DateTime.parse(j['updatedAt']),
+      );
+
+  Map<String, dynamic> _milestoneToJson(SubjectMilestoneRow m) => {
+        'id': m.id,
+        'subjectId': m.subjectId,
+        'title': m.title,
+        'isCompleted': m.isCompleted,
+        'sortOrder': m.sortOrder,
+        'completedAt': m.completedAt?.toUtc().toIso8601String(),
+        'updatedAt': m.updatedAt.toUtc().toIso8601String(),
+      };
+
+  SubjectMilestoneRow _milestoneFromJson(Map<String, dynamic> j) => SubjectMilestoneRow(
+        id: j['id'],
+        subjectId: j['subjectId'],
+        title: j['title'],
+        isCompleted: j['isCompleted'] ?? false,
+        sortOrder: j['sortOrder'] ?? 0,
+        completedAt: j['completedAt'] != null ? DateTime.parse(j['completedAt']) : null,
+        updatedAt: DateTime.parse(j['updatedAt']),
+      );
+
+  Map<String, dynamic> _achievementToJson(AchievementRow r) => {
+        'key': r.key,
+        'unlockedAt': r.unlockedAt?.toUtc().toIso8601String(),
+        'progress': r.progress,
+        'updatedAt': r.updatedAt.toUtc().toIso8601String(),
+      };
+
+  AchievementRow _achievementFromJson(Map<String, dynamic> j) => AchievementRow(
+        key: j['key'],
+        unlockedAt: j['unlockedAt'] != null ? DateTime.parse(j['unlockedAt']) : null,
+        progress: (j['progress'] as num?)?.toDouble() ?? 0.0,
+        updatedAt: DateTime.parse(j['updatedAt']),
+      );
+
+  UserStatsRow _statsFromJson(Map<String, dynamic> j) => UserStatsRow(
+        id: 'default_stats',
+        totalXp: j['totalXp'] ?? 0,
+        currentLevel: j['currentLevel'] ?? 1,
+        currentStreak: j['currentStreak'] ?? 0,
+        longestStreak: j['longestStreak'] ?? 0,
+        lastStudyDate: j['lastStudyDate'] != null ? DateTime.parse(j['lastStudyDate']) : null,
+        totalStudyMinutes: j['totalStudyMinutes'] ?? 0,
+        freezeTokens: j['freezeTokens'] ?? 0,
+        updatedAt: DateTime.parse(j['updatedAt']),
+      );
 }

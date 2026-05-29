@@ -202,6 +202,7 @@ class AchievementService {
                   key: key,
                   unlockedAt: companion.unlockedAt.value,
                   progress: progress,
+                  updatedAt: DateTime.now(),
                 ),
               );
         }

@@ -22,6 +22,11 @@ const projectSchema = z.object({
   name: z.string(),
   icon: z.string(),
   colorValue: z.number(),
+  defaultWorkDuration: z.number(),
+  defaultBreakDuration: z.number(),
+  defaultLongBreakDuration: z.number(),
+  defaultLongBreakEvery: z.number(),
+  studyReminderMinutes: z.number(),
   createdAt: z.string().or(z.date()),
   lastOpenedAt: z.string().or(z.date()),
   isArchived: z.boolean(),
@@ -37,6 +42,9 @@ const subjectSchema = z.object({
   hierarchyMode: z.enum(['flat', 'twoLevel', 'threeLevel']),
   defaultDurationMinutes: z.number(),
   defaultBreakMinutes: z.number(),
+  completenessMode: z.enum(['none', 'hoursGoal', 'milestones', 'weeklyHoursGoal']),
+  targetHours: z.number().nullable(),
+  targetWeeklyHours: z.number().nullable(),
   xpTotal: z.number(),
   createdAt: z.string().or(z.date()),
   updatedAt: z.string().or(z.date()),
@@ -73,6 +81,10 @@ const sessionSchema = z.object({
   confidenceRating: z.number().nullable(),
   notes: z.string().nullable(),
   xpEarned: z.number(),
+  sourceId: z.string().nullable(),
+  startPage: z.number().nullable(),
+  endPage: z.number().nullable(),
+  isFreeTimer: z.boolean(),
   createdAt: z.string().or(z.date()),
   updatedAt: z.string().or(z.date()),
 });
@@ -126,6 +138,17 @@ const userStatsSchema = z.object({
   updatedAt: z.string().or(z.date()),
 });
 
+const subjectMilestoneSchema = z.object({
+  id: z.string().uuid(),
+  subjectId: z.string().uuid(),
+  title: z.string(),
+  isCompleted: z.boolean(),
+  sortOrder: z.number(),
+  completedAt: z.string().or(z.date()).nullable(),
+  createdAt: z.string().or(z.date()),
+  updatedAt: z.string().or(z.date()),
+});
+
 interface ConflictResult {
   accepted: boolean;
   reason?: string;
@@ -147,56 +170,70 @@ export class SyncService {
   static async fullPull(userId: string, since: string): Promise<SyncPullResponse> {
     const whereClause = { updatedAt: { gt: new Date(since) } };
 
+    // 1. Get all IDs for scoping (not just updated ones)
+    const userProjects = await prisma.project.findMany({ where: { userId }, select: { id: true } });
+    const allProjectIds = userProjects.map(p => p.id);
+    
+    const userSubjects = allProjectIds.length 
+      ? await prisma.subject.findMany({ where: { projectId: { in: allProjectIds } }, select: { id: true } })
+      : [];
+    const allSubjectIds = userSubjects.map(s => s.id);
+    
+    const userTopics = allSubjectIds.length
+      ? await prisma.topic.findMany({ where: { subjectId: { in: allSubjectIds } }, select: { id: true } })
+      : [];
+    const allTopicIds = userTopics.map(t => t.id);
+
+    // 2. Fetch actually updated records
     const projects = await prisma.project.findMany({
       where: { userId, ...whereClause },
     });
 
-    const projectIds = projects.map((p: SyncProject) => p.id);
-
-    const subjects = projectIds.length
+    const subjects = allProjectIds.length
       ? (await prisma.subject.findMany({
-          where: { projectId: { in: projectIds }, ...whereClause },
+          where: { projectId: { in: allProjectIds }, ...whereClause },
         })) as any as SyncSubject[]
       : [];
 
-    const subjectIds = subjects.map((s: SyncSubject) => s.id);
-
     const [topics, sessions, sources, skillLabels] = await Promise.all([
-      subjectIds.length
+      allSubjectIds.length
         ? prisma.topic.findMany({
-            where: { subjectId: { in: subjectIds }, ...whereClause },
+            where: { subjectId: { in: allSubjectIds }, ...whereClause },
           })
         : [],
-      subjectIds.length
+      allSubjectIds.length
         ? prisma.studySession.findMany({
-            where: { subjectId: { in: subjectIds }, ...whereClause },
+            where: { subjectId: { in: allSubjectIds }, ...whereClause },
           })
         : [],
-      subjectIds.length
+      allSubjectIds.length
         ? prisma.source.findMany({
-            where: { subjectId: { in: subjectIds }, ...whereClause },
+            where: { subjectId: { in: allSubjectIds }, ...whereClause },
           })
         : [],
-      subjectIds.length
+      allSubjectIds.length
         ? prisma.skillLabel.findMany({
-            where: { subjectId: { in: subjectIds }, ...whereClause },
+            where: { subjectId: { in: allSubjectIds }, ...whereClause },
           })
         : [],
     ]);
 
-    const topicIds = topics.map((t: SyncTopic) => t.id);
-
-    const chapters = topicIds.length
+    const chapters = allTopicIds.length
       ? await prisma.chapter.findMany({
-          where: { topicId: { in: topicIds }, ...whereClause },
+          where: { topicId: { in: allTopicIds }, ...whereClause },
         })
       : [];
 
-    const [achievements, userStats] = await Promise.all([
+    const [achievements, userStats, subjectMilestones] = await Promise.all([
       prisma.achievement.findMany({
         where: { userId, ...whereClause },
       }),
       prisma.userStats.findUnique({ where: { userId } }),
+      allSubjectIds.length
+        ? prisma.subjectMilestone.findMany({
+            where: { subjectId: { in: allSubjectIds }, ...whereClause },
+          })
+        : [],
     ]);
 
     return {
@@ -210,6 +247,7 @@ export class SyncService {
       skillLabels: skillLabels as any as SyncSkillLabel[],
       achievements,
       userStats,
+      subjectMilestones,
     };
   }
 
@@ -433,7 +471,7 @@ export class SyncService {
           a++;
         } catch (e: unknown) {
           const message = e instanceof Error ? e.message : String(e);
-          errors.push({ entity: 'project', id: (item as any).id, error: message });
+          errors.push({ entity: 'session', id: (item as any).id, error: message });
         }
       }
       applied.sessions = a;
@@ -593,6 +631,21 @@ export class SyncService {
                   conflicts.userStats = 1;
                 }
               }
+          } else {
+            // C2: Create initial stats for new users
+            await prisma.userStats.create({
+              data: {
+                userId,
+                totalXp: validated.totalXp,
+                currentLevel: validated.currentLevel,
+                currentStreak: validated.currentStreak,
+                longestStreak: validated.longestStreak,
+                lastStudyDate: validated.lastStudyDate ? new Date(validated.lastStudyDate) : null,
+                totalStudyMinutes: validated.totalStudyMinutes,
+                freezeTokens: validated.freezeTokens,
+              }
+            });
+            applied.userStats = 1;
           }
         }
       } catch (e: unknown) {
@@ -600,11 +653,48 @@ export class SyncService {
       }
     }
 
+    if (payload.subjectMilestones?.length) {
+      let a = 0;
+      let c = 0;
+      for (const item of payload.subjectMilestones) {
+        try {
+          const validated = subjectMilestoneSchema.parse(item);
+
+          const owned = await SyncService.verifySubjectOwnership(validated.subjectId, userId);
+          if (!owned) {
+            errors.push({ entity: 'subjectMilestone', id: validated.id, error: 'forbidden' });
+            continue;
+          }
+
+          const existing = await prisma.subjectMilestone.findUnique({
+            where: { id: validated.id },
+          });
+          const result = lastWriteWins(validated, existing);
+          if (!result.accepted) {
+            c++;
+            continue;
+          }
+
+          await prisma.subjectMilestone.upsert({
+            where: { id: validated.id },
+            create: validated,
+            update: validated,
+          });
+          a++;
+        } catch (e: unknown) {
+          errors.push({ entity: 'subjectMilestone', id: item.id, error: e instanceof Error ? e.message : String(e) });
+        }
+      }
+      applied.subjectMilestones = a;
+      conflicts.subjectMilestones = c;
+    }
+
     if (
       (applied.sessions ?? 0) > 0 ||
       (applied.skillLabels ?? 0) > 0 ||
       (applied.sources ?? 0) > 0 ||
-      (applied.userStats ?? 0) > 0
+      (applied.userStats ?? 0) > 0 ||
+      (applied.subjectMilestones ?? 0) > 0
     ) {
       try {
         await AchievementService.checkAndUnlock(userId);

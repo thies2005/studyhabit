@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../api/client';
 import type { Subject } from '../types';
+import CreateSubjectDialog from '../components/CreateSubjectDialog';
 
 export default function Subjects() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -21,6 +23,12 @@ export default function Subjects() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCreateSubject = async (subjectData: any) => {
+    const response = await apiClient.post('/subjects', subjectData);
+    const newSubject = response.data.data;
+    setSubjects((prev) => [newSubject, ...prev]);
   };
 
   const formatColor = (colorValue: number) => {
@@ -60,7 +68,7 @@ export default function Subjects() {
               </p>
             </div>
             <button
-              onClick={() => {/* TODO: Implement new subject dialog */}}
+              onClick={() => setIsCreateDialogOpen(true)}
               className="flex items-center space-x-2 px-4 py-2 bg-primary hover:bg-primary-container text-white rounded-lg font-medium transition-colors"
             >
               <span className="text-xl">add_circle</span>
@@ -115,7 +123,7 @@ export default function Subjects() {
                     <div className="flex justify-between">
                       <span className="text-sm text-gray-400 font-body">Time Invested</span>
                       <span className="text-sm font-medium text-onSurface font-data">
-                        {Math.floor(subject.xpTotal / 50)}h {(subject.xpTotal % 50) * 0.6}m
+                        {Math.floor((subject.totalStudyMinutes || 0) / 60)}h {(subject.totalStudyMinutes || 0) % 60}m
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -151,6 +159,11 @@ export default function Subjects() {
           </div>
         </div>
       </main>
+      <CreateSubjectDialog
+        isOpen={isCreateDialogOpen}
+        onClose={() => setIsCreateDialogOpen(false)}
+        onSubmit={handleCreateSubject}
+      />
     </div>
   );
 }

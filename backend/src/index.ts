@@ -18,6 +18,7 @@ import achievementRoutes from './routes/achievements.js';
 import topicRoutes from './routes/topics.js';
 import chapterRoutes from './routes/chapters.js';
 import skillLabelRoutes from './routes/skill-labels.js';
+import milestoneRoutes from './routes/milestones.js';
 import { AuthService } from './services/authService.js';
 import docsRoutes from './routes/docs.js';
 
@@ -71,6 +72,7 @@ app.use('/api/v1/chapters', apiLimiter, authMiddleware, chapterRoutes);
 app.use('/api/v1/skill-labels', apiLimiter, authMiddleware, skillLabelRoutes);
 app.use('/api/v1/sessions', apiLimiter, authMiddleware, sessionRoutes);
 app.use('/api/v1/sources', apiLimiter, authMiddleware, sourceRoutes);
+app.use('/api/v1/milestones', apiLimiter, authMiddleware, milestoneRoutes);
 app.use('/api/v1/stats', apiLimiter, authMiddleware, statsRoutes);
 app.use('/api/v1/achievements', apiLimiter, authMiddleware, achievementRoutes);
 

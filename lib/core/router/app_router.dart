@@ -13,11 +13,12 @@ import '../../features/subjects/detail/subject_detail_screen.dart';
 import '../../features/subjects/list/subjects_screen.dart';
 import '../../features/settings/diagnostic_logs_screen.dart';
 import '../../features/settings/battery_optimization_guide.dart';
+import '../../features/settings/auth/login_screen.dart';
+import '../../features/settings/sync/sync_settings_page.dart';
 import '../../shared/widgets/app_shell_scaffold.dart';
 import '../../features/pomodoro/pomodoro_notifier.dart';
 import '../../features/pomodoro/free_timer_notifier.dart';
 import '../../core/models/enums.dart';
-
 
 part 'app_router.g.dart';
 
@@ -147,6 +148,16 @@ GoRouter appRouter(Ref ref) {
             path: 'battery-tips',
             name: 'battery-tips',
             builder: (context, state) => const BatteryOptimizationGuide(),
+          ),
+          GoRoute(
+            path: 'login',
+            name: 'login',
+            builder: (context, state) => const LoginScreen(),
+          ),
+          GoRoute(
+            path: 'sync',
+            name: 'sync-settings',
+            builder: (context, state) => const SyncSettingsPage(),
           ),
         ],
       ),

@@ -21,6 +21,7 @@ abstract class Source with _$Source {
     double? progressPercent,
     String? notes,
     required DateTime addedAt,
+    DateTime? updatedAt,
   }) = _Source;
 
   factory Source.fromJson(Map<String, dynamic> json) => _$SourceFromJson(json);

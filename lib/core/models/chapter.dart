@@ -10,6 +10,7 @@ abstract class Chapter with _$Chapter {
     required String topicId,
     required String name,
     required int order,
+    DateTime? updatedAt,
   }) = _Chapter;
 
   factory Chapter.fromJson(Map<String, dynamic> json) =>

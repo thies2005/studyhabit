@@ -8,6 +8,7 @@ import '../../core/database/daos/project_dao.dart';
 import '../../core/models/model_mapper.dart';
 import '../../core/models/project.dart';
 import '../../core/providers/database_provider.dart';
+import '../../core/services/sync_service.dart';
 
 part 'project_providers.g.dart';
 
@@ -75,6 +76,8 @@ class ProjectNotifier extends _$ProjectNotifier {
         return null;
       }
       AppLogger.i('ProjectNotifier', 'Project created successfully: ${row.id}');
+      // Trigger sync
+      ref.read(syncEngineProvider.notifier).fullSync();
       return mapProject(row);
     } catch (e, stack) {
       AppLogger.e('ProjectNotifier', 'Failed to create project', e, stack);
@@ -107,6 +110,7 @@ class ProjectNotifier extends _$ProjectNotifier {
         ),
       );
       AppLogger.i('ProjectNotifier', 'Project switch successful');
+      ref.read(syncEngineProvider.notifier).fullSync();
     } catch (e, stack) {
       AppLogger.e('ProjectNotifier', 'Failed to switch project', e, stack);
     }
@@ -147,6 +151,7 @@ class ProjectNotifier extends _$ProjectNotifier {
         ),
       );
       AppLogger.i('ProjectNotifier', 'Project update successful');
+      ref.read(syncEngineProvider.notifier).fullSync();
     } catch (e, stack) {
       AppLogger.e('ProjectNotifier', 'Failed to update project', e, stack);
     }
@@ -154,5 +159,6 @@ class ProjectNotifier extends _$ProjectNotifier {
 
   Future<void> archive(String id) async {
     await _dao.softDelete(id);
+    ref.read(syncEngineProvider.notifier).fullSync();
   }
 }

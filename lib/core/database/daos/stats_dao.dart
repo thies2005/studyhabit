@@ -12,7 +12,10 @@ class StatsDao {
   }
 
   Future<void> upsertStats(UserStatsTableCompanion companion) {
-    return _db.into(_db.userStatsTable).insertOnConflictUpdate(companion);
+    final withUpdated = companion.updatedAt.present
+        ? companion
+        : companion.copyWith(updatedAt: Value(DateTime.now()));
+    return _db.into(_db.userStatsTable).insertOnConflictUpdate(withUpdated);
   }
 
   Future<void> initStats() async {
