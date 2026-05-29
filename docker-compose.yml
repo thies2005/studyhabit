@@ -22,7 +22,7 @@ services:
     ports:
       - "${API_PORT:-3001}:3001"
     environment:
-      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${DB_USER:-studytracker}:${DB_PASSWORD}@db:5432/${DB_NAME:-studytracker}}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?Set JWT_REFRESH_SECRET in .env}
       JWT_ACCESS_EXPIRY: ${JWT_ACCESS_EXPIRY:-15m}
