@@ -6,8 +6,7 @@ dist/
 build/
 
 # Source files (already in dist/)
-src/
-tsconfig.json
+# (Removed src/ and tsconfig.json from ignore list to allow Docker build stage compilation)
 
 # Testing
 test/
