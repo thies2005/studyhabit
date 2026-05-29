@@ -27,7 +27,7 @@ export interface Subject {
   defaultBreakMinutes: number;
   xpTotal: number;
   totalStudyMinutes?: number;
-  completenessMode: 'none' | 'hours' | 'chapters';
+  completenessMode: 'none' | 'hoursGoal' | 'milestones' | 'weeklyHoursGoal';
   targetHours: number;
   targetWeeklyHours: number;
   createdAt: string;
