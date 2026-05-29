@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import type { Achievement } from '../types';
+import type { Achievement, StatsOverview } from '../types';
+import { useApi } from '../api/hooks';
 
 const achievementIcons: Record<string, string> = {
   streak_3: 'local_fire_department',
@@ -143,23 +144,25 @@ const mockAchievements: Achievement[] = [
 ];
 
 export default function Achievements() {
-  const [achievements, setAchievements] = useState<Achievement[]>([]);
-  const currentLevel = 4;
-  const totalXp = 12450;
-  const [loading, setLoading] = useState(false);
+  const { data: stats, loading: statsLoading } = useApi<StatsOverview>('/stats/overview');
+  const { data: serverAchievements, loading: achievementsLoading } = useApi<Achievement[]>('/achievements');
   const [selectedAchievement, setSelectedAchievement] = useState<Achievement | null>(null);
 
+  const currentLevel = stats?.currentLevel || 1;
+  const totalXp = stats?.totalXp || 0;
+  const loading = statsLoading || achievementsLoading;
+
+  const displayAchievements = (serverAchievements && serverAchievements.length > 0)
+    ? serverAchievements
+    : mockAchievements;
+
+  const [achievements, setAchievements] = useState<Achievement[]>(mockAchievements);
+
   useEffect(() => {
-    // Mock API call - replace with actual fetch when backend is ready
-    const fetchAchievements = async () => {
-      setLoading(true);
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setAchievements(mockAchievements);
-      setLoading(false);
-    };
-    fetchAchievements();
-  }, []);
+    if (serverAchievements && serverAchievements.length > 0) {
+      setAchievements(serverAchievements);
+    }
+  }, [serverAchievements]);
 
   const getXpInCurrentLevel = () => {
     const levelXp = getXpForLevel(currentLevel);

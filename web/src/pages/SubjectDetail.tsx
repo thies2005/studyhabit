@@ -102,16 +102,53 @@ const mockTopics = [
 
 export default function SubjectDetail() {
   const { subjectId } = useParams<{ subjectId: string }>();
-  const { data: subject, loading } = useApi<Subject>(`/subjects/${subjectId}`);
+  const { data: subject, loading: subjectLoading } = useApi<Subject & { topics: any[] }>(`/subjects/${subjectId}`);
+  const { data: sessions, loading: sessionsLoading } = useApi<any[]>(`/sessions?subjectId=${subjectId}`);
+  const { data: sources, loading: sourcesLoading } = useApi<any[]>(`/sources?subjectId=${subjectId}`);
   const [activeTab, setActiveTab] = useState<Tab>('timeline');
   const [expandedTopics, setExpandedTopics] = useState<Set<string>>(new Set());
+
+  const loading = subjectLoading || sessionsLoading || sourcesLoading;
 
   if (loading) return <div className="p-8 text-center text-gray-400">Loading...</div>;
 
   const displaySubject = subject || mockSubject;
-  const displaySessions = mockSessions;
-  const displaySources = mockSources;
-  const displayTopics = mockTopics;
+
+  const displaySessions = (sessions && sessions.length > 0)
+    ? sessions.map((s) => ({
+        id: s.id,
+        date: new Date(s.startedAt).toLocaleDateString() + ' · ' + new Date(s.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        title: s.notes ? s.notes.split('\n')[0] : 'Study Session',
+        description: s.notes || 'No notes added for this study session.',
+        tags: s.topicId ? ['Topic'] : [],
+        isLab: false,
+        score: undefined,
+        duration: `${s.actualDurationMinutes} min`,
+        xp: s.xpEarned,
+        confidence: s.confidenceRating || 3,
+      }))
+    : mockSessions;
+
+  const displaySources = (sources && sources.length > 0)
+    ? sources.map((src) => ({
+        id: src.id,
+        type: src.type === 'videoUrl' ? ('video' as const) : (src.type as 'pdf' | 'url'),
+        title: src.title,
+        subtitle: src.type === 'pdf' ? `PDF · ${src.totalPages || 0} Pages · Current: ${src.currentPage || 0}` : src.type === 'videoUrl' ? `VIDEO · ${Math.round(src.progressPercent || 0)}% watched` : `WEB · ${src.url || ''}`,
+        pagesRead: src.currentPage || 0,
+        totalPages: src.totalPages || 100,
+        progress: src.progressPercent || 0,
+      }))
+    : mockSources;
+
+  const displayTopics = (subject?.topics && subject.topics.length > 0)
+    ? subject.topics.map((t: any) => ({
+        id: t.id,
+        name: t.name,
+        taskCount: t.chapters?.length || 0,
+        subtopics: t.chapters?.map((c: any) => c.name) || [],
+      }))
+    : mockTopics;
 
   const toggleTopic = (topicId: string) => {
     const newExpanded = new Set(expandedTopics);
