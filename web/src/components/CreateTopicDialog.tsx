@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 
 interface CreateTopicDialogProps {
   isOpen: boolean;
@@ -11,6 +10,8 @@ interface CreateTopicDialogProps {
 export default function CreateTopicDialog({ isOpen, onClose, onSubmit, currentTopicCount }: CreateTopicDialogProps) {
   const [name, setName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,46 +30,53 @@ export default function CreateTopicDialog({ isOpen, onClose, onSubmit, currentTo
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[425px] bg-surfaceHigh border-gray-800">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-heading text-onSurface">Create Topic</DialogTitle>
-        </DialogHeader>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+      <div className="bg-surfaceHigh border border-gray-800 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-scaleUp">
+        <div className="px-6 py-5 border-b border-gray-800 flex justify-between items-center">
+          <h2 className="text-xl font-bold text-onSurface font-heading">Create Topic</h2>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-surface hover:text-white transition-colors"
+          >
+            <span className="material-icons text-lg">close</span>
+          </button>
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-5">
           <div>
-            <label className="block text-sm font-medium text-gray-400 font-body mb-1">
+            <label className="block text-sm font-medium text-gray-400 font-body mb-2">
               Topic Name
             </label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full bg-surface border border-gray-700 rounded-lg px-4 py-2 text-onSurface font-body focus:outline-none focus:border-primary"
+              className="w-full px-4 py-3 bg-surface border border-gray-800 focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors"
               placeholder="e.g., Data Structures"
               autoFocus
               required
             />
           </div>
 
-          <div className="flex justify-end gap-3 mt-6">
+          <div className="flex gap-3 pt-4 border-t border-gray-800">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-400 hover:text-gray-300 font-body transition-colors"
+              disabled={isSubmitting}
+              className="flex-1 py-3 bg-surface hover:bg-gray-800 text-gray-300 font-bold rounded-xl transition-colors font-body text-sm"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting || !name.trim()}
-              className="px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg font-body hover:bg-primary-container disabled:opacity-50 transition-colors"
+              className="flex-1 py-3 bg-primary hover:bg-primary-container text-white font-bold rounded-xl transition-colors font-body text-sm disabled:opacity-50"
             >
               {isSubmitting ? 'Creating...' : 'Create Topic'}
             </button>
           </div>
         </form>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   );
 }

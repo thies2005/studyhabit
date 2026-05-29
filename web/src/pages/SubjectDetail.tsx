@@ -356,15 +356,15 @@ export default function SubjectDetail() {
               <div className="bg-[#323536] rounded-xl p-4">
                 <div className="flex items-center gap-4 mb-4">
                   <div className="flex-1">
-                    <div className="text-sm text-gray-400 font-body mb-1">Retention</div>
-                    <div className="text-2xl font-bold text-onSurface font-data">82%</div>
+                    <div className="text-sm text-gray-400 font-body mb-1">XP Level</div>
+                    <div className="text-2xl font-bold text-onSurface font-data">{stats?.currentLevel || 1}</div>
                   </div>
                   <div className="w-12 h-12 rounded-full border-4 border-primary flex items-center justify-center">
-                    <span className="material-icons text-primary">trending_up</span>
+                    <span className="material-icons text-primary">emoji_events</span>
                   </div>
                 </div>
                 <div className="w-full bg-gray-700 rounded-full h-2">
-                  <div className="bg-primary h-2 rounded-full" style={{ width: '82%' }} />
+                  <div className="bg-primary h-2 rounded-full" style={{ width: `${Math.min(((stats?.totalXp || 0) % 1000) / 10, 100)}%` }} />
                 </div>
               </div>
 
@@ -373,8 +373,8 @@ export default function SubjectDetail() {
                   <span className="material-icons text-tertiary text-2xl">local_fire_department</span>
                 </div>
                 <div>
-                  <div className="text-sm text-gray-400 font-body mb-1">Streak</div>
-                  <div className="text-2xl font-bold text-onSurface font-data">12d</div>
+                  <div className="text-sm text-gray-400 font-body mb-1">Current Streak</div>
+                  <div className="text-2xl font-bold text-onSurface font-data">{stats?.currentStreak || 0}d</div>
                 </div>
               </div>
 

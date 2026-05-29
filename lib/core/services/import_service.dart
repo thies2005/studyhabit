@@ -226,7 +226,7 @@ class ImportService {
                   chapterId: Value(skillLabel.chapterId),
                   label: Value(skillLabel.label),
                   isDeleted: Value(skillLabel.isDeleted),
-                  updatedAt: Value(skillLabel.updatedAt ?? DateTime.now()),
+                  updatedAt: Value(skillLabel.updatedAt),
                 ),
               );
             }

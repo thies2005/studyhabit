@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 
 interface CreateSourceDialogProps {
   isOpen: boolean;
@@ -15,6 +14,8 @@ export default function CreateSourceDialog({ isOpen, onClose, onSubmit, topics }
   const [totalPages, setTotalPages] = useState('');
   const [topicId, setTopicId] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,35 +43,41 @@ export default function CreateSourceDialog({ isOpen, onClose, onSubmit, topics }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[425px] bg-surfaceHigh border-gray-800">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-heading text-onSurface">Add Source</DialogTitle>
-        </DialogHeader>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+      <div className="bg-surfaceHigh border border-gray-800 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-scaleUp">
+        <div className="px-6 py-5 border-b border-gray-800 flex justify-between items-center">
+          <h2 className="text-xl font-bold text-onSurface font-heading">Add Source</h2>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-surface hover:text-white transition-colors"
+          >
+            <span className="material-icons text-lg">close</span>
+          </button>
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-5">
           <div>
-            <label className="block text-sm font-medium text-gray-400 font-body mb-1">
+            <label className="block text-sm font-medium text-gray-400 font-body mb-2">
               Source Title
             </label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full bg-surface border border-gray-700 rounded-lg px-4 py-2 text-onSurface font-body focus:outline-none focus:border-primary"
+              className="w-full px-4 py-3 bg-surface border border-gray-800 focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors"
               placeholder="e.g., Chapter 4: Neural Networks"
               required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-400 font-body mb-1">
+            <label className="block text-sm font-medium text-gray-400 font-body mb-2">
               Source Type
             </label>
             <select
               value={type}
               onChange={(e) => setType(e.target.value as any)}
-              className="w-full bg-surface border border-gray-700 rounded-lg px-4 py-2 text-onSurface font-body focus:outline-none focus:border-primary"
+              className="w-full px-4 py-3 bg-surface border border-gray-800 focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors"
             >
               <option value="url">Website / Article</option>
               <option value="videoUrl">Video</option>
@@ -80,14 +87,14 @@ export default function CreateSourceDialog({ isOpen, onClose, onSubmit, topics }
 
           {type !== 'pdf' && (
             <div>
-              <label className="block text-sm font-medium text-gray-400 font-body mb-1">
+              <label className="block text-sm font-medium text-gray-400 font-body mb-2">
                 URL
               </label>
               <input
                 type="url"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                className="w-full bg-surface border border-gray-700 rounded-lg px-4 py-2 text-onSurface font-body focus:outline-none focus:border-primary"
+                className="w-full px-4 py-3 bg-surface border border-gray-800 focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors"
                 placeholder="https://..."
               />
             </div>
@@ -95,7 +102,7 @@ export default function CreateSourceDialog({ isOpen, onClose, onSubmit, topics }
 
           {type === 'pdf' && (
             <div>
-              <label className="block text-sm font-medium text-gray-400 font-body mb-1">
+              <label className="block text-sm font-medium text-gray-400 font-body mb-2">
                 Total Pages
               </label>
               <input
@@ -103,20 +110,20 @@ export default function CreateSourceDialog({ isOpen, onClose, onSubmit, topics }
                 min="1"
                 value={totalPages}
                 onChange={(e) => setTotalPages(e.target.value)}
-                className="w-full bg-surface border border-gray-700 rounded-lg px-4 py-2 text-onSurface font-body focus:outline-none focus:border-primary"
+                className="w-full px-4 py-3 bg-surface border border-gray-800 focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors"
                 placeholder="e.g., 345"
               />
             </div>
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-400 font-body mb-1">
+            <label className="block text-sm font-medium text-gray-400 font-body mb-2">
               Topic (Optional)
             </label>
             <select
               value={topicId}
               onChange={(e) => setTopicId(e.target.value)}
-              className="w-full bg-surface border border-gray-700 rounded-lg px-4 py-2 text-onSurface font-body focus:outline-none focus:border-primary"
+              className="w-full px-4 py-3 bg-surface border border-gray-800 focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors"
             >
               <option value="">No specific topic</option>
               {topics.map(t => (
@@ -125,24 +132,25 @@ export default function CreateSourceDialog({ isOpen, onClose, onSubmit, topics }
             </select>
           </div>
 
-          <div className="flex justify-end gap-3 mt-6">
+          <div className="flex gap-3 pt-4 border-t border-gray-800">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-400 hover:text-gray-300 font-body transition-colors"
+              disabled={isSubmitting}
+              className="flex-1 py-3 bg-surface hover:bg-gray-800 text-gray-300 font-bold rounded-xl transition-colors font-body text-sm"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting || !title.trim()}
-              className="px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg font-body hover:bg-primary-container disabled:opacity-50 transition-colors"
+              className="flex-1 py-3 bg-primary hover:bg-primary-container text-white font-bold rounded-xl transition-colors font-body text-sm disabled:opacity-50"
             >
               {isSubmitting ? 'Adding...' : 'Add Source'}
             </button>
           </div>
         </form>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   );
 }

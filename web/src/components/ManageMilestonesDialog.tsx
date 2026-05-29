@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import type { SubjectMilestone } from '../types';
 import apiClient from '../api/client';
 
@@ -14,6 +13,8 @@ interface ManageMilestonesDialogProps {
 export default function ManageMilestonesDialog({ isOpen, onClose, subjectId, milestones, onUpdate }: ManageMilestonesDialogProps) {
   const [title, setTitle] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  if (!isOpen) return null;
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,39 +57,45 @@ export default function ManageMilestonesDialog({ isOpen, onClose, subjectId, mil
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[425px] bg-surfaceHigh border-gray-800">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-heading text-onSurface">Manage Milestones</DialogTitle>
-        </DialogHeader>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+      <div className="bg-surfaceHigh border border-gray-800 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-scaleUp">
+        <div className="px-6 py-5 border-b border-gray-800 flex justify-between items-center">
+          <h2 className="text-xl font-bold text-onSurface font-heading">Manage Milestones</h2>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-surface hover:text-white transition-colors"
+          >
+            <span className="material-icons text-lg">close</span>
+          </button>
+        </div>
 
-        <div className="space-y-4 mt-4">
+        <div className="p-6 space-y-5">
           <form onSubmit={handleAdd} className="flex gap-2">
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="flex-1 bg-surface border border-gray-700 rounded-lg px-4 py-2 text-onSurface font-body focus:outline-none focus:border-primary"
+              className="flex-1 px-4 py-3 bg-surface border border-gray-800 focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors"
               placeholder="New milestone..."
             />
             <button
               type="submit"
               disabled={isSubmitting || !title.trim()}
-              className="px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg font-body hover:bg-primary-container disabled:opacity-50 transition-colors"
+              className="px-6 py-3 bg-primary hover:bg-primary-container text-white font-bold rounded-xl transition-colors font-body text-sm disabled:opacity-50"
             >
               Add
             </button>
           </form>
 
-          <div className="max-h-60 overflow-y-auto space-y-2 mt-4 pr-2">
+          <div className="max-h-60 overflow-y-auto space-y-2 pr-2">
             {milestones.length === 0 ? (
-              <p className="text-sm text-gray-400 font-body">No milestones yet.</p>
+              <p className="text-sm text-gray-400 font-body text-center py-4">No milestones yet.</p>
             ) : milestones.sort((a,b) => a.sortOrder - b.sortOrder).map(m => (
-              <div key={m.id} className="flex items-center justify-between p-3 bg-surface rounded-lg">
+              <div key={m.id} className="flex items-center justify-between p-3 bg-surface rounded-xl border border-gray-800">
                 <div className="flex items-center gap-3">
                   <button 
                     onClick={() => toggleMilestone(m)}
-                    className={`w-5 h-5 rounded-md flex items-center justify-center border transition-colors ${m.isCompleted ? 'bg-primary border-primary' : 'border-gray-500'}`}
+                    className={`w-6 h-6 rounded-md flex items-center justify-center border transition-colors ${m.isCompleted ? 'bg-primary border-primary' : 'border-gray-500'}`}
                   >
                     {m.isCompleted && <span className="material-icons text-white text-[16px]">check</span>}
                   </button>
@@ -96,7 +103,7 @@ export default function ManageMilestonesDialog({ isOpen, onClose, subjectId, mil
                     {m.title}
                   </span>
                 </div>
-                <button onClick={() => deleteMilestone(m.id)} className="text-gray-500 hover:text-red-400 transition-colors">
+                <button onClick={() => deleteMilestone(m.id)} className="w-8 h-8 rounded-full flex items-center justify-center text-gray-500 hover:text-red-400 hover:bg-surfaceHigh transition-colors">
                   <span className="material-icons text-sm">delete</span>
                 </button>
               </div>
@@ -104,16 +111,16 @@ export default function ManageMilestonesDialog({ isOpen, onClose, subjectId, mil
           </div>
         </div>
 
-        <div className="flex justify-end gap-3 mt-4">
+        <div className="px-6 py-5 border-t border-gray-800 flex justify-end">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 bg-surface text-onSurface text-sm font-medium rounded-lg font-body transition-colors"
+            className="px-8 py-3 bg-surface hover:bg-gray-800 text-gray-300 font-bold rounded-xl transition-colors font-body text-sm"
           >
             Done
           </button>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   );
 }

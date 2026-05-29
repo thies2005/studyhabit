@@ -149,7 +149,7 @@ class ExportService {
   Future<File> exportToJson() async {
     try {
       // Query all data
-      final projectRows = await _db.select(_db.projects).get();
+      final projects = await _db.select(_db.projects).get();
       final subjectRows = await _db.select(_db.subjects).get();
       final topicRows = await _db.select(_db.topics).get();
       final chapterRows = await _db.select(_db.chapters).get();
