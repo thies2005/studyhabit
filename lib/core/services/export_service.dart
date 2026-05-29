@@ -149,10 +149,7 @@ class ExportService {
   Future<File> exportToJson() async {
     try {
       // Query all data
-      final projectRows = _db.select(_db.projects)
-        ..where((t) => t.isArchived.equals(false));
-
-      final projects = await projectRows.get();
+      final projectRows = await _db.select(_db.projects).get();
       final subjectRows = await _db.select(_db.subjects).get();
       final topicRows = await _db.select(_db.topics).get();
       final chapterRows = await _db.select(_db.chapters).get();
@@ -254,7 +251,7 @@ class ExportService {
       }
 
       final documentWithSettings = ExportDocument(
-        exportVersion: 1,
+        exportVersion: 2,
         exportedAt: DateTime.now().toIso8601String(),
         userStats: userStats,
         projects: exportProjects,

@@ -3,7 +3,11 @@ import { useState } from 'react';
 import { useApi } from '../api/hooks';
 import type { Subject } from '../types';
 import CreateSessionDialog from '../components/CreateSessionDialog';
+import CreateTopicDialog from '../components/CreateTopicDialog';
+import CreateSourceDialog from '../components/CreateSourceDialog';
+import ManageMilestonesDialog from '../components/ManageMilestonesDialog';
 import apiClient from '../api/client';
+import type { SubjectMilestone } from '../types';
 
 type Tab = 'timeline' | 'sources' | 'topics';
 
@@ -13,12 +17,18 @@ export default function SubjectDetail() {
   const { subjectId } = useParams<{ subjectId: string }>();
   const { data: subject, loading: subjectLoading, refetch: refetchSubject } = useApi<Subject & { topics: any[] }>(`/subjects/${subjectId}`);
   const { data: sessions, loading: sessionsLoading, refetch: refetchSessions } = useApi<any[]>(`/sessions?subjectId=${subjectId}`);
-  const { data: sources, loading: sourcesLoading } = useApi<any[]>(`/sources?subjectId=${subjectId}`);
+  const { data: sources, loading: sourcesLoading, refetch: refetchSources } = useApi<any[]>(`/sources?subjectId=${subjectId}`);
+  const { data: milestones, loading: milestonesLoading, refetch: refetchMilestones } = useApi<SubjectMilestone[]>(`/milestones?subjectId=${subjectId}`);
+  const { data: stats } = useApi<any>('/stats/overview');
+  
   const [activeTab, setActiveTab] = useState<Tab>('timeline');
   const [expandedTopics, setExpandedTopics] = useState<Set<string>>(new Set());
   const [isSessionDialogOpen, setIsSessionDialogOpen] = useState(false);
+  const [isTopicDialogOpen, setIsTopicDialogOpen] = useState(false);
+  const [isSourceDialogOpen, setIsSourceDialogOpen] = useState(false);
+  const [isMilestonesDialogOpen, setIsMilestonesDialogOpen] = useState(false);
 
-  const loading = subjectLoading || sessionsLoading || sourcesLoading;
+  const loading = subjectLoading || sessionsLoading || sourcesLoading || milestonesLoading;
 
   if (loading) return <div className="p-8 text-center text-gray-400">Loading...</div>;
   if (!subject) return <div className="p-8 text-center text-gray-400">Subject not found</div>;
@@ -75,6 +85,16 @@ export default function SubjectDetail() {
       newExpanded.add(topicId);
     }
     setExpandedTopics(newExpanded);
+  };
+
+  const handleCreateTopic = async (topicData: { name: string; order: number }) => {
+    await apiClient.post('/topics', { ...topicData, subjectId });
+    refetchSubject();
+  };
+
+  const handleCreateSource = async (sourceData: any) => {
+    await apiClient.post('/sources', { ...sourceData, subjectId });
+    refetchSources();
   };
 
   const renderTabContent = () => {
@@ -151,9 +171,15 @@ export default function SubjectDetail() {
                 <span className="material-icons">folder_open</span>
                 Primary Sources
               </h3>
-              <a href="#" className="text-sm text-primary hover:underline font-body">
-                View All
-              </a>
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setIsSourceDialogOpen(true)}
+                  className="text-xs flex items-center gap-1 text-primary hover:text-primary/80 font-medium transition-colors font-body"
+                >
+                  <span className="material-icons text-sm">add</span>
+                  Add Source
+                </button>
+              </div>
             </div>
             {displaySources.length === 0 ? (
               <div className="text-center py-8 text-gray-400 font-body">No sources added yet.</div>
@@ -211,7 +237,16 @@ export default function SubjectDetail() {
                 <span className="material-icons">schema</span>
                 Topics
               </h3>
-              <span className="text-sm text-gray-400 font-body">{displayTopics.length} topics</span>
+              <div className="flex items-center gap-4">
+                <span className="text-sm text-gray-400 font-body">{displayTopics.length} topics</span>
+                <button
+                  onClick={() => setIsTopicDialogOpen(true)}
+                  className="text-xs flex items-center gap-1 text-primary hover:text-primary/80 font-medium transition-colors font-body"
+                >
+                  <span className="material-icons text-sm">add</span>
+                  Add Topic
+                </button>
+              </div>
             </div>
             {displayTopics.length === 0 ? (
               <div className="text-center py-8 text-gray-400 font-body">No topics added yet.</div>
@@ -345,14 +380,25 @@ export default function SubjectDetail() {
 
               {/* Next Milestone Card */}
               <div className="bg-[#323536] rounded-xl p-4">
-                <h4 className="text-sm text-gray-400 font-body mb-2">Next Milestone</h4>
-                <h3 className="text-lg font-semibold text-onSurface font-heading mb-2">
-                  Motor Cortex Mapping
-                </h3>
-                <p className="text-xs text-gray-400 font-body mb-3">
-                  Due Oct 28 • Complete neural pathway exercises
-                </p>
-                <button className="w-full bg-primary/20 text-primary py-2 rounded-lg text-sm font-medium hover:bg-primary/30 transition-colors font-body">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-sm text-gray-400 font-body">Next Milestone</h4>
+                  <button onClick={() => setIsMilestonesDialogOpen(true)} className="text-xs text-primary hover:underline">Manage</button>
+                </div>
+                
+                {milestones && milestones.filter(m => !m.isCompleted).length > 0 ? (
+                  <>
+                    <h3 className="text-lg font-semibold text-onSurface font-heading mb-2">
+                      {milestones.filter(m => !m.isCompleted).sort((a,b) => a.sortOrder - b.sortOrder)[0].title}
+                    </h3>
+                    <p className="text-xs text-gray-400 font-body mb-3">
+                      Keep going to unlock this!
+                    </p>
+                  </>
+                ) : (
+                  <div className="text-sm text-gray-400 my-4">No upcoming milestones</div>
+                )}
+                
+                <button onClick={() => setIsSessionDialogOpen(true)} className="w-full bg-primary/20 text-primary py-2 rounded-lg text-sm font-medium hover:bg-primary/30 transition-colors font-body">
                   Plan Study Block
                 </button>
               </div>
@@ -365,6 +411,25 @@ export default function SubjectDetail() {
         onClose={() => setIsSessionDialogOpen(false)}
         subjects={[displaySubject as Subject]}
         onSubmit={handleCreateSession}
+      />
+      <CreateTopicDialog
+        isOpen={isTopicDialogOpen}
+        onClose={() => setIsTopicDialogOpen(false)}
+        onSubmit={handleCreateTopic}
+        currentTopicCount={displayTopics.length}
+      />
+      <CreateSourceDialog
+        isOpen={isSourceDialogOpen}
+        onClose={() => setIsSourceDialogOpen(false)}
+        onSubmit={handleCreateSource}
+        topics={displayTopics.map((t: any) => ({ id: t.id, name: t.name }))}
+      />
+      <ManageMilestonesDialog
+        isOpen={isMilestonesDialogOpen}
+        onClose={() => setIsMilestonesDialogOpen(false)}
+        subjectId={subjectId!}
+        milestones={milestones || []}
+        onUpdate={refetchMilestones}
       />
     </div>
   );

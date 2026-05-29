@@ -6,76 +6,99 @@ import type { StatsOverview } from '../types';
 
 const presetSeeds = [
   '#006874', // Deep Teal
-  '#6750A4', // Purple
-  '#0061A4', // Blue
-  '#006E1C', // Green
-  '#B3261E', // Red
-  '#984061', // Pink
-  '#AC3306', // Orange
-  '#7B5800', // Brown
-  '#386667', // Cyan
-  '#343DFF', // Indigo
-  '#1B6B46', // Forest
-  '#4A4458', // Slate
+  '#4F378B', // Purple
+  '#004A77', // Blue
+  '#005313', // Green
+  '#93000A', // Red
+  '#7D264A', // Pink
+  '#8D1500', // Orange
+  '#5D4200', // Amber
+  '#004F50', // Cyan
+  '#0008A6', // Indigo
+  '#00522B', // Emerald
+  '#332D41', // Slate
 ];
-
-const STORAGE_KEY = 'studytracker_settings';
-
-interface SettingsState {
-  seedColor: string;
-  fontScale: 'small' | 'normal' | 'large';
-  workDuration: number;
-  shortBreak: number;
-  longBreak: number;
-  longBreakEvery: number;
-  autoStartBreaks: boolean;
-  vibrationOnComplete: boolean;
-  enableNotifications: boolean;
-  gracePeriod: number;
-}
-
-const loadSettings = (): SettingsState => {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      return JSON.parse(stored);
-    }
-  } catch (error) {
-    console.error('Failed to load settings:', error);
-  }
-  return {
-    seedColor: '#006874',
-    fontScale: 'normal',
-    workDuration: 25,
-    shortBreak: 5,
-    longBreak: 15,
-    longBreakEvery: 4,
-    autoStartBreaks: false,
-    vibrationOnComplete: true,
-    enableNotifications: true,
-    gracePeriod: 2,
-  };
-};
-
-const saveSettings = async (settings: SettingsState) => {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-    // Try to sync to backend if possible (fire and forget)
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      import('../api/client').then(({ default: apiClient }) => {
-        apiClient.post('/settings', settings).catch(console.error);
-      });
-    }
-  } catch (error) {
-    console.error('Failed to save settings:', error);
-  }
-};
 
 export default function Settings() {
   const { logout } = useAuth();
   const navigate = useNavigate();
   const { data: stats } = useApi<StatsOverview>('/stats/overview');
+
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Theme settings
+  const [seedColor, setSeedColor] = useState(presetSeeds[0]);
+  const [fontScale, setFontScale] = useState<'small' | 'normal' | 'large'>('normal');
+
+  // Pomodoro settings
+  const [workDuration, setWorkDuration] = useState(25);
+  const [shortBreak, setShortBreak] = useState(5);
+  const [longBreak, setLongBreak] = useState(15);
+  const [longBreakEvery, setLongBreakEvery] = useState(4);
+  const [autoStartBreaks, setAutoStartBreaks] = useState(false);
+  const [vibrationOnComplete, setVibrationOnComplete] = useState(true);
+
+  // Notifications
+  const [enableNotifications, setEnableNotifications] = useState(true);
+
+  // Streak settings
+  const [gracePeriod, setGracePeriod] = useState(2);
+  const freezeTokens = stats?.freezeTokens ?? 0;
+
+  useEffect(() => {
+    import('../api/client').then(({ default: apiClient }) => {
+      apiClient.get('/settings').then((res) => {
+        const data = res.data.data;
+        if (data) {
+          const seedIndex = data['theme.seedColorIndex'] ?? 0;
+          setSeedColor(presetSeeds[seedIndex] || presetSeeds[0]);
+          
+          const fs = data['theme.fontScale'] ?? 1.0;
+          setFontScale(fs < 0.95 ? 'small' : fs > 1.1 ? 'large' : 'normal');
+
+          setWorkDuration(data['pomodoro.workDuration'] ?? 25);
+          setShortBreak(data['pomodoro.shortBreak'] ?? 5);
+          setLongBreak(data['pomodoro.longBreak'] ?? 15);
+          setLongBreakEvery(data['pomodoro.longBreakEvery'] ?? 4);
+          setAutoStartBreaks(data['pomodoro.autoStartBreaks'] ?? false);
+          setVibrationOnComplete(data['pomodoro.vibration'] ?? true);
+          setEnableNotifications(data['notifications.enabled'] ?? true);
+          setGracePeriod(data['streak.gracePeriod'] ?? 2);
+        }
+        setIsLoading(false);
+      }).catch((e) => {
+        console.error('Failed to load settings from server', e);
+        setIsLoading(false);
+      });
+    });
+  }, []);
+
+  // Save settings whenever they change
+  useEffect(() => {
+    if (isLoading) return;
+    
+    const seedIndex = presetSeeds.indexOf(seedColor);
+    const fontScaleNum = fontScale === 'small' ? 0.9 : fontScale === 'large' ? 1.15 : 1.0;
+
+    const payload = {
+      'theme.seedColorIndex': seedIndex >= 0 ? seedIndex : 0,
+      'theme.fontScale': fontScaleNum,
+      'pomodoro.workDuration': workDuration,
+      'pomodoro.shortBreak': shortBreak,
+      'pomodoro.longBreak': longBreak,
+      'pomodoro.longBreakEvery': longBreakEvery,
+      'pomodoro.autoStartBreaks': autoStartBreaks,
+      'pomodoro.vibration': vibrationOnComplete,
+      'notifications.enabled': enableNotifications,
+      'streak.gracePeriod': gracePeriod,
+      'theme.settingsUpdatedAt': Date.now(),
+    };
+
+    import('../api/client').then(({ default: apiClient }) => {
+      apiClient.post('/settings', payload).catch(console.error);
+    });
+  }, [seedColor, fontScale, workDuration, shortBreak, longBreak, longBreakEvery,
+      autoStartBreaks, vibrationOnComplete, enableNotifications, gracePeriod, isLoading]);
 
   const getEmailFromToken = () => {
     try {
@@ -98,42 +121,6 @@ export default function Settings() {
     await logout();
     navigate('/login');
   };
-
-  // Theme settings
-  const [seedColor, setSeedColor] = useState(() => loadSettings().seedColor);
-  const [fontScale, setFontScale] = useState<'small' | 'normal' | 'large'>(() => loadSettings().fontScale);
-
-  // Pomodoro settings
-  const [workDuration, setWorkDuration] = useState(() => loadSettings().workDuration);
-  const [shortBreak, setShortBreak] = useState(() => loadSettings().shortBreak);
-  const [longBreak, setLongBreak] = useState(() => loadSettings().longBreak);
-  const [longBreakEvery, setLongBreakEvery] = useState(() => loadSettings().longBreakEvery);
-  const [autoStartBreaks, setAutoStartBreaks] = useState(() => loadSettings().autoStartBreaks);
-  const [vibrationOnComplete, setVibrationOnComplete] = useState(() => loadSettings().vibrationOnComplete);
-
-  // Notifications
-  const [enableNotifications, setEnableNotifications] = useState(() => loadSettings().enableNotifications);
-
-  // Streak settings
-  const [gracePeriod, setGracePeriod] = useState(() => loadSettings().gracePeriod);
-  const freezeTokens = stats?.freezeTokens ?? 0;
-
-  // Save settings whenever they change
-  useEffect(() => {
-    saveSettings({
-      seedColor,
-      fontScale,
-      workDuration,
-      shortBreak,
-      longBreak,
-      longBreakEvery,
-      autoStartBreaks,
-      vibrationOnComplete,
-      enableNotifications,
-      gracePeriod,
-    });
-  }, [seedColor, fontScale, workDuration, shortBreak, longBreak, longBreakEvery,
-      autoStartBreaks, vibrationOnComplete, enableNotifications, gracePeriod]);
 
   // Data management is mobile-only
 

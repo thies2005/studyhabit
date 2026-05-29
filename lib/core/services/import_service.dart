@@ -86,7 +86,7 @@ class ImportService {
       final json = jsonDecode(jsonString) as Map<String, dynamic>;
 
       final version = json['exportVersion'] as int?;
-      if (version != 1) {
+      if (version != 1 && version != 2) {
         throw Exception('Unsupported export version: $version');
       }
 
@@ -113,6 +113,8 @@ class ImportService {
               defaultLongBreakDuration: Value(project.defaultLongBreakDuration),
               defaultLongBreakEvery: Value(project.defaultLongBreakEvery),
               studyReminderMinutes: Value(project.studyReminderMinutes),
+              isDeleted: Value(project.isDeleted),
+              updatedAt: Value(project.updatedAt ?? DateTime.now()),
             ),
           );
           projectCount++;
@@ -134,6 +136,8 @@ class ImportService {
                 completenessMode: Value(subject.completenessMode),
                 targetHours: Value(subject.targetHours),
                 targetWeeklyHours: Value(subject.targetWeeklyHours),
+                isDeleted: Value(subject.isDeleted),
+                updatedAt: Value(subject.updatedAt ?? DateTime.now()),
               ),
             );
             subjectCount++;
@@ -145,6 +149,8 @@ class ImportService {
                   subjectId: Value(topic.subjectId),
                   name: Value(topic.name),
                   order: Value(topic.order),
+                  isDeleted: Value(topic.isDeleted),
+                  updatedAt: Value(topic.updatedAt ?? DateTime.now()),
                 ),
               );
             }
@@ -156,6 +162,8 @@ class ImportService {
                   topicId: Value(chapter.topicId),
                   name: Value(chapter.name),
                   order: Value(chapter.order),
+                  isDeleted: Value(chapter.isDeleted),
+                  updatedAt: Value(chapter.updatedAt ?? DateTime.now()),
                 ),
               );
             }
@@ -179,6 +187,8 @@ class ImportService {
                   startPage: Value(session.startPage),
                   endPage: Value(session.endPage),
                   isFreeTimer: Value(session.isFreeTimer),
+                  isDeleted: Value(session.isDeleted),
+                  updatedAt: Value(session.updatedAt ?? DateTime.now()),
                 ),
               );
               sessionCount++;
@@ -200,6 +210,8 @@ class ImportService {
                   progressPercent: Value(source.progressPercent),
                   notes: Value(source.notes),
                   addedAt: Value(source.addedAt),
+                  isDeleted: Value(source.isDeleted),
+                  updatedAt: Value(source.updatedAt ?? DateTime.now()),
                 ),
               );
               sourceCount++;
@@ -213,7 +225,8 @@ class ImportService {
                   topicId: Value(skillLabel.topicId),
                   chapterId: Value(skillLabel.chapterId),
                   label: Value(skillLabel.label),
-                  updatedAt: Value(skillLabel.updatedAt),
+                  isDeleted: Value(skillLabel.isDeleted),
+                  updatedAt: Value(skillLabel.updatedAt ?? DateTime.now()),
                 ),
               );
             }
@@ -227,6 +240,8 @@ class ImportService {
                   isCompleted: Value(milestone.isCompleted),
                   sortOrder: Value(milestone.sortOrder),
                   completedAt: Value(milestone.completedAt),
+                  isDeleted: Value(milestone.isDeleted),
+                  updatedAt: Value(milestone.updatedAt ?? DateTime.now()),
                 ),
               );
             }

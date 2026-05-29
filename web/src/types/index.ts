@@ -27,6 +27,9 @@ export interface Subject {
   defaultBreakMinutes: number;
   xpTotal: number;
   totalStudyMinutes?: number;
+  completenessMode: 'none' | 'hours' | 'chapters';
+  targetHours: number;
+  targetWeeklyHours: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -162,3 +165,13 @@ export interface WeeklyActivityData {
   label: string;
 }
 
+export interface SubjectMilestone {
+  id: string;
+  subjectId: string;
+  title: string;
+  isCompleted: boolean;
+  sortOrder: number;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}

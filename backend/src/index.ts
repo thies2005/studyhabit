@@ -11,6 +11,7 @@ import authRoutes from './routes/auth.js';
 import syncRoutes from './routes/sync.js';
 import projectRoutes from './routes/projects.js';
 import subjectRoutes, { createProjectSubjectRoutes } from './routes/subjects.js';
+import exportRoutes from './routes/export.js';
 import sessionRoutes from './routes/sessions.js';
 import sourceRoutes from './routes/sources.js';
 import statsRoutes from './routes/stats.js';
@@ -70,6 +71,7 @@ app.use('/api/v1/projects/:projectId/subjects', apiLimiter, authMiddleware, crea
 app.use('/api/v1/subjects', apiLimiter, authMiddleware, subjectRoutes);
 app.use('/api/v1/topics', apiLimiter, authMiddleware, topicRoutes);
 app.use('/api/v1/chapters', apiLimiter, authMiddleware, chapterRoutes);
+app.use('/api/v1/export', apiLimiter, authMiddleware, exportRoutes);
 app.use('/api/v1/skill-labels', apiLimiter, authMiddleware, skillLabelRoutes);
 app.use('/api/v1/sessions', apiLimiter, authMiddleware, sessionRoutes);
 app.use('/api/v1/sources', apiLimiter, authMiddleware, sourceRoutes);
