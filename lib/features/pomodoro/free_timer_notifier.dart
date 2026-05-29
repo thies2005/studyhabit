@@ -221,26 +221,46 @@ class FreeTimerNotifier extends _$FreeTimerNotifier with WidgetsBindingObserver 
 
     // Delete dummy session from DB if <= 0 minutes (Finding 9)
     if (elapsedMinutes <= 0) {
-      await _sessionDao?.delete(state.activeSessionId!);
+      try {
+        await _sessionDao?.delete(state.activeSessionId!);
+      } catch (e) {
+        debugPrint('Error deleting dummy session: $e');
+      }
     } else {
       // Award streak if >= 1 min
       if (elapsedMinutes >= 1) {
-        await ref.read(streakServiceProvider).recordStudyDay(ref);
+        try {
+          await ref.read(streakServiceProvider).recordStudyDay(ref);
+        } catch (e) {
+          debugPrint('Error recording study day: $e');
+        }
       }
 
       // Award achievements
-      await AchievementService().checkAndUnlock(ref.read(appDatabaseProvider));
-      await _checkDailyGoalXp();
+      try {
+        await AchievementService().checkAndUnlock(ref.read(appDatabaseProvider));
+      } catch (e) {
+        debugPrint('Error checking achievements: $e');
+      }
+      try {
+        await _checkDailyGoalXp();
+      } catch (e) {
+        debugPrint('Error checking daily goal XP: $e');
+      }
 
       // Update session in DB
-      final session = await _sessionDao?.getById(state.activeSessionId!);
-      if (session != null) {
-        await _sessionDao?.updateRow(
-          session.copyWith(
-            actualDurationMinutes: elapsedMinutes,
-            endedAt: Value(endedAt),
-          ),
-        );
+      try {
+        final session = await _sessionDao?.getById(state.activeSessionId!);
+        if (session != null) {
+          await _sessionDao?.updateRow(
+            session.copyWith(
+              actualDurationMinutes: elapsedMinutes,
+              endedAt: Value(endedAt),
+            ),
+          );
+        }
+      } catch (e) {
+        debugPrint('Error updating session in DB: $e');
       }
     }
 
@@ -248,7 +268,11 @@ class FreeTimerNotifier extends _$FreeTimerNotifier with WidgetsBindingObserver 
     // We keep the state so the review sheet can access activeSessionId
     _persistence?.clearFreeTimer();
     state = state.copyWith(isRunning: false, activeSessionId: null);
-    _stopForegroundService();
+    try {
+      await _stopForegroundService();
+    } catch (e) {
+      debugPrint('Error stopping foreground service: $e');
+    }
   }
 
   void reset() {

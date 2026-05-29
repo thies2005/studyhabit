@@ -575,18 +575,40 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
     final actualMinutes = (newAccumulatedSeconds / 60.0).round();
 
     if (state.pomodorosCompleted > 0 && !_studyDayRecorded) {
-      await ref.read(streakServiceProvider).recordStudyDay(ref);
+      try {
+        await ref.read(streakServiceProvider).recordStudyDay(ref);
+      } catch (e) {
+        AppLogger.e('PomodoroNotifier', 'Error recording study day', e);
+      }
     }
 
-    await _updateSessionInDb(
-      actualDurationMinutes: actualMinutes,
-      pomodorosCompleted: state.pomodorosCompleted,
-      endedAt: DateTime.now(),
-    );
+    try {
+      await _updateSessionInDb(
+        actualDurationMinutes: actualMinutes,
+        pomodorosCompleted: state.pomodorosCompleted,
+        endedAt: DateTime.now(),
+      );
+    } catch (e) {
+      AppLogger.e('PomodoroNotifier', 'Error updating session in DB', e);
+    }
 
-    await AchievementService().checkAndUnlock(ref.read(appDatabaseProvider));
-    await _checkDailyGoalXp();
-    await FlutterForegroundTask.stopService();
+    try {
+      await AchievementService().checkAndUnlock(ref.read(appDatabaseProvider));
+    } catch (e) {
+      AppLogger.e('PomodoroNotifier', 'Error checking achievements', e);
+    }
+
+    try {
+      await _checkDailyGoalXp();
+    } catch (e) {
+      AppLogger.e('PomodoroNotifier', 'Error checking daily goal XP', e);
+    }
+
+    try {
+      await FlutterForegroundTask.stopService();
+    } catch (e) {
+      AppLogger.e('PomodoroNotifier', 'Error stopping foreground task service', e);
+    }
 
     // Cancel any pending reminder
     try {

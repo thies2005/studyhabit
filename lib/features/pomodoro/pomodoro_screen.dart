@@ -653,7 +653,11 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
     }
 
     if (mounted) {
-      await notifier.stop();
+      try {
+        await notifier.stop();
+      } catch (e) {
+        debugPrint('Error during stop: $e');
+      }
       if (mounted) {
         if (context.canPop()) {
           context.pop();

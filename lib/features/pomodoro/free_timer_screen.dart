@@ -418,7 +418,11 @@ class _FreeTimerScreenState extends ConsumerState<FreeTimerScreen>
       );
     }
 
-    await notifier.stop();
+    try {
+      await notifier.stop();
+    } catch (e) {
+      debugPrint('Error during stop: $e');
+    }
     if (mounted) {
       if (context.canPop()) {
         context.pop(); // Go back from timer screen
