@@ -43,7 +43,7 @@ services:
       timeout: 5s
       start_period: 30s
     command: >
-      sh -c "npx prisma db push && node dist/index.js"
+      sh -c "npx prisma db push --skip-generate && node dist/index.js"
 
   web:
     build:
