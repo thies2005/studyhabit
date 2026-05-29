@@ -8,6 +8,7 @@ import '../models/model_mapper.dart';
 import '../models/user_stats.dart';
 import 'database_provider.dart';
 import '../services/app_logger.dart';
+import '../services/streak_service.dart';
 
 part 'user_stats_provider.g.dart';
 
@@ -24,6 +25,9 @@ class UserStatsNotifier extends _$UserStatsNotifier {
     try {
       await _statsDao.initStats();
       AppLogger.d('UserStatsNotifier', 'Stats initialization successful');
+      
+      // Check and update streak if missed days exceed allowed threshold
+      await ref.read(streakServiceProvider).evaluateCurrentStreak(ref);
     } catch (e, stack) {
       AppLogger.e('UserStatsNotifier', 'Stats initialization failed', e, stack);
     }

@@ -107,13 +107,13 @@ export default function Layout() {
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col min-h-screen bg-background">
         {/* Top Bar */}
-        <header className="glass sticky top-0 z-30 px-8 py-5 border-b border-surfaceContainerHigh">
+        <header className="glass sticky top-0 z-30 px-4 md:px-8 py-4 md:py-5 border-b border-surfaceContainerHigh">
           <div className="flex items-center justify-between">
-            <div className="flex-1">
+            <div className="flex-1 ml-12 md:ml-0">
               <ProjectSwitcher />
             </div>
 
-            <div className="flex items-center space-x-6">
+            <div className="flex items-center space-x-2 sm:space-x-4 md:space-x-6">
               {/* Notifications */}
               <button className="relative p-2 text-onSurfaceVariant hover:bg-surfaceContainerHigh hover:text-onSurface rounded-full transition-all duration-300">
                 <span className="material-symbols-rounded text-2xl">notifications</span>
@@ -121,14 +121,14 @@ export default function Layout() {
               </button>
 
               {/* Timer */}
-              <button className="p-2 text-onSurfaceVariant hover:bg-surfaceContainerHigh hover:text-onSurface rounded-full transition-all duration-300">
+              <button className="hidden sm:block p-2 text-onSurfaceVariant hover:bg-surfaceContainerHigh hover:text-onSurface rounded-full transition-all duration-300">
                 <span className="material-symbols-rounded text-2xl">timer</span>
               </button>
 
               {/* Start Session Button */}
-              <button className="flex items-center space-x-2 px-6 py-3 bg-primary hover:bg-primary-container text-background hover:text-primary-onContainer rounded-full font-heading font-bold transition-all duration-300 hover:scale-105 active:scale-95 shadow-lg hover:shadow-primary/20">
+              <button className="flex items-center space-x-2 px-4 sm:px-6 py-2 sm:py-3 bg-primary hover:bg-primary-container text-background hover:text-primary-onContainer rounded-full font-heading font-bold transition-all duration-300 hover:scale-105 active:scale-95 shadow-lg hover:shadow-primary/20">
                 <span className="material-symbols-rounded text-xl">play_arrow</span>
-                <span>Start Session</span>
+                <span className="hidden sm:inline">Start</span>
               </button>
             </div>
           </div>

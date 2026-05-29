@@ -343,9 +343,9 @@ export class SyncService {
           });
           allProjectIds.add(validated.id);
           a++;
-        } catch (e: unknown) {
-          const message = e instanceof Error ? e.message : String(e);
-          errors.push({ entity: 'project', id: item.id, error: message });
+        } catch (e: any) {
+          console.error('[SyncService] Project validation failed:', e.message, item);
+          errors.push({ entity: 'project', id: item.id || 'unknown', error: e.message });
         }
       }
       applied.projects = a;
@@ -381,8 +381,9 @@ export class SyncService {
           });
           allSubjectIds.add(validated.id);
           a++;
-        } catch (e: unknown) {
-          errors.push({ entity: 'subject', id: item.id, error: e instanceof Error ? e.message : String(e) });
+        } catch (e: any) {
+          console.error('[SyncService] Subject validation failed:', e.message, item);
+          errors.push({ entity: 'subject', id: item.id || 'unknown', error: e.message });
         }
       }
       applied.subjects = a;
@@ -419,8 +420,9 @@ export class SyncService {
           });
           allTopicIds.add(validated.id);
           a++;
-        } catch (e: unknown) {
-          errors.push({ entity: 'topic', id: item.id, error: e instanceof Error ? e.message : String(e) });
+        } catch (e: any) {
+          console.error('[SyncService] Topic validation failed:', e.message, item);
+          errors.push({ entity: 'topic', id: item.id || 'unknown', error: e.message });
         }
       }
       applied.topics = a;
@@ -456,8 +458,9 @@ export class SyncService {
             update: validated,
           });
           a++;
-        } catch (e: unknown) {
-          errors.push({ entity: 'chapter', id: item.id, error: e instanceof Error ? e.message : String(e) });
+        } catch (e: any) {
+          console.error('[SyncService] Chapter validation failed:', e.message, item);
+          errors.push({ entity: 'chapter', id: item.id || 'unknown', error: e.message });
         }
       }
       applied.chapters = a;
@@ -493,9 +496,9 @@ export class SyncService {
             update: validated,
           });
           a++;
-        } catch (e: unknown) {
-          const message = e instanceof Error ? e.message : String(e);
-          errors.push({ entity: 'session', id: (item as any).id, error: message });
+        } catch (e: any) {
+          console.error('[SyncService] Session validation failed:', e.message, item);
+          errors.push({ entity: 'session', id: (item as any).id || 'unknown', error: e.message });
         }
       }
       applied.sessions = a;
@@ -531,8 +534,9 @@ export class SyncService {
             update: validated,
           });
           a++;
-        } catch (e: unknown) {
-          errors.push({ entity: 'source', id: item.id, error: e instanceof Error ? e.message : String(e) });
+        } catch (e: any) {
+          console.error('[SyncService] Source validation failed:', e.message, item);
+          errors.push({ entity: 'source', id: item.id || 'unknown', error: e.message });
         }
       }
       applied.sources = a;
@@ -568,8 +572,9 @@ export class SyncService {
             update: validated,
           });
           a++;
-        } catch (e: unknown) {
-          errors.push({ entity: 'skillLabel', id: item.id, error: e instanceof Error ? e.message : String(e) });
+        } catch (e: any) {
+          console.error('[SyncService] SkillLabel validation failed:', e.message, item);
+          errors.push({ entity: 'skillLabel', id: item.id || 'unknown', error: e.message });
         }
       }
       applied.skillLabels = a;

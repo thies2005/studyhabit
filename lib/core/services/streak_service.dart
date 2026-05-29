@@ -106,6 +106,56 @@ class StreakService {
       await ref.read(xpServiceProvider).award(ref, XpReason.streak100);
     }
   }
+
+  Future<void> evaluateCurrentStreak(Ref ref) async {
+    final stats = await ref.read(userStatsProvider.future);
+    if (stats.lastStudyDate == null || stats.currentStreak == 0) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    final themeSettings = await ref.read(themeSettingsProvider.future);
+    final graceWindowHours = themeSettings.gracePeriodHours;
+    final now = DateTime.now();
+    final effectiveNow = now.subtract(
+      Duration(minutes: (graceWindowHours * 60).round()),
+    );
+    final today = DateTime(
+      effectiveNow.year,
+      effectiveNow.month,
+      effectiveNow.day,
+    );
+
+    final lastStudyDate = DateTime(
+      stats.lastStudyDate!.year,
+      stats.lastStudyDate!.month,
+      stats.lastStudyDate!.day,
+    );
+
+    final daysDiff = today.difference(lastStudyDate).inDays;
+    
+    bool isDead = false;
+    if (daysDiff > 2) {
+      isDead = true;
+    } else if (daysDiff == 2 && stats.freezeTokens <= 0) {
+      isDead = true;
+    } else if (daysDiff == 2 && stats.freezeTokens > 0) {
+      final lastFreezeUseStr = prefs.getString(_lastFreezeUseKey);
+      if (lastFreezeUseStr != null) {
+        final parsed = DateTime.parse(lastFreezeUseStr);
+        final lastFreezeUse = DateTime(parsed.year, parsed.month, parsed.day);
+        final weekAgo = today.subtract(const Duration(days: 7));
+        if (!lastFreezeUse.isBefore(weekAgo)) {
+          isDead = true;
+        }
+      }
+    }
+
+    if (isDead) {
+      final updatedStats = stats.copyWith(
+        currentStreak: 0,
+      );
+      await ref.read(userStatsProvider.notifier).upsert(updatedStats);
+    }
+  }
 }
 
 @Riverpod(keepAlive: true)
