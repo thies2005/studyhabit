@@ -33,7 +33,7 @@ router.get('/', async (req, res, next) => {
   try {
     const { projectId } = listSubjectsQuerySchema.parse(req.query);
     const { skip, take, page, limit } = parsePagination(req.query as any);
-    const where = projectId ? { projectId, project: { userId: req.user.userId } } : { project: { userId: req.user.userId } };
+    const where = projectId ? { projectId, project: { userId: req.user.userId }, isDeleted: false } : { project: { userId: req.user.userId }, isDeleted: false };
     const [subjects, total] = await Promise.all([
       prisma.subject.findMany({
         where,
@@ -67,7 +67,7 @@ router.get('/:id', async (req, res, next) => {
   try {
     const id = String(req.params.id);
     const subject = await prisma.subject.findFirst({
-      where: { id, project: { userId: req.user.userId } },
+      where: { id, project: { userId: req.user.userId }, isDeleted: false },
       include: {
         topics: { include: { chapters: true }, orderBy: { order: 'asc' } },
       },
@@ -105,7 +105,7 @@ router.patch('/:id', async (req, res, next) => {
     const id = String(req.params.id);
     const data = updateSubjectSchema.parse(req.body);
     const result = await prisma.subject.updateMany({
-      where: { id, project: { userId: req.user.userId } },
+      where: { id, project: { userId: req.user.userId }, isDeleted: false },
       data,
     });
 
@@ -123,8 +123,9 @@ router.patch('/:id', async (req, res, next) => {
 router.delete('/:id', async (req, res, next) => {
   try {
     const id = String(req.params.id);
-    const result = await prisma.subject.deleteMany({
+    const result = await prisma.subject.updateMany({
       where: { id, project: { userId: req.user.userId } },
+      data: { isDeleted: true, updatedAt: new Date() },
     });
 
     if (result.count === 0) {
@@ -158,7 +159,7 @@ export function createProjectSubjectRoutes(): Router {
 
       const [subjects, total] = await Promise.all([
         prisma.subject.findMany({
-          where: { projectId },
+          where: { projectId, isDeleted: false },
           orderBy: { createdAt: 'desc' },
           skip,
           take,
@@ -168,7 +169,7 @@ export function createProjectSubjectRoutes(): Router {
             },
           },
         }),
-        prisma.subject.count({ where: { projectId } }),
+        prisma.subject.count({ where: { projectId, isDeleted: false } }),
       ]);
 
       const subjectsWithMinutes = subjects.map((sub: any) => {

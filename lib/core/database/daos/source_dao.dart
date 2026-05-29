@@ -10,6 +10,7 @@ class SourceDao {
   Stream<List<SourceRow>> watchBySubject(String subjectId) {
     final query = _db.select(_db.sources)
       ..where((table) => table.subjectId.equals(subjectId))
+      ..where((table) => table.isDeleted.equals(false))
       ..orderBy([(table) => OrderingTerm.desc(table.addedAt)]);
     return query.watch();
   }
@@ -39,13 +40,16 @@ class SourceDao {
 
   Future<SourceRow?> getById(String id) {
     return (_db.select(_db.sources)
-          ..where((table) => table.id.equals(id)))
+          ..where((table) => table.id.equals(id))
+          ..where((table) => table.isDeleted.equals(false)))
         .getSingleOrNull();
   }
 
   Future<void> delete(String id) {
-    return (_db.delete(
-      _db.sources,
-    )..where((table) => table.id.equals(id))).go();
+    return (_db.update(_db.sources)..where((table) => table.id.equals(id)))
+        .write(SourcesCompanion(
+          isDeleted: const Value(true),
+          updatedAt: Value(DateTime.now()),
+        ));
   }
 }

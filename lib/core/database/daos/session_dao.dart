@@ -11,7 +11,8 @@ class SessionDao {
 
   Future<void> cleanupOrphanedSessions() async {
     final orphanedQuery = _db.select(_db.studySessions)
-      ..where((table) => table.endedAt.isNull());
+      ..where((table) => table.endedAt.isNull())
+      ..where((table) => table.isDeleted.equals(false));
     final orphaned = await orphanedQuery.get();
 
     if (orphaned.isEmpty) return;
@@ -53,6 +54,7 @@ class SessionDao {
   Stream<List<StudySessionRow>> watchBySubject(String subjectId) {
     final query = _db.select(_db.studySessions)
       ..where((table) => table.subjectId.equals(subjectId))
+      ..where((table) => table.isDeleted.equals(false))
       ..orderBy([(table) => OrderingTerm.desc(table.startedAt)]);
     return query.watch();
   }
@@ -60,6 +62,7 @@ class SessionDao {
   Future<List<StudySessionRow>> getBySubject(String subjectId) {
     final query = _db.select(_db.studySessions)
       ..where((table) => table.subjectId.equals(subjectId))
+      ..where((table) => table.isDeleted.equals(false))
       ..orderBy([(table) => OrderingTerm.desc(table.startedAt)]);
     return query.get();
   }
@@ -72,7 +75,9 @@ class SessionDao {
   }
 
   Future<StudySessionRow?> getById(String id) {
-    return (_db.select(_db.studySessions)..where((table) => table.id.equals(id)))
+    return (_db.select(_db.studySessions)
+          ..where((table) => table.id.equals(id))
+          ..where((table) => table.isDeleted.equals(false)))
         .getSingleOrNull();
   }
 
@@ -88,8 +93,10 @@ class SessionDao {
   }
 
   Future<void> delete(String id) {
-    return (_db.delete(
-      _db.studySessions,
-    )..where((table) => table.id.equals(id))).go();
+    return (_db.update(_db.studySessions)..where((table) => table.id.equals(id)))
+        .write(StudySessionsCompanion(
+          isDeleted: const Value(true),
+          updatedAt: Value(DateTime.now()),
+        ));
   }
 }

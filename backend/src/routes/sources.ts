@@ -38,6 +38,7 @@ router.get('/', async (req, res, next) => {
     const where = {
       subjectId,
       subject: { project: { userId: req.user.userId } },
+      isDeleted: false,
     };
     const [sources, total] = await Promise.all([
       prisma.source.findMany({
@@ -61,7 +62,7 @@ router.get('/:id', async (req, res, next) => {
   try {
     const id = String(req.params.id);
     const source = await prisma.source.findFirst({
-      where: { id, subject: { project: { userId: req.user.userId } } },
+      where: { id, subject: { project: { userId: req.user.userId } }, isDeleted: false },
     });
     if (!source) {
       return res.status(404).json({ error: 'Source not found' });
@@ -100,7 +101,7 @@ router.patch('/:id', async (req, res, next) => {
     const data = updateSourceSchema.parse(req.body);
 
     const existing = await prisma.source.findFirst({
-      where: { id, subject: { project: { userId: req.user.userId } } },
+      where: { id, subject: { project: { userId: req.user.userId } }, isDeleted: false },
     });
 
     if (!existing) {
@@ -121,8 +122,9 @@ router.patch('/:id', async (req, res, next) => {
 router.delete('/:id', async (req, res, next) => {
   try {
     const id = String(req.params.id);
-    const result = await prisma.source.deleteMany({
+    const result = await prisma.source.updateMany({
       where: { id, subject: { project: { userId: req.user.userId } } },
+      data: { isDeleted: true, updatedAt: new Date() },
     });
 
     if (result.count === 0) {

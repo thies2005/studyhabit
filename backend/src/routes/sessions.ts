@@ -38,6 +38,7 @@ router.get('/', async (req, res, next) => {
     const { skip, take, page, limit } = parsePagination(req.query as any);
     const where: any = {
       subject: { project: { userId: req.user.userId } },
+      isDeleted: false,
     };
     if (subjectId) {
       where.subjectId = subjectId;
@@ -74,7 +75,7 @@ router.get('/:id', async (req, res, next) => {
   try {
     const id = String(req.params.id);
     const session = await prisma.studySession.findFirst({
-      where: { id, subject: { project: { userId: req.user.userId } } },
+      where: { id, subject: { project: { userId: req.user.userId } }, isDeleted: false },
       include: {
         subject: {
           select: {
@@ -194,7 +195,7 @@ router.patch('/:id', async (req, res, next) => {
     const data = updateSessionSchema.parse(req.body);
 
     const existing = await prisma.studySession.findFirst({
-      where: { id, subject: { project: { userId: req.user.userId } } },
+      where: { id, subject: { project: { userId: req.user.userId } }, isDeleted: false },
     });
 
     if (!existing) {
@@ -267,8 +268,9 @@ router.patch('/:id', async (req, res, next) => {
 router.delete('/:id', async (req, res, next) => {
   try {
     const id = String(req.params.id);
-    const result = await prisma.studySession.deleteMany({
+    const result = await prisma.studySession.updateMany({
       where: { id, subject: { project: { userId: req.user.userId } } },
+      data: { isDeleted: true, updatedAt: new Date() },
     });
 
     if (result.count === 0) {

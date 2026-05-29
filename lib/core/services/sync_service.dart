@@ -24,6 +24,7 @@ class SyncEngine extends _$SyncEngine {
   late AppDatabase _db;
   late SharedPreferences _prefs;
   Timer? _syncTimer;
+  bool _syncPending = false;
 
   @override
   SyncStatus build() {
@@ -60,7 +61,8 @@ class SyncEngine extends _$SyncEngine {
     }
 
     if (state == SyncStatus.syncing) {
-      AppLogger.d('SyncEngine', 'Skipping sync: Sync already in progress.');
+      AppLogger.d('SyncEngine', 'Sync already in progress. Queuing next sync.');
+      _syncPending = true;
       return;
     }
 
@@ -98,6 +100,12 @@ class SyncEngine extends _$SyncEngine {
     } catch (e, stack) {
       state = SyncStatus.error;
       AppLogger.e('SyncEngine', 'Sync failed', e, stack);
+    } finally {
+      if (_syncPending) {
+        _syncPending = false;
+        AppLogger.i('SyncEngine', 'Executing pending sync...');
+        fullSync();
+      }
     }
     });
   }
@@ -337,6 +345,7 @@ class SyncEngine extends _$SyncEngine {
         'defaultLongBreakDuration': r.defaultLongBreakDuration,
         'defaultLongBreakEvery': r.defaultLongBreakEvery,
         'studyReminderMinutes': r.studyReminderMinutes,
+        'isDeleted': r.isDeleted,
         'updatedAt': r.updatedAt.toUtc().toIso8601String(),
       };
 
@@ -371,6 +380,7 @@ class SyncEngine extends _$SyncEngine {
         'completenessMode': r.completenessMode.name,
         'targetHours': r.targetHours,
         'targetWeeklyHours': r.targetWeeklyHours,
+        'isDeleted': r.isDeleted,
         'updatedAt': r.updatedAt.toUtc().toIso8601String(),
       };
 
@@ -397,6 +407,7 @@ class SyncEngine extends _$SyncEngine {
         'subjectId': r.subjectId,
         'name': r.name,
         'order': r.order,
+        'isDeleted': r.isDeleted,
         'updatedAt': r.updatedAt.toUtc().toIso8601String(),
       };
 
@@ -414,6 +425,7 @@ class SyncEngine extends _$SyncEngine {
         'topicId': r.topicId,
         'name': r.name,
         'order': r.order,
+        'isDeleted': r.isDeleted,
         'updatedAt': r.updatedAt.toUtc().toIso8601String(),
       };
 
@@ -443,6 +455,7 @@ class SyncEngine extends _$SyncEngine {
         'startPage': r.startPage,
         'endPage': r.endPage,
         'isFreeTimer': r.isFreeTimer,
+        'isDeleted': r.isDeleted,
         'updatedAt': r.updatedAt.toUtc().toIso8601String(),
       };
 
@@ -481,6 +494,7 @@ class SyncEngine extends _$SyncEngine {
         'progressPercent': r.progressPercent,
         'notes': r.notes,
         'addedAt': r.addedAt.toUtc().toIso8601String(),
+        'isDeleted': r.isDeleted,
         'updatedAt': r.updatedAt.toUtc().toIso8601String(),
       };
 
@@ -508,6 +522,7 @@ class SyncEngine extends _$SyncEngine {
         'topicId': r.topicId,
         'chapterId': r.chapterId,
         'label': r.label.name,
+        'isDeleted': r.isDeleted,
         'updatedAt': r.updatedAt.toUtc().toIso8601String(),
       };
 
@@ -528,6 +543,7 @@ class SyncEngine extends _$SyncEngine {
         'isCompleted': m.isCompleted,
         'sortOrder': m.sortOrder,
         'completedAt': m.completedAt?.toUtc().toIso8601String(),
+        'isDeleted': m.isDeleted,
         'updatedAt': m.updatedAt.toUtc().toIso8601String(),
       };
 

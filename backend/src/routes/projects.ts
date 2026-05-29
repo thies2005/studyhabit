@@ -22,7 +22,7 @@ const updateProjectSchema = z.object({
 router.get('/', async (req, res, next) => {
   try {
     const { skip, take, page, limit } = parsePagination(req.query as any);
-    const where = { userId: req.user.userId, isArchived: false };
+    const where = { userId: req.user.userId, isArchived: false, isDeleted: false };
     const [projects, total] = await Promise.all([
       prisma.project.findMany({
         where,
@@ -45,7 +45,7 @@ router.get('/:id', async (req, res, next) => {
   try {
     const id = String(req.params.id);
     const project = await prisma.project.findFirst({
-      where: { id, userId: req.user.userId },
+      where: { id, userId: req.user.userId, isDeleted: false },
     });
     if (!project) {
       return res.status(404).json({ error: 'Project not found' });
@@ -73,7 +73,7 @@ router.patch('/:id', async (req, res, next) => {
     const id = String(req.params.id);
     const data = updateProjectSchema.parse(req.body);
     const project = await prisma.project.updateMany({
-      where: { id, userId: req.user.userId },
+      where: { id, userId: req.user.userId, isDeleted: false },
       data,
     });
 
@@ -92,8 +92,9 @@ router.patch('/:id', async (req, res, next) => {
 router.delete('/:id', async (req, res, next) => {
   try {
     const id = String(req.params.id);
-    const project = await prisma.project.deleteMany({
+    const project = await prisma.project.updateMany({
       where: { id, userId: req.user.userId },
+      data: { isDeleted: true, updatedAt: new Date() },
     });
 
     if (project.count === 0) {

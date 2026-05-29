@@ -42,7 +42,7 @@ router.get('/', async (req, res, next) => {
     }
 
     const milestones = await prisma.subjectMilestone.findMany({
-      where: { subjectId },
+      where: { subjectId, isDeleted: false },
       orderBy: { sortOrder: 'asc' },
     });
 
@@ -86,7 +86,7 @@ router.patch('/:id', async (req, res, next) => {
     const data = updateMilestoneSchema.parse(req.body);
 
     const existing = await prisma.subjectMilestone.findUnique({
-      where: { id },
+      where: { id, isDeleted: false },
       include: { subject: { include: { project: true } } },
     });
 
@@ -119,7 +119,7 @@ router.delete('/:id', async (req, res, next) => {
     const id = String(req.params.id);
 
     const existing = await prisma.subjectMilestone.findUnique({
-      where: { id },
+      where: { id, isDeleted: false },
       include: { subject: { include: { project: true } } },
     });
 
@@ -127,7 +127,10 @@ router.delete('/:id', async (req, res, next) => {
       return res.status(404).json({ error: 'Milestone not found' });
     }
 
-    await prisma.subjectMilestone.delete({ where: { id } });
+    await prisma.subjectMilestone.update({
+      where: { id },
+      data: { isDeleted: true, updatedAt: new Date() }
+    });
 
     res.status(204).send();
   } catch (error: unknown) {

@@ -23,6 +23,7 @@ router.get('/', async (req, res, next) => {
     const where = {
       subjectId,
       subject: { project: { userId: req.user.userId } },
+      isDeleted: false,
     };
 
     const [topics, total] = await Promise.all([
@@ -52,6 +53,7 @@ router.get('/:id', async (req, res, next) => {
       where: {
         id,
         subject: { project: { userId: req.user.userId } },
+        isDeleted: false,
       },
       include: { chapters: { orderBy: { order: 'asc' } } },
     });
@@ -94,6 +96,7 @@ router.patch('/:id', async (req, res, next) => {
       where: {
         id,
         subject: { project: { userId: req.user.userId } },
+        isDeleted: false,
       },
       data,
     });
@@ -116,11 +119,12 @@ router.patch('/:id', async (req, res, next) => {
 router.delete('/:id', async (req, res, next) => {
   try {
     const id = String(req.params.id);
-    const result = await prisma.topic.deleteMany({
+    const result = await prisma.topic.updateMany({
       where: {
         id,
         subject: { project: { userId: req.user.userId } },
       },
+      data: { isDeleted: true, updatedAt: new Date() },
     });
 
     if (result.count === 0) {

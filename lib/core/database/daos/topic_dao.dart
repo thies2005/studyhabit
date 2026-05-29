@@ -8,13 +8,16 @@ class TopicDao {
   final AppDatabase _db;
 
   Future<TopicRow?> getById(String id) {
-    final query = _db.select(_db.topics)..where((table) => table.id.equals(id));
+    final query = _db.select(_db.topics)
+      ..where((table) => table.id.equals(id))
+      ..where((table) => table.isDeleted.equals(false));
     return query.getSingleOrNull();
   }
 
   Stream<List<TopicRow>> watchBySubject(String subjectId) {
     final query = _db.select(_db.topics)
       ..where((table) => table.subjectId.equals(subjectId))
+      ..where((table) => table.isDeleted.equals(false))
       ..orderBy([(table) => OrderingTerm.asc(table.order)]);
     return query.watch();
   }
@@ -27,8 +30,10 @@ class TopicDao {
   }
 
   Future<void> delete(String id) {
-    return (_db.delete(
-      _db.topics,
-    )..where((table) => table.id.equals(id))).go();
+    return (_db.update(_db.topics)..where((table) => table.id.equals(id)))
+        .write(TopicsCompanion(
+          isDeleted: const Value(true),
+          updatedAt: Value(DateTime.now()),
+        ));
   }
 }

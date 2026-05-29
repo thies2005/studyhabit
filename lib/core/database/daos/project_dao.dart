@@ -9,13 +9,15 @@ class ProjectDao {
 
   Stream<List<ProjectRow>> watchAll() {
     final query = _db.select(_db.projects)
+      ..where((table) => table.isDeleted.equals(false))
       ..orderBy([(table) => OrderingTerm.desc(table.lastOpenedAt)]);
     return query.watch();
   }
 
   Future<ProjectRow?> getById(String id) {
     final query = _db.select(_db.projects)
-      ..where((table) => table.id.equals(id));
+      ..where((table) => table.id.equals(id))
+      ..where((table) => table.isDeleted.equals(false));
     return query.getSingleOrNull();
   }
 
@@ -28,6 +30,9 @@ class ProjectDao {
 
   Future<void> softDelete(String id) {
     return (_db.update(_db.projects)..where((table) => table.id.equals(id)))
-        .write(const ProjectsCompanion(isArchived: Value(true)));
+        .write(ProjectsCompanion(
+          isDeleted: const Value(true),
+          updatedAt: Value(DateTime.now()),
+        ));
   }
 }

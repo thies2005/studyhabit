@@ -9,13 +9,15 @@ class ChapterDao {
 
   Future<ChapterRow?> getById(String id) {
     final query = _db.select(_db.chapters)
-      ..where((table) => table.id.equals(id));
+      ..where((table) => table.id.equals(id))
+      ..where((table) => table.isDeleted.equals(false));
     return query.getSingleOrNull();
   }
 
   Stream<List<ChapterRow>> watchByTopic(String topicId) {
     final query = _db.select(_db.chapters)
       ..where((table) => table.topicId.equals(topicId))
+      ..where((table) => table.isDeleted.equals(false))
       ..orderBy([(table) => OrderingTerm.asc(table.order)]);
     return query.watch();
   }
@@ -28,8 +30,10 @@ class ChapterDao {
   }
 
   Future<void> delete(String id) {
-    return (_db.delete(
-      _db.chapters,
-    )..where((table) => table.id.equals(id))).go();
+    return (_db.update(_db.chapters)..where((table) => table.id.equals(id)))
+        .write(ChaptersCompanion(
+          isDeleted: const Value(true),
+          updatedAt: Value(DateTime.now()),
+        ));
   }
 }

@@ -10,6 +10,7 @@ class SubjectMilestoneDao {
   Stream<List<SubjectMilestoneRow>> watchBySubject(String subjectId) {
     final query = _db.select(_db.subjectMilestones)
       ..where((table) => table.subjectId.equals(subjectId))
+      ..where((table) => table.isDeleted.equals(false))
       ..orderBy([(table) => OrderingTerm.asc(table.sortOrder)]);
     return query.watch();
   }
@@ -43,15 +44,21 @@ class SubjectMilestoneDao {
   }
 
   Future<void> delete(String id) {
-    return (_db.delete(_db.subjectMilestones)
+    return (_db.update(_db.subjectMilestones)
           ..where((table) => table.id.equals(id)))
-        .go();
+        .write(SubjectMilestonesCompanion(
+          isDeleted: const Value(true),
+          updatedAt: Value(DateTime.now()),
+        ));
   }
 
   Future<void> deleteAllForSubject(String subjectId) {
-    return (_db.delete(_db.subjectMilestones)
+    return (_db.update(_db.subjectMilestones)
           ..where((table) => table.subjectId.equals(subjectId)))
-        .go();
+        .write(SubjectMilestonesCompanion(
+          isDeleted: const Value(true),
+          updatedAt: Value(DateTime.now()),
+        ));
   }
 
   Future<void> reorder(List<({String id, int sortOrder})> items) async {

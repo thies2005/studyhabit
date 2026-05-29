@@ -33,6 +33,7 @@ router.get('/', async (req, res, next) => {
     const where = {
       subjectId,
       subject: { project: { userId: req.user.userId } },
+      isDeleted: false,
     };
 
     const [skillLabels, total] = await Promise.all([
@@ -61,6 +62,7 @@ router.get('/:id', async (req, res, next) => {
       where: {
         id,
         subject: { project: { userId: req.user.userId } },
+        isDeleted: false,
       },
     });
 
@@ -139,6 +141,7 @@ router.patch('/:id', async (req, res, next) => {
       where: {
         id,
         subject: { project: { userId: req.user.userId } },
+        isDeleted: false,
       },
     });
 
@@ -154,6 +157,7 @@ router.patch('/:id', async (req, res, next) => {
       where: {
         id,
         subject: { project: { userId: req.user.userId } },
+        isDeleted: false,
       },
       data: { label: data.label },
     });
@@ -179,11 +183,12 @@ router.patch('/:id', async (req, res, next) => {
 router.delete('/:id', async (req, res, next) => {
   try {
     const id = String(req.params.id);
-    const result = await prisma.skillLabel.deleteMany({
+    const result = await prisma.skillLabel.updateMany({
       where: {
         id,
         subject: { project: { userId: req.user.userId } },
       },
+      data: { isDeleted: true, updatedAt: new Date() },
     });
 
     if (result.count === 0) {

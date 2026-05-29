@@ -10,13 +10,15 @@ class SubjectDao {
   Stream<List<SubjectRow>> watchByProject(String projectId) {
     final query = _db.select(_db.subjects)
       ..where((table) => table.projectId.equals(projectId))
+      ..where((table) => table.isDeleted.equals(false))
       ..orderBy([(table) => OrderingTerm.asc(table.name)]);
     return query.watch();
   }
 
   Future<SubjectRow?> getById(String id) {
     final query = _db.select(_db.subjects)
-      ..where((table) => table.id.equals(id));
+      ..where((table) => table.id.equals(id))
+      ..where((table) => table.isDeleted.equals(false));
     return query.getSingleOrNull();
   }
 
@@ -28,9 +30,11 @@ class SubjectDao {
   }
 
   Future<void> delete(String id) {
-    return (_db.delete(
-      _db.subjects,
-    )..where((table) => table.id.equals(id))).go();
+    return (_db.update(_db.subjects)..where((table) => table.id.equals(id)))
+        .write(SubjectsCompanion(
+          isDeleted: const Value(true),
+          updatedAt: Value(DateTime.now()),
+        ));
   }
 
   Future<void> updateDefaultDurations({
@@ -40,7 +44,8 @@ class SubjectDao {
     required int newBreak,
   }) async {
     final query = _db.select(_db.subjects)
-      ..where((t) => t.defaultDurationMinutes.equals(oldWork) & t.defaultBreakMinutes.equals(oldBreak));
+      ..where((t) => t.defaultDurationMinutes.equals(oldWork) & t.defaultBreakMinutes.equals(oldBreak))
+      ..where((t) => t.isDeleted.equals(false));
     final rows = await query.get();
     for (final row in rows) {
       await _db.into(_db.subjects).insertOnConflictUpdate(
