@@ -119,21 +119,23 @@ class SyncEngine extends _$SyncEngine {
   }
 
   Future<Map<String, dynamic>> _collectLocalChanges(DateTime since) async {
+    final isFirstSync = since.millisecondsSinceEpoch == 0;
+
     // Query rows modified locally since the last sync time
-    final projects = await (_db.select(_db.projects)..where((t) => t.updatedAt.isBiggerThanValue(since))).get();
-    final subjects = await (_db.select(_db.subjects)..where((t) => t.updatedAt.isBiggerThanValue(since))).get();
-    final topics = await (_db.select(_db.topics)..where((t) => t.updatedAt.isBiggerThanValue(since))).get();
-    final chapters = await (_db.select(_db.chapters)..where((t) => t.updatedAt.isBiggerThanValue(since))).get();
-    final sessions = await (_db.select(_db.studySessions)..where((t) => t.updatedAt.isBiggerThanValue(since))).get();
-    final sources = await (_db.select(_db.sources)..where((t) => t.updatedAt.isBiggerThanValue(since))).get();
-    final skillLabels = await (_db.select(_db.skillLabels)..where((t) => t.updatedAt.isBiggerThanValue(since))).get();
-    final milestones = await (_db.select(_db.subjectMilestones)..where((t) => t.updatedAt.isBiggerThanValue(since))).get();
-    final achievements = await (_db.select(_db.achievements)..where((t) => t.updatedAt.isBiggerThanValue(since))).get();
+    final projects = await (isFirstSync ? _db.select(_db.projects) : (_db.select(_db.projects)..where((t) => t.updatedAt.isBiggerThanValue(since)))).get();
+    final subjects = await (isFirstSync ? _db.select(_db.subjects) : (_db.select(_db.subjects)..where((t) => t.updatedAt.isBiggerThanValue(since)))).get();
+    final topics = await (isFirstSync ? _db.select(_db.topics) : (_db.select(_db.topics)..where((t) => t.updatedAt.isBiggerThanValue(since)))).get();
+    final chapters = await (isFirstSync ? _db.select(_db.chapters) : (_db.select(_db.chapters)..where((t) => t.updatedAt.isBiggerThanValue(since)))).get();
+    final sessions = await (isFirstSync ? _db.select(_db.studySessions) : (_db.select(_db.studySessions)..where((t) => t.updatedAt.isBiggerThanValue(since)))).get();
+    final sources = await (isFirstSync ? _db.select(_db.sources) : (_db.select(_db.sources)..where((t) => t.updatedAt.isBiggerThanValue(since)))).get();
+    final skillLabels = await (isFirstSync ? _db.select(_db.skillLabels) : (_db.select(_db.skillLabels)..where((t) => t.updatedAt.isBiggerThanValue(since)))).get();
+    final milestones = await (isFirstSync ? _db.select(_db.subjectMilestones) : (_db.select(_db.subjectMilestones)..where((t) => t.updatedAt.isBiggerThanValue(since)))).get();
+    final achievements = await (isFirstSync ? _db.select(_db.achievements) : (_db.select(_db.achievements)..where((t) => t.updatedAt.isBiggerThanValue(since)))).get();
     
     // User stats
     final stats = await _db.select(_db.userStatsTable).getSingleOrNull();
     Map<String, dynamic>? statsJson;
-    if (stats != null && stats.updatedAt.isAfter(since)) {
+    if (stats != null && (isFirstSync || stats.updatedAt.isAfter(since))) {
       final authState = ref.read(authProvider);
       final userId = authState.maybeWhen(authenticated: (id, _) => id, orElse: () => '');
       statsJson = {
@@ -152,7 +154,7 @@ class SyncEngine extends _$SyncEngine {
     final settingsUpdatedAtMs = _prefs.getInt('theme.settingsUpdatedAt') ?? 0;
     final settingsUpdatedAt = DateTime.fromMillisecondsSinceEpoch(settingsUpdatedAtMs);
     Map<String, dynamic>? settingsPayload;
-    if (settingsUpdatedAt.isAfter(since)) {
+    if (isFirstSync || settingsUpdatedAt.isAfter(since)) {
       final settingsKeys = _prefs.getKeys().where(
         (k) =>
             k.startsWith('theme.') ||
