@@ -1,7 +1,7 @@
 name: studytracker
 description: A Flutter study tracking app with gamification.
 publish_to: 'none'
-version: 1.0.37+43
+version: 1.0.38+44
 
 environment:
   sdk: '>=3.9.0 <4.0.0'
