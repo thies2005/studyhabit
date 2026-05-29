@@ -3,7 +3,6 @@ services:
   db:
     image: postgres:16-alpine
     restart: unless-stopped
-    profiles: ["internal-db"]
     environment:
       POSTGRES_DB: ${DB_NAME:-studytracker}
       POSTGRES_USER: ${DB_USER:-studytracker}
