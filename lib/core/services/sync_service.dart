@@ -287,32 +287,9 @@ class SyncEngine extends _$SyncEngine {
     final statsJson = pull['userStats'] as Map<String, dynamic>?;
     if (statsJson != null) {
       final local = await _db.select(_db.userStatsTable).getSingleOrNull();
-      if (local == null) {
+      final serverUpdatedAt = DateTime.parse(statsJson['updatedAt']);
+      if (local == null || serverUpdatedAt.isAfter(local.updatedAt)) {
         await _db.into(_db.userStatsTable).insertOnConflictUpdate(_statsFromJson(statsJson));
-      } else {
-        // Apply max-wins to stats values
-        final totalXp = statsJson['totalXp'] as int;
-        final currentLevel = statsJson['currentLevel'] as int?;
-        final currentStreak = statsJson['currentStreak'] as int;
-        final longestStreak = statsJson['longestStreak'] as int;
-        final lastStudyDateStr = statsJson['lastStudyDate'] as String?;
-        final lastStudyDate = lastStudyDateStr != null ? DateTime.tryParse(lastStudyDateStr) : null;
-        final totalStudyMinutes = statsJson['totalStudyMinutes'] as int;
-        final freezeTokens = statsJson['freezeTokens'] as int;
-        
-        final updatedStats = local.copyWith(
-          totalXp: totalXp > local.totalXp ? totalXp : local.totalXp,
-          currentLevel: (currentLevel != null && currentLevel > local.currentLevel) ? currentLevel : local.currentLevel,
-          currentStreak: currentStreak > local.currentStreak ? currentStreak : local.currentStreak,
-          longestStreak: longestStreak > local.longestStreak ? longestStreak : local.longestStreak,
-          lastStudyDate: (lastStudyDate != null && (local.lastStudyDate == null || lastStudyDate.isAfter(local.lastStudyDate!))) 
-              ? Value(lastStudyDate) 
-              : Value(local.lastStudyDate),
-          totalStudyMinutes: totalStudyMinutes > local.totalStudyMinutes ? totalStudyMinutes : local.totalStudyMinutes,
-          freezeTokens: freezeTokens > local.freezeTokens ? freezeTokens : local.freezeTokens,
-          updatedAt: DateTime.now(),
-        );
-        await _db.into(_db.userStatsTable).insertOnConflictUpdate(updatedStats);
       }
     }
 

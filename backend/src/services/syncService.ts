@@ -341,6 +341,7 @@ export class SyncService {
             create: { ...validated, userId },
             update: validated,
           });
+          allProjectIds.add(validated.id);
           a++;
         } catch (e: unknown) {
           const message = e instanceof Error ? e.message : String(e);
@@ -378,6 +379,7 @@ export class SyncService {
             create: validated,
             update: validated,
           });
+          allSubjectIds.add(validated.id);
           a++;
         } catch (e: unknown) {
           errors.push({ entity: 'subject', id: item.id, error: e instanceof Error ? e.message : String(e) });
@@ -415,6 +417,7 @@ export class SyncService {
             create: validated,
             update: validated,
           });
+          allTopicIds.add(validated.id);
           a++;
         } catch (e: unknown) {
           errors.push({ entity: 'topic', id: item.id, error: e instanceof Error ? e.message : String(e) });
