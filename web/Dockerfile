@@ -15,5 +15,5 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 RUN touch /var/run/nginx.pid && \
     chown -R 101:101 /usr/share/nginx/html /var/cache/nginx /var/log/nginx /etc/nginx/conf.d /var/run/nginx.pid
 USER 101
-EXPOSE 80
+EXPOSE 3000
 CMD ["nginx", "-g", "daemon off;"]
