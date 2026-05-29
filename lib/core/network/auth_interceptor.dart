@@ -3,6 +3,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/server_url_provider.dart';
+import '../services/auth_service.dart';
 
 class AuthInterceptor extends QueuedInterceptor {
   final Ref _ref;
@@ -64,7 +65,7 @@ class AuthInterceptor extends QueuedInterceptor {
           await _storage.delete(key: 'auth_user_id');
           await _storage.delete(key: 'auth_user_email');
           
-          // Note: we can broadcast a logout event if we have a listener
+          _ref.read(authProvider.notifier).logout();
         }
       }
     }

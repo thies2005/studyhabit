@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/services/auth_service.dart';
 import '../../../core/providers/server_url_provider.dart';
+import '../../../core/services/sync_service.dart';
 
 class SyncSettingsPage extends ConsumerStatefulWidget {
   const SyncSettingsPage({super.key});
@@ -37,19 +38,28 @@ class _SyncSettingsPageState extends ConsumerState<SyncSettingsPage> {
       _isSyncing = true;
     });
 
-    // Mock sync delay - we will wire this to real SyncEngine in S3
-    await Future.delayed(const Duration(seconds: 2));
+    await ref.read(syncEngineProvider.notifier).fullSync();
 
     if (mounted) {
       setState(() {
         _isSyncing = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Sync complete! All changes backed up. ☁️'),
-          backgroundColor: Theme.of(context).colorScheme.primary,
-        ),
-      );
+      final status = ref.read(syncEngineProvider);
+      if (status == SyncStatus.error) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Sync failed. Please try again later. ❌'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Sync complete! All changes backed up. ☁️'),
+            backgroundColor: Theme.of(context).colorScheme.primary,
+          ),
+        );
+      }
     }
   }
 
@@ -104,6 +114,8 @@ class _SyncSettingsPageState extends ConsumerState<SyncSettingsPage> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final authState = ref.watch(authProvider);
+    final syncStatus = ref.watch(syncEngineProvider);
+    final lastSyncedAt = ref.read(syncEngineProvider.notifier).lastSyncedAt;
 
     return Scaffold(
       appBar: AppBar(
@@ -181,13 +193,16 @@ class _SyncSettingsPageState extends ConsumerState<SyncSettingsPage> {
                           Container(
                             width: 8,
                             height: 8,
-                            decoration: const BoxDecoration(
-                              color: Colors.green,
+                            decoration: BoxDecoration(
+                              color: syncStatus == SyncStatus.error ? Colors.red : (syncStatus == SyncStatus.syncing ? Colors.blue : Colors.green),
                               shape: BoxShape.circle,
                             ),
                           ),
                           const SizedBox(width: 6),
-                          const Text('Connected & Active', style: TextStyle(fontWeight: FontWeight.w600)),
+                          Text(
+                            syncStatus == SyncStatus.error ? 'Error' : (syncStatus == SyncStatus.syncing ? 'Syncing...' : 'Connected & Active'),
+                            style: const TextStyle(fontWeight: FontWeight.w600)
+                          ),
                         ],
                       ),
                     ),
@@ -198,7 +213,9 @@ class _SyncSettingsPageState extends ConsumerState<SyncSettingsPage> {
                       icon: Icons.access_time_outlined,
                       label: 'Last Synced',
                       valueWidget: Text(
-                        DateFormat('h:mm a').format(DateTime.now().subtract(const Duration(minutes: 2))),
+                        lastSyncedAt.millisecondsSinceEpoch == 0 
+                            ? 'Never' 
+                            : DateFormat('h:mm a').format(lastSyncedAt),
                         style: const TextStyle(fontWeight: FontWeight.w500),
                       ),
                     ),
@@ -209,7 +226,7 @@ class _SyncSettingsPageState extends ConsumerState<SyncSettingsPage> {
                       icon: Icons.pending_actions_outlined,
                       label: 'Pending Changes',
                       valueWidget: const Chip(
-                        label: Text('0', style: TextStyle(fontWeight: FontWeight.bold)),
+                        label: Text('-', style: TextStyle(fontWeight: FontWeight.bold)),
                         visualDensity: VisualDensity.compact,
                       ),
                     ),

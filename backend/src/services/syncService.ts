@@ -55,7 +55,7 @@ const topicSchema = z.object({
   subjectId: z.string().uuid(),
   name: z.string(),
   order: z.number(),
-  createdAt: z.string().or(z.date()),
+  createdAt: z.string().or(z.date()).optional(),
   updatedAt: z.string().or(z.date()),
 });
 
@@ -64,7 +64,7 @@ const chapterSchema = z.object({
   topicId: z.string().uuid(),
   name: z.string(),
   order: z.number(),
-  createdAt: z.string().or(z.date()),
+  createdAt: z.string().or(z.date()).optional(),
   updatedAt: z.string().or(z.date()),
 });
 
@@ -85,7 +85,7 @@ const sessionSchema = z.object({
   startPage: z.number().nullable(),
   endPage: z.number().nullable(),
   isFreeTimer: z.boolean(),
-  createdAt: z.string().or(z.date()),
+  createdAt: z.string().or(z.date()).optional(),
   updatedAt: z.string().or(z.date()),
 });
 
@@ -120,7 +120,7 @@ const achievementSchema = z.object({
   key: z.string(),
   unlockedAt: z.string().or(z.date()).nullable(),
   progress: z.number(),
-  createdAt: z.string().or(z.date()),
+  createdAt: z.string().or(z.date()).optional(),
   updatedAt: z.string().or(z.date()),
 });
 
@@ -134,7 +134,7 @@ const userStatsSchema = z.object({
   lastStudyDate: z.string().or(z.date()).nullable(),
   totalStudyMinutes: z.number(),
   freezeTokens: z.number(),
-  createdAt: z.string().or(z.date()),
+  createdAt: z.string().or(z.date()).optional(),
   updatedAt: z.string().or(z.date()),
 });
 
@@ -145,7 +145,7 @@ const subjectMilestoneSchema = z.object({
   isCompleted: z.boolean(),
   sortOrder: z.number(),
   completedAt: z.string().or(z.date()).nullable(),
-  createdAt: z.string().or(z.date()),
+  createdAt: z.string().or(z.date()).optional(),
   updatedAt: z.string().or(z.date()),
 });
 
@@ -616,13 +616,18 @@ export class SyncService {
           if (existing) {
             const updates: {
               totalXp?: number;
+              currentLevel?: number;
               currentStreak?: number;
               longestStreak?: number;
+              lastStudyDate?: Date;
               totalStudyMinutes?: number;
               freezeTokens?: number;
             } = {};
             if (validated.totalXp > existing.totalXp) {
               updates.totalXp = validated.totalXp;
+            }
+            if (validated.currentLevel > existing.currentLevel) {
+              updates.currentLevel = validated.currentLevel;
             }
             if (validated.currentStreak > existing.currentStreak) {
               updates.currentStreak = validated.currentStreak;
@@ -630,6 +635,9 @@ export class SyncService {
                 existing.longestStreak,
                 validated.currentStreak
               );
+            }
+            if (validated.lastStudyDate && (!existing.lastStudyDate || new Date(validated.lastStudyDate) > existing.lastStudyDate)) {
+              updates.lastStudyDate = new Date(validated.lastStudyDate);
             }
             if (validated.totalStudyMinutes > existing.totalStudyMinutes) {
               updates.totalStudyMinutes = validated.totalStudyMinutes;

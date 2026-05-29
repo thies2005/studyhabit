@@ -26,9 +26,32 @@ export default function Subjects() {
   };
 
   const handleCreateSubject = async (subjectData: any) => {
-    const response = await apiClient.post('/subjects', subjectData);
-    const newSubject = response.data.data;
-    setSubjects((prev) => [newSubject, ...prev]);
+    try {
+      // We need a projectId to create a subject. Fetch projects first.
+      const projectsRes = await apiClient.get('/projects');
+      let projects = projectsRes.data.data;
+      
+      let projectId = '';
+      if (projects.length === 0) {
+        // Create a default project if the user has none
+        const newProjectRes = await apiClient.post('/projects', {
+          name: 'My Project',
+          colorValue: 0x006874, // Deep Teal
+        });
+        projectId = newProjectRes.data.data.id;
+      } else {
+        projectId = projects[0].id;
+      }
+
+      subjectData.projectId = projectId;
+      
+      const response = await apiClient.post('/subjects', subjectData);
+      const newSubject = response.data.data;
+      setSubjects((prev) => [newSubject, ...prev]);
+    } catch (error) {
+      console.error('Failed to create subject:', error);
+      throw error;
+    }
   };
 
   const formatColor = (colorValue: number) => {

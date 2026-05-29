@@ -178,7 +178,7 @@ class SyncEngine extends _$SyncEngine {
       final serverUpdatedAt = DateTime.parse(item['updatedAt']);
       final local = await (_db.select(_db.projects)..where((t) => t.id.equals(id))).getSingleOrNull();
       if (local == null || serverUpdatedAt.isAfter(local.updatedAt)) {
-        _db.into(_db.projects).insertOnConflictUpdate(_projectFromJson(item));
+        await _db.into(_db.projects).insertOnConflictUpdate(_projectFromJson(item));
       }
     }
 
@@ -189,7 +189,7 @@ class SyncEngine extends _$SyncEngine {
       final serverUpdatedAt = DateTime.parse(item['updatedAt']);
       final local = await (_db.select(_db.subjects)..where((t) => t.id.equals(id))).getSingleOrNull();
       if (local == null || serverUpdatedAt.isAfter(local.updatedAt)) {
-        _db.into(_db.subjects).insertOnConflictUpdate(_subjectFromJson(item));
+        await _db.into(_db.subjects).insertOnConflictUpdate(_subjectFromJson(item));
       }
     }
 
@@ -200,7 +200,7 @@ class SyncEngine extends _$SyncEngine {
       final serverUpdatedAt = DateTime.parse(item['updatedAt']);
       final local = await (_db.select(_db.topics)..where((t) => t.id.equals(id))).getSingleOrNull();
       if (local == null || serverUpdatedAt.isAfter(local.updatedAt)) {
-        _db.into(_db.topics).insertOnConflictUpdate(_topicFromJson(item));
+        await _db.into(_db.topics).insertOnConflictUpdate(_topicFromJson(item));
       }
     }
 
@@ -211,7 +211,7 @@ class SyncEngine extends _$SyncEngine {
       final serverUpdatedAt = DateTime.parse(item['updatedAt']);
       final local = await (_db.select(_db.chapters)..where((t) => t.id.equals(id))).getSingleOrNull();
       if (local == null || serverUpdatedAt.isAfter(local.updatedAt)) {
-        _db.into(_db.chapters).insertOnConflictUpdate(_chapterFromJson(item));
+        await _db.into(_db.chapters).insertOnConflictUpdate(_chapterFromJson(item));
       }
     }
 
@@ -222,7 +222,7 @@ class SyncEngine extends _$SyncEngine {
       final serverUpdatedAt = DateTime.parse(item['updatedAt']);
       final local = await (_db.select(_db.studySessions)..where((t) => t.id.equals(id))).getSingleOrNull();
       if (local == null || serverUpdatedAt.isAfter(local.updatedAt)) {
-        _db.into(_db.studySessions).insertOnConflictUpdate(_sessionFromJson(item));
+        await _db.into(_db.studySessions).insertOnConflictUpdate(_sessionFromJson(item));
       }
     }
 
@@ -233,7 +233,7 @@ class SyncEngine extends _$SyncEngine {
       final serverUpdatedAt = DateTime.parse(item['updatedAt']);
       final local = await (_db.select(_db.sources)..where((t) => t.id.equals(id))).getSingleOrNull();
       if (local == null || serverUpdatedAt.isAfter(local.updatedAt)) {
-        _db.into(_db.sources).insertOnConflictUpdate(_sourceFromJson(item));
+        await _db.into(_db.sources).insertOnConflictUpdate(_sourceFromJson(item));
       }
     }
 
@@ -244,7 +244,7 @@ class SyncEngine extends _$SyncEngine {
       final serverUpdatedAt = DateTime.parse(item['updatedAt']);
       final local = await (_db.select(_db.skillLabels)..where((t) => t.id.equals(id))).getSingleOrNull();
       if (local == null || serverUpdatedAt.isAfter(local.updatedAt)) {
-        _db.into(_db.skillLabels).insertOnConflictUpdate(_skillLabelFromJson(item));
+        await _db.into(_db.skillLabels).insertOnConflictUpdate(_skillLabelFromJson(item));
       }
     }
 
@@ -255,7 +255,7 @@ class SyncEngine extends _$SyncEngine {
       final serverUpdatedAt = DateTime.parse(item['updatedAt']);
       final local = await (_db.select(_db.subjectMilestones)..where((t) => t.id.equals(id))).getSingleOrNull();
       if (local == null || serverUpdatedAt.isAfter(local.updatedAt)) {
-        _db.into(_db.subjectMilestones).insertOnConflictUpdate(_milestoneFromJson(item));
+        await _db.into(_db.subjectMilestones).insertOnConflictUpdate(_milestoneFromJson(item));
       }
     }
 
@@ -266,7 +266,7 @@ class SyncEngine extends _$SyncEngine {
       final serverUpdatedAt = DateTime.parse(item['updatedAt']);
       final local = await (_db.select(_db.achievements)..where((t) => t.key.equals(key))).getSingleOrNull();
       if (local == null || serverUpdatedAt.isAfter(local.updatedAt)) {
-        _db.into(_db.achievements).insertOnConflictUpdate(_achievementFromJson(item));
+        await _db.into(_db.achievements).insertOnConflictUpdate(_achievementFromJson(item));
       }
     }
 
@@ -279,15 +279,22 @@ class SyncEngine extends _$SyncEngine {
       } else {
         // Apply max-wins to stats values
         final totalXp = statsJson['totalXp'] as int;
+        final currentLevel = statsJson['currentLevel'] as int?;
         final currentStreak = statsJson['currentStreak'] as int;
         final longestStreak = statsJson['longestStreak'] as int;
+        final lastStudyDateStr = statsJson['lastStudyDate'] as String?;
+        final lastStudyDate = lastStudyDateStr != null ? DateTime.tryParse(lastStudyDateStr) : null;
         final totalStudyMinutes = statsJson['totalStudyMinutes'] as int;
         final freezeTokens = statsJson['freezeTokens'] as int;
         
         final updatedStats = local.copyWith(
           totalXp: totalXp > local.totalXp ? totalXp : local.totalXp,
+          currentLevel: (currentLevel != null && currentLevel > local.currentLevel) ? currentLevel : local.currentLevel,
           currentStreak: currentStreak > local.currentStreak ? currentStreak : local.currentStreak,
           longestStreak: longestStreak > local.longestStreak ? longestStreak : local.longestStreak,
+          lastStudyDate: (lastStudyDate != null && (local.lastStudyDate == null || lastStudyDate.isAfter(local.lastStudyDate!))) 
+              ? Value(lastStudyDate) 
+              : Value(local.lastStudyDate),
           totalStudyMinutes: totalStudyMinutes > local.totalStudyMinutes ? totalStudyMinutes : local.totalStudyMinutes,
           freezeTokens: freezeTokens > local.freezeTokens ? freezeTokens : local.freezeTokens,
           updatedAt: DateTime.now(),

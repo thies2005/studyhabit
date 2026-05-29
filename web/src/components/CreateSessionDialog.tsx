@@ -14,6 +14,7 @@ interface CreateSessionDialogProps {
     endedAt: string | null;
     plannedDurationMinutes: number;
     actualDurationMinutes: number;
+    pomodorosCompleted: number;
     confidenceRating: number | null;
     notes: string | null;
   }) => Promise<void>;
@@ -104,6 +105,7 @@ export default function CreateSessionDialog({ isOpen, onClose, subjects, onSubmi
         endedAt: endDateTime.toISOString(),
         plannedDurationMinutes: plannedDuration,
         actualDurationMinutes: actualDuration,
+        pomodorosCompleted: Math.floor(actualDuration / 25),
         confidenceRating: confidence,
         notes: notes.trim() || null,
       });

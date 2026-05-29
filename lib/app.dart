@@ -6,6 +6,7 @@ import 'core/providers/theme_provider.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/services/sync_service.dart';
+import 'core/network/connectivity_provider.dart';
 
 class StudyTrackerApp extends ConsumerStatefulWidget {
   const StudyTrackerApp({super.key});
@@ -37,6 +38,12 @@ class _StudyTrackerAppState extends ConsumerState<StudyTrackerApp> with WidgetsB
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<AsyncValue<bool>>(isOnlineProvider, (previous, next) {
+      if (previous?.value == false && next.value == true) {
+        ref.read(syncEngineProvider.notifier).fullSync();
+      }
+    });
+
     final router = ref.watch(appRouterProvider);
     final themeSettings = ref.watch(themeSettingsProvider);
 
