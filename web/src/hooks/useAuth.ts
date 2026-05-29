@@ -33,7 +33,9 @@ export function useAuth() {
 
   const logout = useCallback(async () => {
     try {
-      await apiClient.post('/auth/logout');
+      if (auth.refreshToken) {
+        await apiClient.post('/auth/logout', { refreshToken: auth.refreshToken });
+      }
     } catch {
       // Ignore errors on logout
     }

@@ -30,6 +30,7 @@ const projectSchema = z.object({
   createdAt: z.string().or(z.date()),
   lastOpenedAt: z.string().or(z.date()),
   isArchived: z.boolean(),
+  isDeleted: z.boolean().optional(),
   updatedAt: z.string().or(z.date()),
 });
 
@@ -47,6 +48,7 @@ const subjectSchema = z.object({
   targetWeeklyHours: z.number().nullable(),
   xpTotal: z.number(),
   createdAt: z.string().or(z.date()),
+  isDeleted: z.boolean().optional(),
   updatedAt: z.string().or(z.date()),
 });
 
@@ -56,6 +58,7 @@ const topicSchema = z.object({
   name: z.string(),
   order: z.number(),
   createdAt: z.string().or(z.date()).optional(),
+  isDeleted: z.boolean().optional(),
   updatedAt: z.string().or(z.date()),
 });
 
@@ -65,6 +68,7 @@ const chapterSchema = z.object({
   name: z.string(),
   order: z.number(),
   createdAt: z.string().or(z.date()).optional(),
+  isDeleted: z.boolean().optional(),
   updatedAt: z.string().or(z.date()),
 });
 
@@ -86,6 +90,7 @@ const sessionSchema = z.object({
   endPage: z.number().nullable(),
   isFreeTimer: z.boolean(),
   createdAt: z.string().or(z.date()).optional(),
+  isDeleted: z.boolean().optional(),
   updatedAt: z.string().or(z.date()),
 });
 
@@ -103,6 +108,7 @@ const sourceSchema = z.object({
   progressPercent: z.number().nullable(),
   notes: z.string().nullable(),
   addedAt: z.string().or(z.date()),
+  isDeleted: z.boolean().optional(),
   updatedAt: z.string().or(z.date()),
 });
 
@@ -112,6 +118,7 @@ const skillLabelSchema = z.object({
   topicId: z.string().uuid().nullable(),
   chapterId: z.string().uuid().nullable(),
   label: z.enum(['beginner', 'intermediate', 'advanced', 'expert']),
+  isDeleted: z.boolean().optional(),
   updatedAt: z.string().or(z.date()),
 });
 
@@ -121,6 +128,7 @@ const achievementSchema = z.object({
   unlockedAt: z.string().or(z.date()).nullable(),
   progress: z.number(),
   createdAt: z.string().or(z.date()).optional(),
+  isDeleted: z.boolean().optional(),
   updatedAt: z.string().or(z.date()),
 });
 
@@ -135,6 +143,7 @@ const userStatsSchema = z.object({
   totalStudyMinutes: z.number(),
   freezeTokens: z.number(),
   createdAt: z.string().or(z.date()).optional(),
+  isDeleted: z.boolean().optional(),
   updatedAt: z.string().or(z.date()),
 });
 
@@ -146,11 +155,13 @@ const subjectMilestoneSchema = z.object({
   sortOrder: z.number(),
   completedAt: z.string().or(z.date()).nullable(),
   createdAt: z.string().or(z.date()).optional(),
+  isDeleted: z.boolean().optional(),
   updatedAt: z.string().or(z.date()),
 });
 
 const userSettingsSchema = z.object({
   settings: z.record(z.unknown()),
+  isDeleted: z.boolean().optional(),
   updatedAt: z.string().or(z.date()),
 });
 
@@ -266,21 +277,8 @@ export class SyncService {
     };
   }
 
-  private static async verifySubjectOwnership(subjectId: string, userId: string): Promise<boolean> {
-    const subject = await prisma.subject.findUnique({
-      where: { id: subjectId },
-      include: { project: true },
-    });
-    return !!subject && subject.project.userId === userId;
-  }
+  // Removed slow verifySubjectOwnership and verifyTopicOwnership
 
-  private static async verifyTopicOwnership(topicId: string, userId: string): Promise<boolean> {
-    const topic = await prisma.topic.findUnique({
-      where: { id: topicId },
-      include: { subject: { include: { project: true } } },
-    });
-    return !!topic && topic.subject.project.userId === userId;
-  }
 
   static async pushChanges(
     userId: string,
@@ -294,9 +292,20 @@ export class SyncService {
     const conflicts: Record<string, number> = {};
     const errors: Array<{ entity: string; id: string; error: string }> = [];
 
-    // Note: Per-item try/catch is intentional for sync — one bad record
-    // should not roll back the entire batch. If atomic per-entity-type
-    // is needed, wrap each section in prisma.$transaction().
+    // Pre-fetch all owned IDs to prevent N+1 queries (M2 fix)
+    const userProjects = await prisma.project.findMany({ where: { userId }, select: { id: true } });
+    const allProjectIds = new Set(userProjects.map(p => p.id));
+    const userSubjects = allProjectIds.size > 0 
+      ? await prisma.subject.findMany({ where: { projectId: { in: Array.from(allProjectIds) } }, select: { id: true } })
+      : [];
+    const allSubjectIds = new Set(userSubjects.map(s => s.id));
+    const userTopics = allSubjectIds.size > 0
+      ? await prisma.topic.findMany({ where: { subjectId: { in: Array.from(allSubjectIds) } }, select: { id: true } })
+      : [];
+    const allTopicIds = new Set(userTopics.map(t => t.id));
+
+    // Execute the entire push within a single transaction to prevent race conditions (M4 fix)
+    await prisma.$transaction(async (tx) => {
 
     if (payload.projects?.length) {
       let a = 0;
@@ -312,7 +321,7 @@ export class SyncService {
             continue;
           }
 
-          const existing = await prisma.project.findUnique({
+          const existing = await tx.project.findUnique({
             where: { id: validated.id },
           });
 
@@ -327,7 +336,7 @@ export class SyncService {
             continue;
           }
 
-          await prisma.project.upsert({
+          await tx.project.upsert({
             where: { id: validated.id },
             create: { ...validated, userId },
             update: validated,
@@ -350,15 +359,12 @@ export class SyncService {
           // Validate and strip unknown fields
           const validated = subjectSchema.parse(item);
 
-          const project = await prisma.project.findUnique({
-            where: { id: validated.projectId },
-          });
-          if (!project || project.userId !== userId) {
+          if (!allProjectIds.has(validated.projectId)) {
             errors.push({ entity: 'subject', id: validated.id, error: 'forbidden' });
             continue;
           }
 
-          const existing = await prisma.subject.findUnique({
+          const existing = await tx.subject.findUnique({
             where: { id: validated.id },
           });
           const result = lastWriteWins(validated, existing);
@@ -367,7 +373,7 @@ export class SyncService {
             continue;
           }
 
-          await prisma.subject.upsert({
+          await tx.subject.upsert({
             where: { id: validated.id },
             create: validated,
             update: validated,
@@ -389,13 +395,13 @@ export class SyncService {
           // Validate and strip unknown fields
           const validated = topicSchema.parse(item);
 
-          const owned = await SyncService.verifySubjectOwnership(validated.subjectId, userId);
+          const owned = allSubjectIds.has(validated.subjectId);
           if (!owned) {
             errors.push({ entity: 'topic', id: validated.id, error: 'forbidden' });
             continue;
           }
 
-          const existing = await prisma.topic.findUnique({
+          const existing = await tx.topic.findUnique({
             where: { id: validated.id },
           });
           const result = lastWriteWins(validated, existing);
@@ -404,7 +410,7 @@ export class SyncService {
             continue;
           }
 
-          await prisma.topic.upsert({
+          await tx.topic.upsert({
             where: { id: validated.id },
             create: validated,
             update: validated,
@@ -426,13 +432,13 @@ export class SyncService {
           // Validate and strip unknown fields
           const validated = chapterSchema.parse(item);
 
-          const owned = await SyncService.verifyTopicOwnership(validated.topicId, userId);
+          const owned = allTopicIds.has(validated.topicId);
           if (!owned) {
             errors.push({ entity: 'chapter', id: validated.id, error: 'forbidden' });
             continue;
           }
 
-          const existing = await prisma.chapter.findUnique({
+          const existing = await tx.chapter.findUnique({
             where: { id: validated.id },
           });
           const result = lastWriteWins(validated, existing);
@@ -441,7 +447,7 @@ export class SyncService {
             continue;
           }
 
-          await prisma.chapter.upsert({
+          await tx.chapter.upsert({
             where: { id: validated.id },
             create: validated,
             update: validated,
@@ -463,13 +469,13 @@ export class SyncService {
           // Validate and strip unknown fields
           const validated = sessionSchema.parse(item);
 
-          const owned = await SyncService.verifySubjectOwnership(validated.subjectId, userId);
+          const owned = allSubjectIds.has(validated.subjectId);
           if (!owned) {
             errors.push({ entity: 'session', id: validated.id, error: 'forbidden' });
             continue;
           }
 
-          const existing = await prisma.studySession.findUnique({
+          const existing = await tx.studySession.findUnique({
             where: { id: validated.id },
           });
           const result = lastWriteWins(validated, existing);
@@ -478,7 +484,7 @@ export class SyncService {
             continue;
           }
 
-          await prisma.studySession.upsert({
+          await tx.studySession.upsert({
             where: { id: validated.id },
             create: validated,
             update: validated,
@@ -501,13 +507,13 @@ export class SyncService {
           // Validate and strip unknown fields
           const validated = sourceSchema.parse(item);
 
-          const owned = await SyncService.verifySubjectOwnership(validated.subjectId, userId);
+          const owned = allSubjectIds.has(validated.subjectId);
           if (!owned) {
             errors.push({ entity: 'source', id: validated.id, error: 'forbidden' });
             continue;
           }
 
-          const existing = await prisma.source.findUnique({
+          const existing = await tx.source.findUnique({
             where: { id: validated.id },
           });
           const result = lastWriteWins(validated, existing);
@@ -516,7 +522,7 @@ export class SyncService {
             continue;
           }
 
-          await prisma.source.upsert({
+          await tx.source.upsert({
             where: { id: validated.id },
             create: validated,
             update: validated,
@@ -538,13 +544,13 @@ export class SyncService {
           // Validate and strip unknown fields
           const validated = skillLabelSchema.parse(item);
 
-          const owned = await SyncService.verifySubjectOwnership(validated.subjectId, userId);
+          const owned = allSubjectIds.has(validated.subjectId);
           if (!owned) {
             errors.push({ entity: 'skillLabel', id: validated.id, error: 'forbidden' });
             continue;
           }
 
-          const existing = await prisma.skillLabel.findUnique({
+          const existing = await tx.skillLabel.findUnique({
             where: { id: validated.id },
           });
           const result = lastWriteWins(validated, existing);
@@ -553,7 +559,7 @@ export class SyncService {
             continue;
           }
 
-          await prisma.skillLabel.upsert({
+          await tx.skillLabel.upsert({
             where: { id: validated.id },
             create: validated,
             update: validated,
@@ -579,12 +585,12 @@ export class SyncService {
             continue;
           }
 
-          const existing = await prisma.achievement.findUnique({
+          const existing = await tx.achievement.findUnique({
             where: { userId_key: { userId, key: validated.key } },
           });
           if (existing && validated.progress <= existing.progress) continue;
 
-          await prisma.achievement.upsert({
+          await tx.achievement.upsert({
             where: { userId_key: { userId, key: validated.key } },
             create: { ...validated, userId, unlockedAt: null },
             update: {
@@ -610,7 +616,7 @@ export class SyncService {
         if (validated.userId !== userId) {
           errors.push({ entity: 'userStats', id: userId, error: 'forbidden' });
         } else {
-          const existing = await prisma.userStats.findUnique({
+          const existing = await tx.userStats.findUnique({
             where: { userId },
           });
           if (existing) {
@@ -646,14 +652,14 @@ export class SyncService {
               updates.freezeTokens = validated.freezeTokens;
             }
             if (Object.keys(updates).length > 0) {
-              await prisma.userStats.update({ where: { userId }, data: updates });
+              await tx.userStats.update({ where: { userId }, data: updates });
               applied.userStats = 1;
             } else {
               conflicts.userStats = 1;
             }
           } else {
             // C2: Create initial stats for new users
-            await prisma.userStats.create({
+            await tx.userStats.create({
               data: {
                 userId,
                 totalXp: validated.totalXp,
@@ -676,7 +682,7 @@ export class SyncService {
     if (payload.userSettings) {
       try {
         const validated = userSettingsSchema.parse(payload.userSettings);
-        const existing = await prisma.userSettings.findUnique({
+        const existing = await tx.userSettings.findUnique({
           where: { userId },
         });
 
@@ -685,7 +691,7 @@ export class SyncService {
         
         const result = lastWriteWins(incoming, current);
         if (result.accepted) {
-          await prisma.userSettings.upsert({
+          await tx.userSettings.upsert({
             where: { userId },
             create: {
               userId,
@@ -711,13 +717,13 @@ export class SyncService {
         try {
           const validated = subjectMilestoneSchema.parse(item);
 
-          const owned = await SyncService.verifySubjectOwnership(validated.subjectId, userId);
+          const owned = allSubjectIds.has(validated.subjectId);
           if (!owned) {
             errors.push({ entity: 'subjectMilestone', id: validated.id, error: 'forbidden' });
             continue;
           }
 
-          const existing = await prisma.subjectMilestone.findUnique({
+          const existing = await tx.subjectMilestone.findUnique({
             where: { id: validated.id },
           });
           const result = lastWriteWins(validated, existing);
@@ -726,7 +732,7 @@ export class SyncService {
             continue;
           }
 
-          await prisma.subjectMilestone.upsert({
+          await tx.subjectMilestone.upsert({
             where: { id: validated.id },
             create: validated,
             update: validated,
@@ -758,6 +764,8 @@ export class SyncService {
         });
       }
     }
+
+    }); // End of transaction
 
     return { applied, conflicts, errors };
   }

@@ -22,6 +22,7 @@ abstract class StudySession with _$StudySession {
     int? startPage,
     int? endPage,
     @Default(false) bool isFreeTimer,
+    @Default(false) bool isDeleted,
     DateTime? updatedAt,
   }) = _StudySession;
 

@@ -1,6 +1,7 @@
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
+import ProjectSwitcher from './ProjectSwitcher';
 
 export default function Layout() {
   const navigate = useNavigate();
@@ -126,7 +127,9 @@ export default function Layout() {
         {/* Top Bar */}
         <header className="bg-surfaceHigh border-b border-surfaceHigh px-6 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex-1"></div>
+            <div className="flex-1">
+              <ProjectSwitcher />
+            </div>
 
             <div className="flex items-center space-x-4">
               {/* Notifications */}

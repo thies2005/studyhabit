@@ -34,12 +34,15 @@ const updateSessionSchema = z.object({
 
 router.get('/', async (req, res, next) => {
   try {
-    const subjectId = String(req.query.subjectId ?? '');
+    const subjectId = req.query.subjectId ? String(req.query.subjectId) : undefined;
     const { skip, take, page, limit } = parsePagination(req.query as any);
-    const where = {
-      subjectId,
+    const where: any = {
       subject: { project: { userId: req.user.userId } },
     };
+    if (subjectId) {
+      where.subjectId = subjectId;
+    }
+    
     const [sessions, total] = await Promise.all([
       prisma.studySession.findMany({
         where,

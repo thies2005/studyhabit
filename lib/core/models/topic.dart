@@ -10,6 +10,7 @@ abstract class Topic with _$Topic {
     required String subjectId,
     required String name,
     required int order,
+    @Default(false) bool isDeleted,
     DateTime? updatedAt,
   }) = _Topic;
 

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:drift/drift.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -22,6 +23,7 @@ class SyncEngine extends _$SyncEngine {
   
   late AppDatabase _db;
   late SharedPreferences _prefs;
+  Timer? _syncTimer;
 
   @override
   SyncStatus build() {
@@ -62,11 +64,13 @@ class SyncEngine extends _$SyncEngine {
       return;
     }
 
-    state = SyncStatus.syncing;
-    AppLogger.i('SyncEngine', 'Starting full synchronization...');
+    _syncTimer?.cancel();
+    _syncTimer = Timer(const Duration(seconds: 5), () async {
+      state = SyncStatus.syncing;
+      AppLogger.i('SyncEngine', 'Starting full synchronization...');
 
-    try {
-      final since = lastSyncedAt;
+      try {
+        final since = lastSyncedAt;
       final dio = ref.read(apiClientProvider);
 
       // 2. Fetch local changes since lastSync
@@ -95,6 +99,7 @@ class SyncEngine extends _$SyncEngine {
       state = SyncStatus.error;
       AppLogger.e('SyncEngine', 'Sync failed', e, stack);
     }
+    });
   }
 
   Future<Map<String, dynamic>> _collectLocalChanges(DateTime since) async {
@@ -348,6 +353,7 @@ class SyncEngine extends _$SyncEngine {
         defaultLongBreakDuration: j['defaultLongBreakDuration'] ?? 15,
         defaultLongBreakEvery: j['defaultLongBreakEvery'] ?? 4,
         studyReminderMinutes: j['studyReminderMinutes'] ?? 30,
+        isDeleted: j['isDeleted'] as bool? ?? false,
         updatedAt: DateTime.parse(j['updatedAt']),
       );
 
@@ -382,6 +388,7 @@ class SyncEngine extends _$SyncEngine {
         completenessMode: CompletenessMode.values.firstWhere((e) => e.name == j['completenessMode'], orElse: () => CompletenessMode.none),
         targetHours: j['targetHours'],
         targetWeeklyHours: j['targetWeeklyHours'],
+        isDeleted: j['isDeleted'] as bool? ?? false,
         updatedAt: DateTime.parse(j['updatedAt']),
       );
 
@@ -398,6 +405,7 @@ class SyncEngine extends _$SyncEngine {
         subjectId: j['subjectId'],
         name: j['name'],
         order: j['order'] ?? 0,
+        isDeleted: j['isDeleted'] as bool? ?? false,
         updatedAt: DateTime.parse(j['updatedAt']),
       );
 
@@ -414,6 +422,7 @@ class SyncEngine extends _$SyncEngine {
         topicId: j['topicId'],
         name: j['name'],
         order: j['order'] ?? 0,
+        isDeleted: j['isDeleted'] as bool? ?? false,
         updatedAt: DateTime.parse(j['updatedAt']),
       );
 
@@ -454,6 +463,7 @@ class SyncEngine extends _$SyncEngine {
         startPage: j['startPage'],
         endPage: j['endPage'],
         isFreeTimer: j['isFreeTimer'] ?? false,
+        isDeleted: j['isDeleted'] as bool? ?? false,
         updatedAt: DateTime.parse(j['updatedAt']),
       );
 
@@ -488,6 +498,7 @@ class SyncEngine extends _$SyncEngine {
         progressPercent: (j['progressPercent'] as num?)?.toDouble(),
         notes: j['notes'],
         addedAt: DateTime.parse(j['addedAt']),
+        isDeleted: j['isDeleted'] as bool? ?? false,
         updatedAt: DateTime.parse(j['updatedAt']),
       );
 
@@ -506,6 +517,7 @@ class SyncEngine extends _$SyncEngine {
         topicId: j['topicId'],
         chapterId: j['chapterId'],
         label: SkillLevel.values.firstWhere((e) => e.name == j['label'], orElse: () => SkillLevel.beginner),
+        isDeleted: j['isDeleted'] as bool? ?? false,
         updatedAt: DateTime.parse(j['updatedAt']),
       );
 
@@ -526,6 +538,7 @@ class SyncEngine extends _$SyncEngine {
         isCompleted: j['isCompleted'] ?? false,
         sortOrder: j['sortOrder'] ?? 0,
         completedAt: j['completedAt'] != null ? DateTime.parse(j['completedAt']) : null,
+        isDeleted: j['isDeleted'] as bool? ?? false,
         updatedAt: DateTime.parse(j['updatedAt']),
       );
 

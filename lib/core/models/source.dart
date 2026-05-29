@@ -21,6 +21,7 @@ abstract class Source with _$Source {
     double? progressPercent,
     String? notes,
     required DateTime addedAt,
+    @Default(false) bool isDeleted,
     DateTime? updatedAt,
   }) = _Source;
 

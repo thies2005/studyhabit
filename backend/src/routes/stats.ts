@@ -46,6 +46,8 @@ router.get('/overview', async (req, res, next) => {
         totalXp: userStats.totalXp,
         currentLevel: userStats.currentLevel,
         levelName,
+        longestStreak: userStats.longestStreak,
+        freezeTokens: userStats.freezeTokens,
       },
     });
   } catch (error: unknown) {

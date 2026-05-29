@@ -10,6 +10,7 @@ abstract class Chapter with _$Chapter {
     required String topicId,
     required String name,
     required int order,
+    @Default(false) bool isDeleted,
     DateTime? updatedAt,
   }) = _Chapter;
 

@@ -57,9 +57,16 @@ const loadSettings = (): SettingsState => {
   };
 };
 
-const saveSettings = (settings: SettingsState) => {
+const saveSettings = async (settings: SettingsState) => {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    // Try to sync to backend if possible (fire and forget)
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      import('../api/client').then(({ default: apiClient }) => {
+        apiClient.post('/settings', settings).catch(console.error);
+      });
+    }
   } catch (error) {
     console.error('Failed to save settings:', error);
   }

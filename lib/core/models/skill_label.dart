@@ -13,6 +13,7 @@ abstract class SkillLabel with _$SkillLabel {
     String? topicId,
     String? chapterId,
     required SkillLevel label,
+    @Default(false) bool isDeleted,
     required DateTime updatedAt,
   }) = _SkillLabel;
 

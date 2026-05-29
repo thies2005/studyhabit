@@ -8,69 +8,71 @@ datasource db {
 }
 
 model User {
-  id           String         @id @default(uuid())
-  email        String         @unique
-  passwordHash String
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  projects     Project[]
-  achievements Achievement[]
-  userStats    UserStats?
-  userSettings UserSettings?
+  id            String         @id @default(uuid())
+  email         String         @unique
+  passwordHash  String
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  projects      Project[]
+  achievements  Achievement[]
+  userStats     UserStats?
+  userSettings  UserSettings?
   refreshTokens RefreshToken[]
 }
 
 model RefreshToken {
-  id        String   @id @default(uuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash String   @unique
+  id         String    @id @default(uuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String    @unique
   deviceName String?
   deviceInfo String?
-  ipAddress String?
-  createdAt DateTime @default(now())
-  expiresAt DateTime
-  revokedAt DateTime?
+  ipAddress  String?
+  createdAt  DateTime  @default(now())
+  expiresAt  DateTime
+  revokedAt  DateTime?
 
   @@index([userId])
   @@index([expiresAt])
 }
 
 model Project {
-  id           String    @id @default(uuid())
-  userId       String
-  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name         String
-  icon         String    @default("📚")
-  colorValue   Int
-  createdAt    DateTime  @default(now())
-  lastOpenedAt DateTime  @default(now())
-  isArchived   Boolean   @default(false)
-  defaultWorkDuration      Int      @default(25)
-  defaultBreakDuration     Int      @default(5)
-  defaultLongBreakDuration Int      @default(15)
-  defaultLongBreakEvery    Int      @default(4)
-  studyReminderMinutes     Int      @default(30)
-  updatedAt    DateTime  @updatedAt
-  subjects     Subject[]
+  id                       String    @id @default(uuid())
+  userId                   String
+  user                     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name                     String
+  icon                     String    @default("📚")
+  colorValue               Int
+  createdAt                DateTime  @default(now())
+  lastOpenedAt             DateTime  @default(now())
+  isArchived               Boolean   @default(false)
+  defaultWorkDuration      Int       @default(25)
+  defaultBreakDuration     Int       @default(5)
+  defaultLongBreakDuration Int       @default(15)
+  defaultLongBreakEvery    Int       @default(4)
+  studyReminderMinutes     Int       @default(30)
+  isDeleted                Boolean   @default(false)
+  updatedAt                DateTime  @updatedAt
+  subjects                 Subject[]
 
   @@index([userId])
 }
 
 model Subject {
-  id                     String        @id @default(uuid())
+  id                     String             @id @default(uuid())
   projectId              String
-  project                Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project                Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
   name                   String
   description            String?
   colorValue             Int
-  hierarchyMode          String        @default("flat")
-  defaultDurationMinutes Int           @default(25)
-  defaultBreakMinutes    Int           @default(5)
-  xpTotal                Int           @default(0)
-  createdAt              DateTime      @default(now())
-  updatedAt              DateTime      @updatedAt
-  completenessMode       String        @default("none")
+  hierarchyMode          String             @default("flat")
+  defaultDurationMinutes Int                @default(25)
+  defaultBreakMinutes    Int                @default(5)
+  xpTotal                Int                @default(0)
+  createdAt              DateTime           @default(now())
+  isDeleted              Boolean            @default(false)
+  updatedAt              DateTime           @updatedAt
+  completenessMode       String             @default("none")
   targetHours            Float?
   targetWeeklyHours      Float?
   topics                 Topic[]
@@ -83,72 +85,75 @@ model Subject {
 }
 
 model Topic {
-  id        String        @id @default(uuid())
-  subjectId String
-  subject   Subject       @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  name      String
-  order     Int           @default(0)
-  chapters  Chapter[]
-  sessions  StudySession[]
-  sources   Source[]
+  id          String         @id @default(uuid())
+  subjectId   String
+  subject     Subject        @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  name        String
+  order       Int            @default(0)
+  chapters    Chapter[]
+  sessions    StudySession[]
+  sources     Source[]
   skillLabels SkillLabel[]
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
+  createdAt   DateTime       @default(now())
+  isDeleted   Boolean        @default(false)
+  updatedAt   DateTime       @updatedAt
 
   @@index([subjectId])
 }
 
 model Chapter {
-  id        String        @id @default(uuid())
-  topicId   String
-  topic     Topic         @relation(fields: [topicId], references: [id], onDelete: Cascade)
-  name      String
-  order     Int           @default(0)
-  sessions  StudySession[]
-  sources   Source[]
+  id          String         @id @default(uuid())
+  topicId     String
+  topic       Topic          @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  name        String
+  order       Int            @default(0)
+  sessions    StudySession[]
+  sources     Source[]
   skillLabels SkillLabel[]
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
+  createdAt   DateTime       @default(now())
+  isDeleted   Boolean        @default(false)
+  updatedAt   DateTime       @updatedAt
 
   @@index([topicId])
 }
 
 model StudySession {
-  id                       String     @id @default(uuid())
-  subjectId                String
-  subject                  Subject    @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  topicId                  String?
-  topic                    Topic?     @relation(fields: [topicId], references: [id], onDelete: SetNull)
-  chapterId                String?
-  chapter                  Chapter?   @relation(fields: [chapterId], references: [id], onDelete: SetNull)
-  startedAt                DateTime
-  endedAt                  DateTime?
-  plannedDurationMinutes   Int        @default(25)
-  actualDurationMinutes    Int        @default(0)
-  pomodorosCompleted       Int        @default(0)
-  confidenceRating         Int?
-  notes                    String?
-  xpEarned                 Int        @default(0)
-  sourceId                 String?
-  startPage                Int?
-  endPage                  Int?
-  isFreeTimer              Boolean    @default(false)
-  createdAt                DateTime   @default(now())
-  updatedAt                DateTime   @updatedAt
+  id                     String    @id @default(uuid())
+  subjectId              String
+  subject                Subject   @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  topicId                String?
+  topic                  Topic?    @relation(fields: [topicId], references: [id], onDelete: SetNull)
+  chapterId              String?
+  chapter                Chapter?  @relation(fields: [chapterId], references: [id], onDelete: SetNull)
+  startedAt              DateTime
+  endedAt                DateTime?
+  plannedDurationMinutes Int       @default(25)
+  actualDurationMinutes  Int       @default(0)
+  pomodorosCompleted     Int       @default(0)
+  confidenceRating       Int?
+  notes                  String?
+  xpEarned               Int       @default(0)
+  sourceId               String?
+  startPage              Int?
+  endPage                Int?
+  isFreeTimer            Boolean   @default(false)
+  createdAt              DateTime  @default(now())
+  isDeleted              Boolean   @default(false)
+  updatedAt              DateTime  @updatedAt
 
   @@index([subjectId])
   @@index([startedAt])
 }
 
 model Source {
-  id              String    @id @default(uuid())
+  id              String   @id @default(uuid())
   subjectId       String
-  subject         Subject   @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  subject         Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   topicId         String?
-  topic           Topic?    @relation(fields: [topicId], references: [id], onDelete: SetNull)
+  topic           Topic?   @relation(fields: [topicId], references: [id], onDelete: SetNull)
   chapterId       String?
-  chapter         Chapter?  @relation(fields: [chapterId], references: [id], onDelete: SetNull)
-  type            String    @default("pdf")
+  chapter         Chapter? @relation(fields: [chapterId], references: [id], onDelete: SetNull)
+  type            String   @default("pdf")
   title           String
   filePath        String?
   url             String?
@@ -156,8 +161,9 @@ model Source {
   totalPages      Int?
   progressPercent Float?
   notes           String?
-  addedAt         DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  addedAt         DateTime @default(now())
+  isDeleted       Boolean  @default(false)
+  updatedAt       DateTime @updatedAt
 
   @@index([subjectId])
   @@index([subjectId, addedAt])
@@ -172,6 +178,7 @@ model SkillLabel {
   chapterId String?
   chapter   Chapter? @relation(fields: [chapterId], references: [id], onDelete: SetNull)
   label     String   @default("beginner")
+  isDeleted Boolean  @default(false)
   updatedAt DateTime @updatedAt
 
   @@index([subjectId])
@@ -181,14 +188,14 @@ model SkillLabel {
 }
 
 model Achievement {
-  id          String    @id @default(uuid())
-  userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  key         String
-  unlockedAt  DateTime?
-  progress    Float     @default(0)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id         String    @id @default(uuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key        String
+  unlockedAt DateTime?
+  progress   Float     @default(0)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   @@unique([userId, key])
   @@index([userId])
@@ -218,6 +225,7 @@ model SubjectMilestone {
   sortOrder   Int       @default(0)
   completedAt DateTime?
   createdAt   DateTime  @default(now())
+  isDeleted   Boolean   @default(false)
   updatedAt   DateTime  @updatedAt
 
   @@index([subjectId])

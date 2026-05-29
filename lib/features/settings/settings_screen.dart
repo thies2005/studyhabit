@@ -950,7 +950,7 @@ class _SettingsContent extends ConsumerWidget {
       await db.delete(db.projects).go();
       await db.delete(db.achievements).go();
       await db.delete(db.userStatsTable).go();
-      await db.delete(db.pendingSyncOps).go();
+
       await db.delete(db.subjectMilestones).go();
 
       if (!context.mounted) return;

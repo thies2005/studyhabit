@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/providers/server_url_provider.dart';
 import '../../../core/services/sync_service.dart';
+import '../../../core/network/api_client.dart';
 
 class SyncSettingsPage extends ConsumerStatefulWidget {
   const SyncSettingsPage({super.key});
@@ -88,6 +89,57 @@ class _SyncSettingsPageState extends ConsumerState<SyncSettingsPage> {
       await ref.read(authProvider.notifier).logout();
       if (mounted) {
         context.pop(); // Go back to settings screen
+      }
+    }
+  }
+
+  Future<void> _handleEraseData() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Erase Cloud Data?'),
+        content: const Text(
+          'This will permanently delete all your synchronized study history from the server. Your local data will remain intact on this device, but it will sync back to the server on the next sync if you don\'t disconnect. Are you sure?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton.tonal(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.errorContainer,
+              foregroundColor: Theme.of(context).colorScheme.onErrorContainer,
+            ),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Erase Data'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        final dio = ref.read(apiClientProvider);
+        await dio.post('/sync/erase');
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Cloud data erased successfully. 🗑️'),
+              backgroundColor: Theme.of(context).colorScheme.primary,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Failed to erase cloud data. ❌'),
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+          );
+        }
       }
     }
   }
@@ -342,9 +394,7 @@ class _SyncSettingsPageState extends ConsumerState<SyncSettingsPage> {
                       subtitle: const Text('Clears all synchronized history on the server. Local data remains intact.'),
                       trailing: OutlinedButton(
                         style: OutlinedButton.styleFrom(foregroundColor: colorScheme.error),
-                        onPressed: () {
-                          // Placeholder
-                        },
+                        onPressed: _handleEraseData,
                         child: const Text('Erase'),
                       ),
                     ),

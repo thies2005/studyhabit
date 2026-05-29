@@ -302,7 +302,7 @@ class ImportService {
     await _db.delete(_db.subjects).go();
     await _db.delete(_db.projects).go();
     await _db.delete(_db.achievements).go();
-    await _db.delete(_db.pendingSyncOps).go();
+
     await _db.delete(_db.userStatsTable).go();
   }
 }

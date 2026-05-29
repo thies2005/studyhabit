@@ -95,6 +95,8 @@ class Projects extends Table {
 
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
 
+  BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
+
   @override
   Set<Column<Object>> get primaryKey => {id};
 }
@@ -135,6 +137,8 @@ class Subjects extends Table {
 
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
 
+  BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
+
   @override
   Set<Column<Object>> get primaryKey => {id};
 }
@@ -151,6 +155,8 @@ class Topics extends Table {
 
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
 
+  BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
+
   @override
   Set<Column<Object>> get primaryKey => {id};
 }
@@ -166,6 +172,8 @@ class Chapters extends Table {
   IntColumn get order => integer()();
 
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+
+  BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -209,6 +217,8 @@ class StudySessions extends Table {
 
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
 
+  BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
+
   @override
   Set<Column<Object>> get primaryKey => {id};
 }
@@ -226,6 +236,8 @@ class SkillLabels extends Table {
   TextColumn get label => text().map(const SkillLevelConverter())();
 
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+
+  BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -260,6 +272,8 @@ class Sources extends Table {
   DateTimeColumn get addedAt => dateTime().withDefault(currentDateAndTime)();
 
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+
+  BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -303,23 +317,7 @@ class UserStatsTable extends Table {
   Set<Column<Object>> get primaryKey => {id};
 }
 
-@DataClassName('PendingSyncOpRow')
-class PendingSyncOps extends Table {
-  TextColumn get id => text()();
 
-  TextColumn get entity => text()();
-
-  TextColumn get operation => text()();
-
-  TextColumn get payload => text()();
-
-  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
-
-  BoolColumn get isSynced => boolean().withDefault(const Constant(false))();
-
-  @override
-  Set<Column<Object>> get primaryKey => {id};
-}
 
 @DataClassName('SubjectMilestoneRow')
 class SubjectMilestones extends Table {
@@ -337,6 +335,8 @@ class SubjectMilestones extends Table {
 
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
 
+  BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
+
   @override
   Set<Column<Object>> get primaryKey => {id};
 }
@@ -352,7 +352,6 @@ class SubjectMilestones extends Table {
     Sources,
     Achievements,
     UserStatsTable,
-    PendingSyncOps,
     SubjectMilestones,
   ],
 )
@@ -364,7 +363,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration {
@@ -374,7 +373,7 @@ class AppDatabase extends _$AppDatabase {
       },
       onUpgrade: (Migrator m, int from, int to) async {
         if (from < 2) {
-          await m.createTable(pendingSyncOps);
+          // Previously created pendingSyncOps, now removed
         }
         if (from < 3) {
           await m.addColumn(studySessions, studySessions.sourceId);
@@ -409,6 +408,16 @@ class AppDatabase extends _$AppDatabase {
           await m.addColumn(achievements, achievements.updatedAt);
           await m.addColumn(userStatsTable, userStatsTable.updatedAt);
           await m.addColumn(subjectMilestones, subjectMilestones.updatedAt);
+        }
+        if (from < 9) {
+          await m.addColumn(projects, projects.isDeleted);
+          await m.addColumn(subjects, subjects.isDeleted);
+          await m.addColumn(topics, topics.isDeleted);
+          await m.addColumn(chapters, chapters.isDeleted);
+          await m.addColumn(studySessions, studySessions.isDeleted);
+          await m.addColumn(skillLabels, skillLabels.isDeleted);
+          await m.addColumn(sources, sources.isDeleted);
+          await m.addColumn(subjectMilestones, subjectMilestones.isDeleted);
         }
       },
     );

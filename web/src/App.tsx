@@ -12,6 +12,7 @@ const Achievements = lazy(() => import('./pages/Achievements'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Layout = lazy(() => import('./components/Layout'));
 import { useThemeSettings } from './hooks/useThemeSettings';
+import { ProjectProvider } from './contexts/ProjectContext';
 
 // Error Boundary Component
 interface ErrorBoundaryProps {
@@ -115,7 +116,9 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Suspense fallback={<LoadingFallback />}>
-                    <Layout />
+                    <ProjectProvider>
+                      <Layout />
+                    </ProjectProvider>
                   </Suspense>
                 </ProtectedRoute>
               }

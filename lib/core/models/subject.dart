@@ -21,6 +21,7 @@ abstract class Subject with _$Subject {
     @Default(CompletenessMode.none) CompletenessMode completenessMode,
     @Default(null) int? targetHours,
     @Default(null) int? targetWeeklyHours,
+    @Default(false) bool isDeleted,
     DateTime? updatedAt,
   }) = _Subject;
 

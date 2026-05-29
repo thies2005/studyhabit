@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z, ZodError } from 'zod';
 import { SyncService } from '../services/syncService.js';
+import { prisma } from '../db.js';
 
 const router = Router();
 
@@ -93,6 +94,22 @@ router.post('/full', async (req, res, next) => {
     if (error instanceof ZodError) {
       return res.status(400).json({ error: 'Validation error', details: error.errors });
     }
+    next(error);
+  }
+});
+
+router.post('/erase', async (req, res, next) => {
+  try {
+    const userId = req.user.userId;
+    // Prisma cascades deletes so deleting Projects deletes Subjects, Topics, Chapters, Sessions, Sources, SkillLabels, Milestones
+    await prisma.$transaction([
+      prisma.project.deleteMany({ where: { userId } }),
+      prisma.achievement.deleteMany({ where: { userId } }),
+      prisma.userStats.deleteMany({ where: { userId } }),
+      prisma.userSettings.deleteMany({ where: { userId } }),
+    ]);
+    res.json({ success: true });
+  } catch (error: unknown) {
     next(error);
   }
 });
