@@ -111,6 +111,7 @@ class _MilestoneEditorSheetState extends ConsumerState<MilestoneEditorSheet> {
                   scrollController: scrollController,
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   itemCount: milestones.length,
+                  // ignore: deprecated_member_use
                   onReorder: (oldIndex, newIndex) {
                     if (newIndex > oldIndex) newIndex--;
                     final reordered = List<SubjectMilestone>.from(milestones);

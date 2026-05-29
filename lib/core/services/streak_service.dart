@@ -1,6 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../models/user_stats.dart';
 import '../providers/theme_provider.dart';
 import '../providers/user_stats_provider.dart';
 import 'xp_service.dart';
