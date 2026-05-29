@@ -4,6 +4,7 @@ COPY package*.json ./
 RUN npm ci
 
 FROM node:22-alpine AS build
+ARG VITE_API_URL
 WORKDIR /app
 COPY . .
 COPY --from=deps /app/node_modules ./node_modules
