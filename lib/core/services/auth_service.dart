@@ -71,7 +71,8 @@ class AuthNotifier extends _$AuthNotifier {
 
       state = AuthState.authenticated(userId: userId, email: userEmail);
     } on DioException catch (e) {
-      final message = e.response?.data['error'] ?? 'Login failed. Please check your credentials.';
+      final data = e.response?.data;
+      final message = (data is Map<String, dynamic> ? data['error'] : null) ?? 'Login failed. Please check your credentials. (${e.response?.statusCode})';
       state = AuthState.error(message.toString());
     } catch (e) {
       state = AuthState.error(e.toString());
@@ -105,7 +106,8 @@ class AuthNotifier extends _$AuthNotifier {
 
       state = AuthState.authenticated(userId: userId, email: userEmail);
     } on DioException catch (e) {
-      final message = e.response?.data['error'] ?? 'Registration failed.';
+      final data = e.response?.data;
+      final message = (data is Map<String, dynamic> ? data['error'] : null) ?? 'Registration failed. (${e.response?.statusCode})';
       state = AuthState.error(message.toString());
     } catch (e) {
       state = AuthState.error(e.toString());
