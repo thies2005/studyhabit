@@ -10,16 +10,20 @@ export default function Subjects() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const navigate = useNavigate();
 
+  const [error, setError] = useState<string | null>(null);
+
   useEffect(() => {
     fetchSubjects();
   }, []);
 
   const fetchSubjects = async () => {
     try {
+      setError(null);
       const response = await apiClient.get('/subjects');
       setSubjects(response.data.data);
-    } catch (error) {
-      // Silent error handling - loading state will be cleared in finally block
+    } catch (error: any) {
+      setError(error.message || 'Failed to load subjects');
+      console.error('Failed to fetch subjects:', error);
     } finally {
       setLoading(false);
     }
@@ -99,16 +103,33 @@ export default function Subjects() {
             </button>
           </div>
 
-          {/* Subjects Grid */}
-          {loading ? (
-            <div className="text-center py-12">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          {error && (
+            <div className="bg-red-500/20 border border-red-500/30 rounded-2xl p-6 mb-6 text-center">
+              <p className="text-red-400 font-body mb-4">{error}</p>
+              <button
+                onClick={fetchSubjects}
+                className="px-6 py-2 bg-primary hover:bg-primary-container text-background font-bold rounded-lg transition-colors"
+              >
+                Retry
+              </button>
             </div>
-          ) : subjects.length === 0 ? (
+          )}
+
+          {/* Loading State */}
+          {loading && !error && (
+            <div className="flex justify-center items-center py-20">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            </div>
+          )}
+
+          {/* Empty State */}
+          {!loading && !error && subjects.length === 0 && (
             <div className="text-center py-12">
               <p className="text-gray-400">No subjects yet. Create your first subject to get started!</p>
             </div>
-          ) : (
+          )}
+          
+          {!loading && !error && subjects.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
               {subjects.map((subject, index) => (
                 <div

@@ -43,8 +43,17 @@ export default function Dashboard() {
   // Fetch sessions for today and recent sessions
   const { data: sessions, loading: sessionsLoading, error: sessionsError, refetch: refetchSessions } = useApi<SessionWithSubject[]>('/sessions?limit=3');
 
-  const loading = statsLoading || sessionsLoading;
-  const error = statsError || sessionsError;
+  const loading = (statsLoading && !stats) || (sessionsLoading && !sessions);
+  // Only treat statsError as fatal if it's not a 404
+  const isStatsNotFound = statsError?.includes('404') || statsError?.includes('not found') || false;
+  const isFatalError = (statsError && !isStatsNotFound) || sessionsError;
+
+  const defaultStats: StatsOverview = {
+    totalHours: 0, weekHours: 0, currentStreak: 0, currentLevel: 1, 
+    levelName: 'Beginner', totalXp: 0, totalStudyMinutes: 0, longestStreak: 0, freezeTokens: 0
+  };
+
+  const currentStats = stats || defaultStats;
 
   const handleRetry = () => {
     refetchStats();
@@ -74,9 +83,9 @@ export default function Dashboard() {
       )}
 
       {/* Error State */}
-      {error && (
+      {isFatalError && (
         <div className="bg-red-500/20 border border-red-500/30 rounded-2xl p-6 mb-6">
-          <p className="text-red-400 mb-4">Failed to load dashboard data</p>
+          <p className="text-red-400 mb-4">Failed to load dashboard data. Please check your connection.</p>
           <button
             onClick={handleRetry}
             className="px-4 py-2 bg-primary hover:bg-primary-container rounded-lg text-background font-medium transition-colors"
@@ -87,7 +96,7 @@ export default function Dashboard() {
       )}
 
       {/* Content */}
-      {!loading && !error && stats && (
+      {!loading && !isFatalError && (
         <>
           {/* Header Section */}
           <div className="mb-8">
@@ -101,26 +110,28 @@ export default function Dashboard() {
               <div className="flex items-center gap-3">
                 <span className="px-3 py-1 bg-tertiary/20 text-tertiary rounded-full text-sm font-medium font-body flex items-center gap-2">
                   <span className="material-symbols-rounded text-sm">local_fire_department</span>
-                  {stats.currentStreak} day streak
+                  {currentStats.currentStreak} day streak
                 </span>
                 <span className="px-3 py-1 bg-primary/20 text-primary rounded-full text-sm font-medium font-body">
-                  Level {stats.currentLevel} — {getLevelName(stats.currentLevel)}
+                  Level {currentStats.currentLevel} — {getLevelName(currentStats.currentLevel)}
                 </span>
               </div>
             </div>
 
             {/* XP Bar */}
             <div className="mt-4">
-              <div className="flex justify-between text-sm mb-2">
-                <span className="text-gray-400 font-body">XP Progress</span>
-                <span className="text-onSurface font-data">
-                  {stats.totalXp.toLocaleString()} / {calculateLevelThreshold(stats.currentLevel + 1).toLocaleString()} XP
-                </span>
+              <div className="text-3xl font-bold text-onSurface mt-2 font-heading">{currentStats.currentLevel}</div>
+              <div className="text-xs text-primary mt-1 font-medium">{currentStats.levelName}</div>
+            </div>
+            <div className="ml-4 flex-grow">
+              <div className="flex justify-between text-xs text-gray-400 mb-1">
+                <span>{currentStats.totalXp} XP</span>
+                <span>{calculateLevelThreshold(currentStats.currentLevel + 1) - currentStats.totalXp} XP to Level {currentStats.currentLevel + 1}</span>
               </div>
-              <div className="w-full bg-surface rounded-full h-3">
-                <div
-                  className="bg-primary h-3 rounded-full transition-all duration-600"
-                  style={{ width: `${calculateLevelProgress(stats.currentLevel, stats.totalXp) * 100}%` }}
+              <div className="w-full bg-surface-container rounded-full h-2">
+                <div 
+                  className="bg-primary h-2 rounded-full transition-all duration-1000 ease-out" 
+                  style={{ width: `${Math.max(5, calculateLevelProgress(currentStats.currentLevel, currentStats.totalXp) * 100)}%` }}
                 ></div>
               </div>
             </div>
@@ -165,7 +176,7 @@ export default function Dashboard() {
                 <div>
                   <p className="text-sm text-gray-400 font-body">Total Hours</p>
                   <p className="text-2xl font-bold text-onSurface font-data">
-                    {stats.totalHours.toFixed(1)}h
+                    {currentStats.totalHours.toFixed(1)}h
                   </p>
                 </div>
               </div>
@@ -176,7 +187,7 @@ export default function Dashboard() {
                 <div>
                   <p className="text-sm text-gray-400 font-body">This Week</p>
                   <p className="text-2xl font-bold text-onSurface font-data">
-                    {stats.weekHours.toFixed(1)}h
+                    {currentStats.weekHours.toFixed(1)}h
                   </p>
                 </div>
               </div>
@@ -187,7 +198,7 @@ export default function Dashboard() {
                 <div>
                   <p className="text-sm text-gray-400 font-body">Streak</p>
                   <p className="text-2xl font-bold text-onSurface font-data">
-                    {stats.currentStreak}d
+                    {currentStats.currentStreak}d
                   </p>
                 </div>
               </div>
@@ -198,7 +209,7 @@ export default function Dashboard() {
                 <div>
                   <p className="text-sm text-gray-400 font-body">Level</p>
                   <p className="text-2xl font-bold text-onSurface font-data">
-                    {getLevelName(stats.currentLevel)}
+                    {getLevelName(currentStats.currentLevel)}
                   </p>
                 </div>
               </div>
@@ -252,7 +263,7 @@ export default function Dashboard() {
           )}
 
           {/* Streak Card */}
-          {stats.currentStreak > 0 && (
+          {currentStats.currentStreak > 0 && (
             <div className="bg-gradient-to-r from-tertiary-container to-error-container rounded-3xl p-8 text-white mb-6 shadow-xl relative overflow-hidden">
               <div className="absolute top-0 right-0 -mr-8 -mt-8 opacity-20 pointer-events-none">
                 <span className="material-symbols-rounded text-[150px]">local_fire_department</span>
@@ -261,10 +272,10 @@ export default function Dashboard() {
                 <div className="flex items-center space-x-4">
                   <span className="text-4xl">🔥</span>
                   <div>
-                    <p className="text-3xl font-bold font-heading">{stats.currentStreak} Day Streak</p>
+                    <p className="text-3xl font-bold font-heading">{currentStats.currentStreak} Day Streak</p>
                     <p className="text-sm opacity-90 font-body">
-                      {stats.longestStreak > stats.currentStreak
-                        ? `Personal best: ${stats.longestStreak} days`
+                      {currentStats.longestStreak > currentStats.currentStreak
+                        ? `Personal best: ${currentStats.longestStreak} days`
                         : "You're on fire!"}
                     </p>
                   </div>

@@ -68,7 +68,7 @@ class ThemeSettings extends _$ThemeSettings {
       orElse: () => AppThemeStyle.atmosphericTeal,
     );
 
-    final fontScale = _prefs.getDouble(_fontScaleKey) ?? 1.0;
+    final fontScale = _getDoubleSafe(_fontScaleKey, 1.0);
     final workDuration = _prefs.getInt(_workDurationKey) ?? 25;
     final shortBreak = _prefs.getInt(_shortBreakKey) ?? 5;
     final longBreak = _prefs.getInt(_longBreakKey) ?? 15;
@@ -82,7 +82,7 @@ class ThemeSettings extends _$ThemeSettings {
     final dailyReminderHour = _prefs.getInt(_dailyReminderHourKey) ?? 9;
     final dailyReminderMinute = _prefs.getInt(_dailyReminderMinuteKey) ?? 0;
     final dailyReminderEnabled = _prefs.getBool(_dailyReminderEnabledKey) ?? false;
-    final gracePeriod = _prefs.getDouble(_gracePeriodKey) ?? 2.0;
+    final gracePeriod = _getDoubleSafe(_gracePeriodKey, 2.0);
     final continuousFocus = _prefs.getBool(_continuousFocusKey) ?? true;
     final dailyGoalMinutes = _prefs.getInt(_dailyGoalMinutesKey) ?? 0;
     final dailyGoalsByWeekday = <int, int>{
@@ -126,10 +126,24 @@ class ThemeSettings extends _$ThemeSettings {
     );
   }
 
+  double _getDoubleSafe(String key, double defaultValue) {
+    try {
+      final value = _prefs.get(key);
+      if (value is num) return value.toDouble();
+      return defaultValue;
+    } catch (_) {
+      return defaultValue;
+    }
+  }
+
   Future<void> loadSettings(Map<String, dynamic> settings) async {
     for (final entry in settings.entries) {
       final value = entry.value;
-      if (value is int) {
+      if (entry.key == _fontScaleKey || entry.key == _gracePeriodKey) {
+        if (value is num) {
+          await _prefs.setDouble(entry.key, value.toDouble());
+        }
+      } else if (value is int) {
         await _prefs.setInt(entry.key, value);
       } else if (value is double) {
         await _prefs.setDouble(entry.key, value);

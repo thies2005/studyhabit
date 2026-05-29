@@ -67,11 +67,11 @@ class SyncEngine extends _$SyncEngine {
     }
 
     _syncTimer?.cancel();
-    _syncTimer = Timer(const Duration(seconds: 5), () async {
-      state = SyncStatus.syncing;
-      AppLogger.i('SyncEngine', 'Starting full synchronization...');
+    
+    state = SyncStatus.syncing;
+    AppLogger.i('SyncEngine', 'Starting full synchronization...');
 
-      try {
+    try {
         final since = lastSyncedAt;
       final dio = ref.read(apiClientProvider);
 
@@ -90,6 +90,15 @@ class SyncEngine extends _$SyncEngine {
       final serverTimeStr = pullData['serverTime'] as String;
       final serverTime = DateTime.parse(serverTimeStr);
 
+      // Log push results
+      final pushData = responseData['push'] as Map<String, dynamic>?;
+      if (pushData != null) {
+        final errors = pushData['errors'] as List?;
+        if (errors != null && errors.isNotEmpty) {
+          AppLogger.e('SyncEngine', 'Server returned ${errors.length} sync errors: $errors');
+        }
+      }
+
       // 4. Apply remote changes locally
       await _applyRemoteChanges(pullData);
 
@@ -104,10 +113,9 @@ class SyncEngine extends _$SyncEngine {
       if (_syncPending) {
         _syncPending = false;
         AppLogger.i('SyncEngine', 'Executing pending sync...');
-        fullSync();
+        await fullSync();
       }
     }
-    });
   }
 
   Future<Map<String, dynamic>> _collectLocalChanges(DateTime since) async {

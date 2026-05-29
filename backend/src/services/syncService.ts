@@ -775,6 +775,11 @@ export class SyncService {
 
     }, { timeout: 30000 }); // End of transaction
 
+    console.log(`[SyncService] Push completed for user ${userId}. Applied:`, applied, 'Conflicts:', conflicts, 'Errors:', errors.length);
+    if (errors.length > 0) {
+      console.warn(`[SyncService] Push had ${errors.length} errors:`, errors);
+    }
+
     return { applied, conflicts, errors };
   }
 }
