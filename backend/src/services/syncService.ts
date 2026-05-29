@@ -599,38 +599,35 @@ export class SyncService {
             where: { userId },
           });
           if (existing) {
-            const incomingUpdated = validated.updatedAt
-              ? new Date(validated.updatedAt)
-              : new Date(0);
-              if (incomingUpdated <= existing.updatedAt) {
-                conflicts.userStats = 1;
-              } else {
-                const updates: {
-                  totalXp?: number;
-                  currentStreak?: number;
-                  longestStreak?: number;
-                  totalStudyMinutes?: number;
-                } = {};
-                if (validated.totalXp > existing.totalXp) {
-                  updates.totalXp = validated.totalXp;
-                }
-                if (validated.currentStreak > existing.currentStreak) {
-                  updates.currentStreak = validated.currentStreak;
-                  updates.longestStreak = Math.max(
-                    existing.longestStreak,
-                    validated.currentStreak
-                  );
-                }
-                if (validated.totalStudyMinutes > existing.totalStudyMinutes) {
-                  updates.totalStudyMinutes = validated.totalStudyMinutes;
-                }
-                if (Object.keys(updates).length > 0) {
-                  await prisma.userStats.update({ where: { userId }, data: updates });
-                  applied.userStats = 1;
-                } else {
-                  conflicts.userStats = 1;
-                }
-              }
+            const updates: {
+              totalXp?: number;
+              currentStreak?: number;
+              longestStreak?: number;
+              totalStudyMinutes?: number;
+              freezeTokens?: number;
+            } = {};
+            if (validated.totalXp > existing.totalXp) {
+              updates.totalXp = validated.totalXp;
+            }
+            if (validated.currentStreak > existing.currentStreak) {
+              updates.currentStreak = validated.currentStreak;
+              updates.longestStreak = Math.max(
+                existing.longestStreak,
+                validated.currentStreak
+              );
+            }
+            if (validated.totalStudyMinutes > existing.totalStudyMinutes) {
+              updates.totalStudyMinutes = validated.totalStudyMinutes;
+            }
+            if (validated.freezeTokens > existing.freezeTokens) {
+              updates.freezeTokens = validated.freezeTokens;
+            }
+            if (Object.keys(updates).length > 0) {
+              await prisma.userStats.update({ where: { userId }, data: updates });
+              applied.userStats = 1;
+            } else {
+              conflicts.userStats = 1;
+            }
           } else {
             // C2: Create initial stats for new users
             await prisma.userStats.create({

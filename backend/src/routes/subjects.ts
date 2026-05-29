@@ -26,14 +26,14 @@ const updateSubjectSchema = z.object({
 
 // Schema for validating query parameters
 const listSubjectsQuerySchema = z.object({
-  projectId: z.string().uuid('Invalid or missing projectId'),
+  projectId: z.string().uuid('Invalid or missing projectId').optional(),
 });
 
 router.get('/', async (req, res, next) => {
   try {
     const { projectId } = listSubjectsQuerySchema.parse(req.query);
     const { skip, take, page, limit } = parsePagination(req.query as any);
-    const where = { projectId, project: { userId: req.user.userId } };
+    const where = projectId ? { projectId, project: { userId: req.user.userId } } : { project: { userId: req.user.userId } };
     const [subjects, total] = await Promise.all([
       prisma.subject.findMany({
         where,
