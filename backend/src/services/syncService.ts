@@ -773,7 +773,7 @@ export class SyncService {
       }
     }
 
-    }); // End of transaction
+    }, { timeout: 30000 }); // End of transaction
 
     return { applied, conflicts, errors };
   }

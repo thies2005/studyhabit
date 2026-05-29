@@ -107,9 +107,8 @@ class StreakService {
     }
   }
 
-  Future<void> evaluateCurrentStreak(Ref ref) async {
-    final stats = await ref.read(userStatsProvider.future);
-    if (stats.lastStudyDate == null || stats.currentStreak == 0) return;
+  Future<UserStats?> evaluateCurrentStreak(UserStats stats, Ref ref) async {
+    if (stats.lastStudyDate == null || stats.currentStreak == 0) return null;
 
     final prefs = await SharedPreferences.getInstance();
     final themeSettings = await ref.read(themeSettingsProvider.future);
@@ -150,11 +149,11 @@ class StreakService {
     }
 
     if (isDead) {
-      final updatedStats = stats.copyWith(
+      return stats.copyWith(
         currentStreak: 0,
       );
-      await ref.read(userStatsProvider.notifier).upsert(updatedStats);
     }
+    return null;
   }
 }
 

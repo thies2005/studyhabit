@@ -373,8 +373,8 @@ class SyncEngine extends _$SyncEngine {
         xpTotal: j['xpTotal'] ?? 0,
         createdAt: DateTime.parse(j['createdAt']),
         completenessMode: CompletenessMode.values.firstWhere((e) => e.name == j['completenessMode'], orElse: () => CompletenessMode.none),
-        targetHours: j['targetHours'],
-        targetWeeklyHours: j['targetWeeklyHours'],
+        targetHours: (j['targetHours'] as num?)?.toInt(),
+        targetWeeklyHours: (j['targetWeeklyHours'] as num?)?.toInt(),
         isDeleted: j['isDeleted'] as bool? ?? false,
         updatedAt: DateTime.parse(j['updatedAt']),
       );

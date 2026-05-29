@@ -26,8 +26,15 @@ class UserStatsNotifier extends _$UserStatsNotifier {
       await _statsDao.initStats();
       AppLogger.d('UserStatsNotifier', 'Stats initialization successful');
       
-      // Check and update streak if missed days exceed allowed threshold
-      await ref.read(streakServiceProvider).evaluateCurrentStreak(ref);
+      // Load initial stats without watching (avoids deadlock before yield)
+      final row = await _db.select(_db.userStatsTable).getSingleOrNull();
+      if (row != null) {
+        final stats = mapUserStats(row);
+        final updatedStats = await ref.read(streakServiceProvider).evaluateCurrentStreak(stats, ref);
+        if (updatedStats != null) {
+          await upsert(updatedStats);
+        }
+      }
     } catch (e, stack) {
       AppLogger.e('UserStatsNotifier', 'Stats initialization failed', e, stack);
     }
