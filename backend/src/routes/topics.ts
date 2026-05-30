@@ -98,7 +98,7 @@ router.patch('/:id', async (req, res, next) => {
         subject: { project: { userId: req.user.userId } },
         isDeleted: false,
       },
-      data,
+      data: { ...data, updatedAt: new Date() },
     });
 
     if (result.count === 0) {

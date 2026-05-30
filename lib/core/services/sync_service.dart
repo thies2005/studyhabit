@@ -122,6 +122,15 @@ class SyncEngine extends _$SyncEngine {
         await _prefs.setString(_lastSyncedUserKey, userId);
         await _prefs.setInt(_lastSyncedKey, 0);
         AppLogger.i('SyncEngine', 'Detected new user. Reset lastSyncedAt to epoch.');
+      } else {
+        final ms = _prefs.getInt(_lastSyncedKey) ?? 0;
+        if (ms > 0) {
+          final p = await (_db.select(_db.projects)..limit(1)).get();
+          if (p.isEmpty) {
+            await _prefs.setInt(_lastSyncedKey, 0);
+            AppLogger.w('SyncEngine', 'Local DB is empty but lastSyncedAt > 0. Forcing full sync (likely a fresh install with restored prefs).');
+          }
+        }
       }
     }
 

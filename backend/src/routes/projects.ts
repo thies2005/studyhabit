@@ -74,7 +74,7 @@ router.patch('/:id', async (req, res, next) => {
     const data = updateProjectSchema.parse(req.body);
     const project = await prisma.project.updateMany({
       where: { id, userId: req.user.userId, isDeleted: false },
-      data,
+      data: { ...data, updatedAt: new Date() },
     });
 
     if (project.count === 0) {
