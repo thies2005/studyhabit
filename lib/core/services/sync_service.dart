@@ -165,14 +165,14 @@ class SyncEngine extends _$SyncEngine {
         AppLogger.w('SyncEngine', 'Soft-deleting ${forbiddenSessionIds.length} orphaned sessions (subject not owned by user)');
         for (final id in forbiddenSessionIds) {
           await (_db.update(_db.studySessions)..where((t) => t.id.equals(id)))
-              .write(StudySessionsCompanion(isDeleted: const Value(true), updatedAt: Value(DateTime.now())));
+              .write(StudySessionsCompanion(isDeleted: const Value(true), updatedAt: Value(serverTime)));
         }
       }
       if (forbiddenSourceIds.isNotEmpty) {
         AppLogger.w('SyncEngine', 'Soft-deleting ${forbiddenSourceIds.length} orphaned sources (subject not owned by user)');
         for (final id in forbiddenSourceIds) {
           await (_db.update(_db.sources)..where((t) => t.id.equals(id)))
-              .write(SourcesCompanion(isDeleted: const Value(true), updatedAt: Value(DateTime.now())));
+              .write(SourcesCompanion(isDeleted: const Value(true), updatedAt: Value(serverTime)));
         }
       }
 
@@ -204,14 +204,38 @@ class SyncEngine extends _$SyncEngine {
     final isFirstSync = since.millisecondsSinceEpoch == 0;
 
     // Query rows modified locally since the last sync time
-    final projects = await (isFirstSync ? _db.select(_db.projects) : (_db.select(_db.projects)..where((t) => t.updatedAt.isBiggerThanValue(since)))).get();
-    final subjects = await (isFirstSync ? _db.select(_db.subjects) : (_db.select(_db.subjects)..where((t) => t.updatedAt.isBiggerThanValue(since)))).get();
-    final topics = await (isFirstSync ? _db.select(_db.topics) : (_db.select(_db.topics)..where((t) => t.updatedAt.isBiggerThanValue(since)))).get();
-    final chapters = await (isFirstSync ? _db.select(_db.chapters) : (_db.select(_db.chapters)..where((t) => t.updatedAt.isBiggerThanValue(since)))).get();
-    final sessions = await (isFirstSync ? _db.select(_db.studySessions) : (_db.select(_db.studySessions)..where((t) => t.updatedAt.isBiggerThanValue(since)))).get();
-    final sources = await (isFirstSync ? _db.select(_db.sources) : (_db.select(_db.sources)..where((t) => t.updatedAt.isBiggerThanValue(since)))).get();
-    final skillLabels = await (isFirstSync ? _db.select(_db.skillLabels) : (_db.select(_db.skillLabels)..where((t) => t.updatedAt.isBiggerThanValue(since)))).get();
-    final milestones = await (isFirstSync ? _db.select(_db.subjectMilestones) : (_db.select(_db.subjectMilestones)..where((t) => t.updatedAt.isBiggerThanValue(since)))).get();
+    final projects = await (isFirstSync
+        ? (_db.select(_db.projects)..where((t) => t.isDeleted.equals(false)))
+        : (_db.select(_db.projects)..where((t) => t.updatedAt.isBiggerThanValue(since)))
+    ).get();
+    final subjects = await (isFirstSync
+        ? (_db.select(_db.subjects)..where((t) => t.isDeleted.equals(false)))
+        : (_db.select(_db.subjects)..where((t) => t.updatedAt.isBiggerThanValue(since)))
+    ).get();
+    final topics = await (isFirstSync
+        ? (_db.select(_db.topics)..where((t) => t.isDeleted.equals(false)))
+        : (_db.select(_db.topics)..where((t) => t.updatedAt.isBiggerThanValue(since)))
+    ).get();
+    final chapters = await (isFirstSync
+        ? (_db.select(_db.chapters)..where((t) => t.isDeleted.equals(false)))
+        : (_db.select(_db.chapters)..where((t) => t.updatedAt.isBiggerThanValue(since)))
+    ).get();
+    final sessions = await (isFirstSync
+        ? (_db.select(_db.studySessions)..where((t) => t.isDeleted.equals(false)))
+        : (_db.select(_db.studySessions)..where((t) => t.updatedAt.isBiggerThanValue(since)))
+    ).get();
+    final sources = await (isFirstSync
+        ? (_db.select(_db.sources)..where((t) => t.isDeleted.equals(false)))
+        : (_db.select(_db.sources)..where((t) => t.updatedAt.isBiggerThanValue(since)))
+    ).get();
+    final skillLabels = await (isFirstSync
+        ? (_db.select(_db.skillLabels)..where((t) => t.isDeleted.equals(false)))
+        : (_db.select(_db.skillLabels)..where((t) => t.updatedAt.isBiggerThanValue(since)))
+    ).get();
+    final milestones = await (isFirstSync
+        ? (_db.select(_db.subjectMilestones)..where((t) => t.isDeleted.equals(false)))
+        : (_db.select(_db.subjectMilestones)..where((t) => t.updatedAt.isBiggerThanValue(since)))
+    ).get();
     final achievements = await (isFirstSync ? _db.select(_db.achievements) : (_db.select(_db.achievements)..where((t) => t.updatedAt.isBiggerThanValue(since)))).get();
     
     // User stats
