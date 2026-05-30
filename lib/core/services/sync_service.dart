@@ -133,17 +133,46 @@ class SyncEngine extends _$SyncEngine {
 
       final pushData = responseData['push'] as Map<String, dynamic>?;
       bool hasDataErrors = false;
+      final forbiddenSessionIds = <String>[];
+      final forbiddenSourceIds = <String>[];
       if (pushData != null) {
         final errors = pushData['errors'] as List?;
         if (errors != null && errors.isNotEmpty) {
           for (final e in errors) {
-            final entity = (e as Map<String, dynamic>)['entity'] as String?;
+            final errMap = e as Map<String, dynamic>;
+            final entity = errMap['entity'] as String?;
+            final errorType = errMap['error'] as String?;
+            final errId = errMap['id'] as String?;
+            if (errorType == 'forbidden') {
+              if (entity == 'session' && errId != null) {
+                forbiddenSessionIds.add(errId);
+              } else if (entity == 'source' && errId != null) {
+                forbiddenSourceIds.add(errId);
+              }
+              continue;
+            }
             if (entity != null && _dataEntityTypes.contains(entity)) {
               hasDataErrors = true;
-              break;
             }
           }
-          AppLogger.e('SyncEngine', 'Server returned ${errors.length} sync errors: $errors');
+          if (errors.isNotEmpty) {
+            AppLogger.e('SyncEngine', 'Server returned ${errors.length} sync errors: $errors');
+          }
+        }
+      }
+
+      if (forbiddenSessionIds.isNotEmpty) {
+        AppLogger.w('SyncEngine', 'Soft-deleting ${forbiddenSessionIds.length} orphaned sessions (subject not owned by user)');
+        for (final id in forbiddenSessionIds) {
+          await (_db.update(_db.studySessions)..where((t) => t.id.equals(id)))
+              .write(StudySessionsCompanion(isDeleted: const Value(true), updatedAt: Value(DateTime.now())));
+        }
+      }
+      if (forbiddenSourceIds.isNotEmpty) {
+        AppLogger.w('SyncEngine', 'Soft-deleting ${forbiddenSourceIds.length} orphaned sources (subject not owned by user)');
+        for (final id in forbiddenSourceIds) {
+          await (_db.update(_db.sources)..where((t) => t.id.equals(id)))
+              .write(SourcesCompanion(isDeleted: const Value(true), updatedAt: Value(DateTime.now())));
         }
       }
 
@@ -600,7 +629,7 @@ class SyncEngine extends _$SyncEngine {
 
   Map<String, dynamic> _achievementToJson(AchievementRow r) => {
         'key': r.key,
-        'unlockedAt': r.unlockedAt?.toUtc().toIso8601String(),
+        'unlockedAt': null,
         'progress': r.progress,
         'updatedAt': r.updatedAt.toUtc().toIso8601String(),
       };
