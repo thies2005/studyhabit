@@ -332,7 +332,7 @@ class MilestoneNotifier extends _$MilestoneNotifier {
           title: Value(newTitle),
         ),
       );
-      ref.read(syncEngineProvider.notifier).fullSync();
+      syncEngine.fullSync();
     } catch (e, stack) {
       AppLogger.e('MilestoneNotifier', 'Failed to rename milestone', e, stack);
     }
