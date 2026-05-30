@@ -8,13 +8,13 @@ const router = Router();
 const projectSchema = z.object({
   name: z.string().min(1).max(100),
   icon: z.string().default('📚'),
-  colorValue: z.number(),
+  colorValue: z.number().transform(v => v & 0xFFFFFF),
 });
 
 const updateProjectSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   icon: z.string().optional(),
-  colorValue: z.number().optional(),
+  colorValue: z.number().transform(v => v & 0xFFFFFF).optional(),
   isArchived: z.boolean().optional(),
   lastOpenedAt: z.string().datetime().optional(),
 });

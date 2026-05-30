@@ -151,6 +151,9 @@ class SyncEngine extends _$SyncEngine {
       bool hasDataErrors = false;
       final forbiddenSessionIds = <String>[];
       final forbiddenSourceIds = <String>[];
+      final forbiddenSubjectIds = <String>[];
+      final forbiddenTopicIds = <String>[];
+      final forbiddenChapterIds = <String>[];
       if (pushData != null) {
         final errors = pushData['errors'] as List?;
         if (errors != null && errors.isNotEmpty) {
@@ -164,6 +167,12 @@ class SyncEngine extends _$SyncEngine {
                 forbiddenSessionIds.add(errId);
               } else if (entity == 'source' && errId != null) {
                 forbiddenSourceIds.add(errId);
+              } else if (entity == 'subject' && errId != null) {
+                forbiddenSubjectIds.add(errId);
+              } else if (entity == 'topic' && errId != null) {
+                forbiddenTopicIds.add(errId);
+              } else if (entity == 'chapter' && errId != null) {
+                forbiddenChapterIds.add(errId);
               }
               continue;
             }
@@ -189,6 +198,27 @@ class SyncEngine extends _$SyncEngine {
         for (final id in forbiddenSourceIds) {
           await (_db.update(_db.sources)..where((t) => t.id.equals(id)))
               .write(SourcesCompanion(isDeleted: const Value(true), updatedAt: Value(serverTime)));
+        }
+      }
+      if (forbiddenChapterIds.isNotEmpty) {
+        AppLogger.w('SyncEngine', 'Soft-deleting ${forbiddenChapterIds.length} orphaned chapters (topic not owned by user)');
+        for (final id in forbiddenChapterIds) {
+          await (_db.update(_db.chapters)..where((t) => t.id.equals(id)))
+              .write(ChaptersCompanion(isDeleted: const Value(true), updatedAt: Value(serverTime)));
+        }
+      }
+      if (forbiddenTopicIds.isNotEmpty) {
+        AppLogger.w('SyncEngine', 'Soft-deleting ${forbiddenTopicIds.length} orphaned topics (subject not owned by user)');
+        for (final id in forbiddenTopicIds) {
+          await (_db.update(_db.topics)..where((t) => t.id.equals(id)))
+              .write(TopicsCompanion(isDeleted: const Value(true), updatedAt: Value(serverTime)));
+        }
+      }
+      if (forbiddenSubjectIds.isNotEmpty) {
+        AppLogger.w('SyncEngine', 'Soft-deleting ${forbiddenSubjectIds.length} orphaned subjects (project not owned by user)');
+        for (final id in forbiddenSubjectIds) {
+          await (_db.update(_db.subjects)..where((t) => t.id.equals(id)))
+              .write(SubjectsCompanion(isDeleted: const Value(true), updatedAt: Value(serverTime)));
         }
       }
 
@@ -445,7 +475,7 @@ class SyncEngine extends _$SyncEngine {
         'userId': ref.read(authProvider).maybeWhen(authenticated: (id, _) => id, orElse: () => ''),
         'name': r.name,
         'icon': r.icon,
-        'colorValue': r.colorValue,
+        'colorValue': _normalizeColorForSync(r.colorValue),
         'createdAt': r.createdAt.toUtc().toIso8601String(),
         'lastOpenedAt': r.lastOpenedAt.toUtc().toIso8601String(),
         'isArchived': r.isArchived,
@@ -462,7 +492,7 @@ class SyncEngine extends _$SyncEngine {
         id: j['id'],
         name: j['name'],
         icon: j['icon'] ?? '📚',
-        colorValue: j['colorValue'],
+        colorValue: _normalizeColorFromSync(j['colorValue']),
         createdAt: DateTime.parse(j['createdAt']),
         lastOpenedAt: DateTime.parse(j['lastOpenedAt']),
         isArchived: j['isArchived'] ?? false,
@@ -480,7 +510,7 @@ class SyncEngine extends _$SyncEngine {
         'projectId': r.projectId,
         'name': r.name,
         'description': r.description,
-        'colorValue': r.colorValue,
+        'colorValue': _normalizeColorForSync(r.colorValue),
         'hierarchyMode': r.hierarchyMode.name,
         'defaultDurationMinutes': r.defaultDurationMinutes,
         'defaultBreakMinutes': r.defaultBreakMinutes,
@@ -498,7 +528,7 @@ class SyncEngine extends _$SyncEngine {
         projectId: j['projectId'],
         name: j['name'],
         description: j['description'],
-        colorValue: j['colorValue'],
+        colorValue: _normalizeColorFromSync(j['colorValue']),
         hierarchyMode: HierarchyMode.values.firstWhere((e) => e.name == j['hierarchyMode'], orElse: () => HierarchyMode.flat),
         defaultDurationMinutes: j['defaultDurationMinutes'] ?? 25,
         defaultBreakMinutes: j['defaultBreakMinutes'] ?? 5,
@@ -673,6 +703,18 @@ class SyncEngine extends _$SyncEngine {
         'progress': r.progress,
         'updatedAt': r.updatedAt.toUtc().toIso8601String(),
       };
+
+  int _normalizeColorForSync(Object? value) {
+    if (value == null) return 0;
+    final v = value is num ? value.toInt() : (value is int ? value : 0);
+    return v & 0xFFFFFF;
+  }
+
+  int _normalizeColorFromSync(Object? value) {
+    if (value == null) return 0xFF000000;
+    final v = value is num ? value.toInt() : (value is int ? value : 0);
+    return (v & 0xFFFFFF) | 0xFF000000;
+  }
 
   AchievementRow _achievementFromJson(Map<String, dynamic> j) => AchievementRow(
         key: j['key'],

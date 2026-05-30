@@ -9,7 +9,7 @@ const subjectSchema = z.object({
   projectId: z.string().uuid(),
   name: z.string().min(1).max(100),
   description: z.string().optional(),
-  colorValue: z.number(),
+  colorValue: z.number().transform(v => v & 0xFFFFFF),
   hierarchyMode: z.enum(['flat', 'twoLevel', 'threeLevel']),
   defaultDurationMinutes: z.number().int().min(5).max(90),
   defaultBreakMinutes: z.number().int().min(1).max(30),
@@ -18,7 +18,7 @@ const subjectSchema = z.object({
 const updateSubjectSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   description: z.string().optional(),
-  colorValue: z.number().optional(),
+  colorValue: z.number().transform(v => v & 0xFFFFFF).optional(),
   hierarchyMode: z.enum(['flat', 'twoLevel', 'threeLevel']).optional(),
   defaultDurationMinutes: z.number().int().min(5).max(90).optional(),
   defaultBreakMinutes: z.number().int().min(1).max(30).optional(),
