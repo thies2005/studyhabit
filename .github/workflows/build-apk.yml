@@ -118,9 +118,6 @@ jobs:
         run: flutter analyze --no-fatal-infos
 
       # ── Build ──────────────────────────────
-      - name: Build APK (debug)
-        run: flutter build apk --debug
-
       - name: Build APK (release, signed)
         run: flutter build apk --release
 
@@ -134,12 +131,9 @@ jobs:
           BUILD_DATE=$(date +%Y%m%d)
           APK_DIR="build/app/outputs/flutter-apk"
           RELEASE_NAME="StudyTracker-v${VERSION_NAME}-b${BUILD_NUMBER}-${BUILD_DATE}-release.apk"
-          DEBUG_NAME="StudyTracker-v${VERSION_NAME}-b${BUILD_NUMBER}-${BUILD_DATE}-debug.apk"
           mv "${APK_DIR}/app-release.apk" "${APK_DIR}/${RELEASE_NAME}"
-          mv "${APK_DIR}/app-debug.apk" "${APK_DIR}/${DEBUG_NAME}"
           echo "release_apk=${APK_DIR}/${RELEASE_NAME}" >> "$GITHUB_OUTPUT"
-          echo "debug_apk=${APK_DIR}/${DEBUG_NAME}" >> "$GITHUB_OUTPUT"
-          echo "Renamed APKs: ${RELEASE_NAME}, ${DEBUG_NAME}"
+          echo "Renamed APK: ${RELEASE_NAME}"
 
       # ── Compute beta tag version ───────────
       - name: Compute beta version tag
@@ -162,13 +156,6 @@ jobs:
           echo "## 🏷️ Beta Tag: \`${TAG}\`" >> "$GITHUB_STEP_SUMMARY"
 
       # ── Upload artifacts ───────────────────
-      - name: Upload Debug APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: studytracker-debug
-          path: ${{ steps.rename.outputs.debug_apk }}
-          retention-days: 14
-
       - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
@@ -197,12 +184,10 @@ jobs:
 
             ### Downloads
             - `StudyTracker-v…-release.apk` — signed release build
-            - `StudyTracker-v…-debug.apk` — debug build with logs
 
-            > ⚠️ This is an automated **beta** build. Not intended for production use.
+            > This is an automated **beta** build. Not intended for production use.
           files: |
             ${{ steps.rename.outputs.release_apk }}
-            ${{ steps.rename.outputs.debug_apk }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

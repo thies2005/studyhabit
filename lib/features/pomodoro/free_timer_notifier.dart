@@ -352,12 +352,9 @@ class FreeTimerNotifier extends _$FreeTimerNotifier with WidgetsBindingObserver 
 
   Future<void> _stopForegroundService() async {
     try {
-      await FlutterForegroundTask.stopService().timeout(
-        const Duration(seconds: 3),
-        onTimeout: () {
-          debugPrint('FreeTimer: stopService timed out after 3s');
-        },
-      );
+      await FlutterForegroundTask.stopService();
+    } on TimeoutException {
+      debugPrint('FreeTimer: stopService timed out after 3s');
     } catch (e) {
       debugPrint('FreeTimer: Error stopping foreground service: $e');
     }

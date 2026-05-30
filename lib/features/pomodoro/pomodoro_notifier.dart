@@ -607,12 +607,9 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
     }
 
     try {
-      await FlutterForegroundTask.stopService().timeout(
-        const Duration(seconds: 3),
-        onTimeout: () {
-          AppLogger.w('PomodoroNotifier', 'stopService timed out after 3s');
-        },
-      );
+      await FlutterForegroundTask.stopService();
+    } on TimeoutException {
+      AppLogger.w('PomodoroNotifier', 'stopService timed out');
     } catch (e) {
       AppLogger.e('PomodoroNotifier', 'Error stopping foreground task service', e);
     }
