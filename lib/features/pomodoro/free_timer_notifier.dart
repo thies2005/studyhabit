@@ -171,7 +171,7 @@ class FreeTimerNotifier extends _$FreeTimerNotifier with WidgetsBindingObserver 
         isFreeTimer: const Value(true),
       ),
     );
-    ref.read(syncEngineProvider.notifier).fullSync();
+    ref.read(syncEngineProvider.notifier).debouncedSync();
   }
 
   void pause() {
@@ -225,7 +225,7 @@ class FreeTimerNotifier extends _$FreeTimerNotifier with WidgetsBindingObserver 
     if (elapsedMinutes <= 0) {
       try {
         await _sessionDao?.delete(state.activeSessionId!);
-        ref.read(syncEngineProvider.notifier).fullSync();
+        ref.read(syncEngineProvider.notifier).debouncedSync();
       } catch (e) {
         debugPrint('Error deleting dummy session: $e');
       }
@@ -261,7 +261,7 @@ class FreeTimerNotifier extends _$FreeTimerNotifier with WidgetsBindingObserver 
               endedAt: Value(endedAt),
             ),
           );
-          ref.read(syncEngineProvider.notifier).fullSync();
+          ref.read(syncEngineProvider.notifier).debouncedSync();
         }
       } catch (e) {
         debugPrint('Error updating session in DB: $e');
@@ -289,10 +289,12 @@ class FreeTimerNotifier extends _$FreeTimerNotifier with WidgetsBindingObserver 
   Future<void> awardConfidenceXpAndNotes({
     required int? confidenceRating,
     String? notes,
+    String? sessionId,
   }) async {
-    if (state.activeSessionId == null) return;
+    final id = sessionId ?? state.activeSessionId;
+    if (id == null) return;
 
-    final session = await _sessionDao?.getById(state.activeSessionId!);
+    final session = await _sessionDao?.getById(id);
     if (session == null) return;
 
     int newXpEarned = session.xpEarned;
@@ -309,7 +311,7 @@ class FreeTimerNotifier extends _$FreeTimerNotifier with WidgetsBindingObserver 
         xpEarned: newXpEarned,
       ),
     );
-    ref.read(syncEngineProvider.notifier).fullSync();
+    ref.read(syncEngineProvider.notifier).debouncedSync();
   }
 
   Future<void> _startForegroundService() async {
@@ -349,7 +351,16 @@ class FreeTimerNotifier extends _$FreeTimerNotifier with WidgetsBindingObserver 
   }
 
   Future<void> _stopForegroundService() async {
-    await FlutterForegroundTask.stopService();
+    try {
+      await FlutterForegroundTask.stopService().timeout(
+        const Duration(seconds: 3),
+        onTimeout: () {
+          debugPrint('FreeTimer: stopService timed out after 3s');
+        },
+      );
+    } catch (e) {
+      debugPrint('FreeTimer: Error stopping foreground service: $e');
+    }
   }
 
   void _ensureListener() {

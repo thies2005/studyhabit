@@ -597,6 +597,9 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
     final notifier = ref.read(pomodoroProvider.notifier);
     notifier.syncTimeFromTimestamps();
     final pomodoroState = ref.read(pomodoroProvider);
+    
+    // Capture session ID before any state changes
+    final capturedSessionId = pomodoroState.activeSessionId;
 
     // Determine the actual work minutes:
     // - If we're still in a work phase (early stop), calculate elapsed now.
@@ -647,24 +650,26 @@ class _PomodoroScreenState extends ConsumerState<PomodoroScreen>
           await notifier.awardConfidenceXpAndNotes(
             confidenceRating: confidence,
             notes: notes,
+            sessionId: capturedSessionId,
           );
         },
       );
     }
 
+    // Navigate away FIRST — this is the critical user-facing action.
     if (mounted) {
-      try {
-        await notifier.stop();
-      } catch (e) {
-        debugPrint('Error during stop: $e');
+      if (context.canPop()) {
+        context.pop();
+      } else {
+        context.go('/home');
       }
-      if (mounted) {
-        if (context.canPop()) {
-          context.pop();
-        } else {
-          context.go('/home');
-        }
-      }
+    }
+
+    // Then clean up in the background — errors won't block navigation
+    try {
+      await notifier.stop();
+    } catch (e) {
+      debugPrint('Error during stop: $e');
     }
   }
 

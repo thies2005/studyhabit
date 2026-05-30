@@ -389,7 +389,10 @@ class _FreeTimerScreenState extends ConsumerState<FreeTimerScreen>
     final state = ref.read(freeTimerProvider);
     final notifier = ref.read(freeTimerProvider.notifier);
     
-    // Calculate elapsed minutes accurately from timestamps to prevent stale values (Finding 7 & 2)
+    // Capture session ID before any state changes
+    final capturedSessionId = state.activeSessionId;
+    
+    // Calculate elapsed minutes accurately from timestamps to prevent stale values
     final now = DateTime.now();
     int actualElapsedSeconds = 0;
     if (state.startedAt != null) {
@@ -413,24 +416,31 @@ class _FreeTimerScreenState extends ConsumerState<FreeTimerScreen>
           await notifier.awardConfidenceXpAndNotes(
             confidenceRating: confidence,
             notes: notes,
+            sessionId: capturedSessionId,
           );
         },
       );
     }
 
+    // Navigate away FIRST — this is the critical user-facing action.
+    // If stop() hangs (e.g. foreground service already dead after standby),
+    // the user won't be stuck on the timer screen.
+    if (mounted) {
+      if (context.canPop()) {
+        context.pop();
+      } else {
+        context.go('/home');
+      }
+    }
+
+    // Then clean up in the background — errors won't block navigation
     try {
       await notifier.stop();
     } catch (e) {
       debugPrint('Error during stop: $e');
     }
-    if (mounted) {
-      if (context.canPop()) {
-        context.pop(); // Go back from timer screen
-      } else {
-        context.go('/home');
-      }
-    }
   }
+
 
   String _formatTime(int seconds) {
     final h = seconds ~/ 3600;

@@ -19,7 +19,7 @@ export const apiLimiter = rateLimit({
 
 export const syncLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 10,
+  max: 30,
   message: { error: 'Sync rate limit exceeded, try again in a minute' },
   standardHeaders: true,
   legacyHeaders: false,

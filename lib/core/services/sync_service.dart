@@ -21,16 +21,44 @@ enum SyncStatus { idle, syncing, synced, error }
 class SyncEngine extends _$SyncEngine {
   static const _lastSyncedKey = 'sync.lastSyncedAt';
   
+  static const _dataEntityTypes = {
+    'project', 'subject', 'topic', 'chapter', 'session',
+    'source', 'skillLabel', 'subjectMilestone',
+  };
+
   late AppDatabase _db;
   late SharedPreferences _prefs;
   Timer? _syncTimer;
   bool _syncPending = false;
+  bool _forceFullSync = false;
 
   @override
   SyncStatus build() {
     _db = ref.watch(appDatabaseProvider);
     _prefs = ref.watch(sharedPreferencesInstanceProvider);
+
+    ref.listen(authProvider, (previous, next) {
+      final wasAuthed = previous?.maybeWhen(authenticated: (_, __) => true, orElse: () => false) ?? false;
+      final isAuthed = next.maybeWhen(authenticated: (_, __) => true, orElse: () => false);
+      if (!wasAuthed && isAuthed) {
+        _forceFullSync = true;
+        () async {
+          try {
+            await fullSync();
+          } catch (e, stack) {
+            AppLogger.e('SyncEngine', 'Post-auth sync failed', e, stack);
+            state = SyncStatus.error;
+          }
+        }();
+      }
+    });
+
     return SyncStatus.idle;
+  }
+
+  Future<void> resetLastSyncedAt() async {
+    await _prefs.setInt(_lastSyncedKey, 0);
+    AppLogger.i('SyncEngine', 'Reset lastSyncedAt to epoch for first sync after auth.');
   }
 
   DateTime get lastSyncedAt {
@@ -40,6 +68,13 @@ class SyncEngine extends _$SyncEngine {
 
   Future<void> setLastSyncedAt(DateTime dateTime) async {
     await _prefs.setInt(_lastSyncedKey, dateTime.millisecondsSinceEpoch);
+  }
+
+  void debouncedSync() {
+    _syncTimer?.cancel();
+    _syncTimer = Timer(const Duration(seconds: 30), () {
+      fullSync();
+    });
   }
 
   Future<void> fullSync() async {
@@ -67,12 +102,18 @@ class SyncEngine extends _$SyncEngine {
     }
 
     _syncTimer?.cancel();
-    
+
+    if (_forceFullSync) {
+      _forceFullSync = false;
+      await _prefs.setInt(_lastSyncedKey, 0);
+      AppLogger.i('SyncEngine', 'Force full sync: reset lastSyncedAt to epoch.');
+    }
+
     state = SyncStatus.syncing;
     AppLogger.i('SyncEngine', 'Starting full synchronization...');
 
     try {
-        final since = lastSyncedAt;
+      final since = lastSyncedAt;
       final dio = ref.read(apiClientProvider);
 
       // 2. Fetch local changes since lastSync
@@ -90,11 +131,18 @@ class SyncEngine extends _$SyncEngine {
       final serverTimeStr = pullData['serverTime'] as String;
       final serverTime = DateTime.parse(serverTimeStr);
 
-      // Log push results
       final pushData = responseData['push'] as Map<String, dynamic>?;
+      bool hasDataErrors = false;
       if (pushData != null) {
         final errors = pushData['errors'] as List?;
         if (errors != null && errors.isNotEmpty) {
+          for (final e in errors) {
+            final entity = (e as Map<String, dynamic>)['entity'] as String?;
+            if (entity != null && _dataEntityTypes.contains(entity)) {
+              hasDataErrors = true;
+              break;
+            }
+          }
           AppLogger.e('SyncEngine', 'Server returned ${errors.length} sync errors: $errors');
         }
       }
@@ -102,10 +150,15 @@ class SyncEngine extends _$SyncEngine {
       // 4. Apply remote changes locally
       await _applyRemoteChanges(pullData);
 
-      // 5. Update last synced timestamp
-      await setLastSyncedAt(serverTime);
-      state = SyncStatus.synced;
-      AppLogger.i('SyncEngine', 'Synchronization completed successfully at $serverTime');
+      // 5. Update last synced timestamp ONLY if no data-entity push errors
+      if (hasDataErrors) {
+        AppLogger.w('SyncEngine', 'Not updating lastSyncedAt due to data-entity push errors. Failed items will be retried on next sync.');
+        state = SyncStatus.error;
+      } else {
+        await setLastSyncedAt(serverTime);
+        state = SyncStatus.synced;
+        AppLogger.i('SyncEngine', 'Synchronization completed successfully at $serverTime');
+      }
     } catch (e, stack) {
       state = SyncStatus.error;
       AppLogger.e('SyncEngine', 'Sync failed', e, stack);

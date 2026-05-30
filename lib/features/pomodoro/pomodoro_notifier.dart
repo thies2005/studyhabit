@@ -345,7 +345,7 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
           sourceId: Value(config.sourceId),
         ),
       );
-      ref.read(syncEngineProvider.notifier).fullSync();
+      ref.read(syncEngineProvider.notifier).debouncedSync();
     } catch (e) {
       AppLogger.e('PomodoroNotifier', 'Error inserting session', e);
       return;
@@ -607,7 +607,12 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
     }
 
     try {
-      await FlutterForegroundTask.stopService();
+      await FlutterForegroundTask.stopService().timeout(
+        const Duration(seconds: 3),
+        onTimeout: () {
+          AppLogger.w('PomodoroNotifier', 'stopService timed out after 3s');
+        },
+      );
     } catch (e) {
       AppLogger.e('PomodoroNotifier', 'Error stopping foreground task service', e);
     }
@@ -684,19 +689,20 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
         notes: Value(notes),
       ),
     );
-    ref.read(syncEngineProvider.notifier).fullSync();
+    ref.read(syncEngineProvider.notifier).debouncedSync();
   }
 
   Future<void> awardConfidenceXpAndNotes({
     required int? confidenceRating,
     String? notes,
+    String? sessionId,
   }) async {
-    final sessionId = state.activeSessionId;
-    if (sessionId == null || _db == null) return;
+    final id = sessionId ?? state.activeSessionId;
+    if (id == null || _db == null) return;
 
     final sessionRow = await (_db!.select(
       _db!.studySessions,
-    )..where((t) => t.id.equals(sessionId))).getSingleOrNull();
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
 
     if (sessionRow == null) return;
 
@@ -732,7 +738,7 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
         xpEarned: newXpEarned,
       ),
     );
-    ref.read(syncEngineProvider.notifier).fullSync();
+    ref.read(syncEngineProvider.notifier).debouncedSync();
   }
 
   Future<void> _updateSessionInDb({
@@ -760,7 +766,7 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
         endPage: Value(endPage ?? sessionRow.endPage),
       ),
     );
-    ref.read(syncEngineProvider.notifier).fullSync();
+    ref.read(syncEngineProvider.notifier).debouncedSync();
   }
 
   Future<void> updateSessionPageRange({
