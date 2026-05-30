@@ -478,7 +478,7 @@ class SyncEngine extends _$SyncEngine {
       final localUpdatedAt = DateTime.fromMillisecondsSinceEpoch(localUpdatedAtMs);
 
       if (settingsJson != null && serverUpdatedAt.isAfter(localUpdatedAt)) {
-        await ref.read(themeSettingsProvider.notifier).loadSettings(settingsJson);
+        await ref.read(themeSettingsProvider.notifier).loadSettings(settingsJson, remoteUpdatedAt: serverUpdatedAt);
         ref.read(pomodoroProvider.notifier).reloadFromPersistence();
         ref.read(freeTimerProvider.notifier).reloadFromPersistence();
       }

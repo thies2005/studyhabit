@@ -136,7 +136,7 @@ class ThemeSettings extends _$ThemeSettings {
     }
   }
 
-  Future<void> loadSettings(Map<String, dynamic> settings) async {
+  Future<void> loadSettings(Map<String, dynamic> settings, {DateTime? remoteUpdatedAt}) async {
     for (final entry in settings.entries) {
       final value = entry.value;
       if (entry.key == _fontScaleKey || entry.key == _gracePeriodKey) {
@@ -153,7 +153,11 @@ class ThemeSettings extends _$ThemeSettings {
         await _prefs.setString(entry.key, value);
       }
     }
-    await _markSettingsUpdated();
+    if (remoteUpdatedAt != null) {
+      await _prefs.setInt(_settingsUpdatedAtKey, remoteUpdatedAt.millisecondsSinceEpoch);
+    } else {
+      await _markSettingsUpdated();
+    }
     // Re-build state by forcing a new read from SharedPreferences
     ref.invalidateSelf();
   }

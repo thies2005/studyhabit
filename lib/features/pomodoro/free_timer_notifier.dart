@@ -202,6 +202,7 @@ class FreeTimerNotifier extends _$FreeTimerNotifier with WidgetsBindingObserver 
     );
     _syncForegroundTaskData();
     _persistState();
+    ref.read(syncEngineProvider.notifier).debouncedSync();
   }
 
   void resume() {
@@ -216,6 +217,7 @@ class FreeTimerNotifier extends _$FreeTimerNotifier with WidgetsBindingObserver 
     );
     _syncForegroundTaskData();
     _persistState();
+    ref.read(syncEngineProvider.notifier).debouncedSync();
   }
 
   Future<void> stop() async {

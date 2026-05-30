@@ -558,6 +558,7 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
     );
     _stopLocalTimer();
     _syncForegroundTaskData();
+    ref.read(syncEngineProvider.notifier).debouncedSync();
   }
 
   void resume() {
@@ -577,6 +578,7 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
     _startLocalTimer();
     _syncForegroundTaskData();
     _persistState();
+    ref.read(syncEngineProvider.notifier).debouncedSync();
   }
 
   Future<void> stop() async {
@@ -667,6 +669,7 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
       }
 
       _syncForegroundTaskData();
+      ref.read(syncEngineProvider.notifier).debouncedSync();
     }
   }
 
