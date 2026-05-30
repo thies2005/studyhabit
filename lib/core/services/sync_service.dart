@@ -20,6 +20,7 @@ enum SyncStatus { idle, syncing, synced, error }
 @Riverpod(keepAlive: true)
 class SyncEngine extends _$SyncEngine {
   static const _lastSyncedKey = 'sync.lastSyncedAt';
+  static const _lastSyncedUserKey = 'sync.lastSyncedUserId';
   
   static const _dataEntityTypes = {
     'project', 'subject', 'topic', 'chapter', 'session',
@@ -70,6 +71,10 @@ class SyncEngine extends _$SyncEngine {
     await _prefs.setInt(_lastSyncedKey, dateTime.millisecondsSinceEpoch);
   }
 
+  Future<void> resetLastSyncedUser() async {
+    await _prefs.remove(_lastSyncedUserKey);
+  }
+
   void debouncedSync() {
     _syncTimer?.cancel();
     _syncTimer = Timer(const Duration(seconds: 30), () {
@@ -89,6 +94,8 @@ class SyncEngine extends _$SyncEngine {
       return;
     }
 
+    final userId = authState.maybeWhen(authenticated: (id, _) => id, orElse: () => '');
+
     final isOnlineVal = await ref.read(isOnlineProvider.future).catchError((_) => false);
     if (!isOnlineVal) {
       AppLogger.d('SyncEngine', 'Skipping sync: Device is offline.');
@@ -107,6 +114,15 @@ class SyncEngine extends _$SyncEngine {
       _forceFullSync = false;
       await _prefs.setInt(_lastSyncedKey, 0);
       AppLogger.i('SyncEngine', 'Force full sync: reset lastSyncedAt to epoch.');
+    }
+
+    if (userId.isNotEmpty) {
+      final lastSyncedUserId = _prefs.getString(_lastSyncedUserKey);
+      if (lastSyncedUserId != userId) {
+        await _prefs.setString(_lastSyncedUserKey, userId);
+        await _prefs.setInt(_lastSyncedKey, 0);
+        AppLogger.i('SyncEngine', 'Detected new user. Reset lastSyncedAt to epoch.');
+      }
     }
 
     state = SyncStatus.syncing;
