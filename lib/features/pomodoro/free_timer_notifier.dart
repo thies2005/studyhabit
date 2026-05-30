@@ -57,6 +57,26 @@ class FreeTimerNotifier extends _$FreeTimerNotifier with WidgetsBindingObserver 
     return FreeTimerState.initial();
   }
 
+  void reloadFromPersistence() {
+    final saved = _persistence?.loadFreeTimerSync();
+    if (saved != null && saved.activeSessionId != null) {
+      state = saved;
+      if (state.isRunning) {
+        _startTickingDelayed();
+        _startForegroundServiceDelayed();
+      } else {
+        _tickTimer?.cancel();
+        _stopForegroundService();
+      }
+    } else {
+      if (state.activeSessionId != null) {
+        _tickTimer?.cancel();
+        _stopForegroundService();
+        state = FreeTimerState.initial();
+      }
+    }
+  }
+
   void _startTickingDelayed() {
     Future.microtask(() {
       _startTicking();

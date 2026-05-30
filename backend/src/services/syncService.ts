@@ -336,10 +336,11 @@ export class SyncService {
             continue;
           }
 
+          const { updatedAt, ...dataToSave } = validated;
           await tx.project.upsert({
             where: { id: validated.id },
-            create: { ...validated, userId },
-            update: validated,
+            create: { ...dataToSave, userId },
+            update: dataToSave,
           });
           allProjectIds.add(validated.id);
           a++;
@@ -374,10 +375,11 @@ export class SyncService {
             continue;
           }
 
+          const { updatedAt, ...dataToSave } = validated;
           await tx.subject.upsert({
             where: { id: validated.id },
-            create: validated,
-            update: validated,
+            create: dataToSave,
+            update: dataToSave,
           });
           allSubjectIds.add(validated.id);
           a++;
@@ -413,10 +415,11 @@ export class SyncService {
             continue;
           }
 
+          const { updatedAt, ...dataToSave } = validated;
           await tx.topic.upsert({
             where: { id: validated.id },
-            create: validated,
-            update: validated,
+            create: dataToSave,
+            update: dataToSave,
           });
           allTopicIds.add(validated.id);
           a++;
@@ -452,10 +455,11 @@ export class SyncService {
             continue;
           }
 
+          const { updatedAt, ...dataToSave } = validated;
           await tx.chapter.upsert({
             where: { id: validated.id },
-            create: validated,
-            update: validated,
+            create: dataToSave,
+            update: dataToSave,
           });
           a++;
         } catch (e: any) {
@@ -490,10 +494,11 @@ export class SyncService {
             continue;
           }
 
+          const { updatedAt, ...dataToSave } = validated;
           await tx.studySession.upsert({
             where: { id: validated.id },
-            create: validated,
-            update: validated,
+            create: dataToSave,
+            update: dataToSave,
           });
           a++;
         } catch (e: any) {
@@ -528,10 +533,11 @@ export class SyncService {
             continue;
           }
 
+          const { updatedAt, ...dataToSave } = validated;
           await tx.source.upsert({
             where: { id: validated.id },
-            create: validated,
-            update: validated,
+            create: dataToSave,
+            update: dataToSave,
           });
           a++;
         } catch (e: any) {
@@ -566,10 +572,11 @@ export class SyncService {
             continue;
           }
 
+          const { updatedAt, ...dataToSave } = validated;
           await tx.skillLabel.upsert({
             where: { id: validated.id },
-            create: validated,
-            update: validated,
+            create: dataToSave,
+            update: dataToSave,
           });
           a++;
         } catch (e: any) {
@@ -740,10 +747,11 @@ export class SyncService {
             continue;
           }
 
+          const { updatedAt, ...dataToSave } = validated;
           await tx.subjectMilestone.upsert({
             where: { id: validated.id },
-            create: validated,
-            update: validated,
+            create: dataToSave,
+            update: dataToSave,
           });
           a++;
         } catch (e: unknown) {

@@ -28,6 +28,7 @@ class TimerPersistenceService {
   Future<void> savePomodoro(PomodoroState state) async {
     await _prefs.setString(_activeTimerKey, 'pomodoro');
     await _prefs.setString(_pomodoroStateKey, jsonEncode(state.toJson()));
+    await _markUpdated();
   }
 
   Future<PomodoroState?> loadPomodoro() async {
@@ -55,6 +56,7 @@ class TimerPersistenceService {
   Future<void> saveFreeTimer(FreeTimerState state) async {
     await _prefs.setString(_activeTimerKey, 'free');
     await _prefs.setString(_freeTimerStateKey, jsonEncode(state.toJson()));
+    await _markUpdated();
   }
 
   Future<FreeTimerState?> loadFreeTimer() async {
@@ -88,6 +90,7 @@ class TimerPersistenceService {
     if (getActiveTimerType() == 'pomodoro') {
       await _prefs.remove(_activeTimerKey);
     }
+    await _markUpdated();
   }
 
   Future<void> clearFreeTimer() async {
@@ -95,11 +98,17 @@ class TimerPersistenceService {
     if (getActiveTimerType() == 'free') {
       await _prefs.remove(_activeTimerKey);
     }
+    await _markUpdated();
   }
 
   Future<void> clear() async {
     await _prefs.remove(_activeTimerKey);
     await _prefs.remove(_pomodoroStateKey);
     await _prefs.remove(_freeTimerStateKey);
+    await _markUpdated();
+  }
+
+  Future<void> _markUpdated() async {
+    await _prefs.setInt('theme.settingsUpdatedAt', DateTime.now().millisecondsSinceEpoch);
   }
 }

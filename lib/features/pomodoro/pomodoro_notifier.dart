@@ -98,6 +98,25 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
     return PomodoroState.initial(subjectId: '');
   }
 
+  void reloadFromPersistence() {
+    final savedState = _persistence?.loadPomodoroSync();
+    if (savedState != null) {
+      state = savedState;
+      if (state.phase != TimerPhase.idle && state.isRunning) {
+        _syncTimeDelayed();
+        _startLocalTimerDelayed();
+        _startForegroundServiceDelayed();
+      } else {
+        _stopLocalTimer();
+      }
+    } else {
+      if (state.phase != TimerPhase.idle) {
+        _stopLocalTimer();
+        state = PomodoroState.initial(subjectId: '');
+      }
+    }
+  }
+
   void _syncTimeDelayed() {
     Future.microtask(() {
       syncTimeFromTimestamps();

@@ -12,6 +12,8 @@ import 'auth_service.dart';
 import 'app_logger.dart';
 import '../models/enums.dart';
 import '../providers/theme_provider.dart';
+import '../../features/pomodoro/pomodoro_notifier.dart';
+import '../../features/pomodoro/free_timer_notifier.dart';
 
 part 'sync_service.g.dart';
 
@@ -322,7 +324,10 @@ class SyncEngine extends _$SyncEngine {
             k.startsWith('pomodoro.') ||
             k.startsWith('notifications.') ||
             k.startsWith('streak.') ||
-            k.startsWith('goal.'),
+            k.startsWith('goal.') ||
+            k == 'active_timer_type' ||
+            k == 'pomodoro_state_json' ||
+            k == 'free_timer_state_json',
       );
       final settingsMap = <String, dynamic>{};
       for (final key in settingsKeys) {
@@ -474,6 +479,8 @@ class SyncEngine extends _$SyncEngine {
 
       if (settingsJson != null && serverUpdatedAt.isAfter(localUpdatedAt)) {
         await ref.read(themeSettingsProvider.notifier).loadSettings(settingsJson);
+        ref.read(pomodoroProvider.notifier).reloadFromPersistence();
+        ref.read(freeTimerProvider.notifier).reloadFromPersistence();
       }
     }
   }
