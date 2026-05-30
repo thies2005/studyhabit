@@ -14,6 +14,8 @@ class PomodoroTaskHandler extends TaskHandler {
   bool _isRunning = false;
   int _lastRemaining = 0;
   bool _phaseCompleteSent = false;
+  bool _isOvertime = false;
+  int _lastOvertime = 0;
 
   @override
   Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
@@ -24,6 +26,7 @@ class PomodoroTaskHandler extends TaskHandler {
     _pausedDurationSeconds = await FlutterForegroundTask.getData<int>(key: 'pausedDurationSeconds') ?? 0;
     _totalSeconds = await FlutterForegroundTask.getData<int>(key: 'totalSeconds') ?? 0;
     _isRunning = await FlutterForegroundTask.getData<bool>(key: 'isRunning') ?? false;
+    _isOvertime = await FlutterForegroundTask.getData<bool>(key: 'isOvertime') ?? false;
   }
 
   @override
@@ -31,20 +34,32 @@ class PomodoroTaskHandler extends TaskHandler {
     if (_isRunning && _startTimestamp != null) {
       final now = DateTime.now();
       final actualElapsedSeconds = now.difference(_startTimestamp!).inSeconds - _pausedDurationSeconds;
-      final remaining = (_totalSeconds - actualElapsedSeconds).clamp(0, _totalSeconds);
+      
+      if (_isOvertime) {
+        final overtime = (actualElapsedSeconds - _totalSeconds).clamp(0, 86400);
+        if (overtime != _lastOvertime) {
+          _lastOvertime = overtime;
+          FlutterForegroundTask.updateService(
+            notificationTitle: 'Overtime Focus',
+            notificationText: '+${_formatTime(overtime)} extra',
+          );
+        }
+      } else {
+        final remaining = (_totalSeconds - actualElapsedSeconds).clamp(0, _totalSeconds);
 
-      if (remaining != _lastRemaining) {
-        _lastRemaining = remaining;
-        FlutterForegroundTask.updateService(
-          notificationTitle: _formatNotifTitle(remaining),
-          notificationText: '${_formatTime(remaining)} remaining',
-        );
-        FlutterForegroundTask.sendDataToMain(remaining);
-      }
+        if (remaining != _lastRemaining) {
+          _lastRemaining = remaining;
+          FlutterForegroundTask.updateService(
+            notificationTitle: _formatNotifTitle(remaining),
+            notificationText: '${_formatTime(remaining)} remaining',
+          );
+          FlutterForegroundTask.sendDataToMain(remaining);
+        }
 
-      if (remaining <= 0 && !_phaseCompleteSent) {
-        _phaseCompleteSent = true;
-        FlutterForegroundTask.sendDataToMain('PHASE_COMPLETE');
+        if (remaining <= 0 && !_phaseCompleteSent) {
+          _phaseCompleteSent = true;
+          FlutterForegroundTask.sendDataToMain('PHASE_COMPLETE');
+        }
       }
     }
   }
@@ -71,6 +86,10 @@ class PomodoroTaskHandler extends TaskHandler {
       if (data.containsKey('isRunning')) {
         _isRunning = data['isRunning'] as bool;
         FlutterForegroundTask.saveData(key: 'isRunning', value: _isRunning);
+      }
+      if (data.containsKey('isOvertime')) {
+        _isOvertime = data['isOvertime'] as bool;
+        FlutterForegroundTask.saveData(key: 'isOvertime', value: _isOvertime);
       }
     }
   }

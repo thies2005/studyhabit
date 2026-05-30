@@ -52,6 +52,7 @@ class ProjectNotifier extends _$ProjectNotifier {
   }) async {
     try {
       AppLogger.i('ProjectNotifier', 'Creating project: $name');
+      final syncEngine = ref.read(syncEngineProvider.notifier);
       const uuid = Uuid();
       final id = uuid.v4();
       final now = DateTime.now();
@@ -77,7 +78,7 @@ class ProjectNotifier extends _$ProjectNotifier {
       }
       AppLogger.i('ProjectNotifier', 'Project created successfully: ${row.id}');
       // Trigger sync
-      ref.read(syncEngineProvider.notifier).fullSync();
+      syncEngine.fullSync();
       return mapProject(row);
     } catch (e, stack) {
       AppLogger.e('ProjectNotifier', 'Failed to create project', e, stack);
@@ -88,6 +89,7 @@ class ProjectNotifier extends _$ProjectNotifier {
   Future<void> switchProject(String id) async {
     try {
       AppLogger.i('ProjectNotifier', 'Switching to project: $id');
+      final syncEngine = ref.read(syncEngineProvider.notifier);
       final row = await _dao.getById(id);
       if (row == null) {
         AppLogger.w('ProjectNotifier', 'Switch target project not found: $id');
@@ -110,7 +112,7 @@ class ProjectNotifier extends _$ProjectNotifier {
         ),
       );
       AppLogger.i('ProjectNotifier', 'Project switch successful');
-      ref.read(syncEngineProvider.notifier).fullSync();
+      syncEngine.fullSync();
     } catch (e, stack) {
       AppLogger.e('ProjectNotifier', 'Failed to switch project', e, stack);
     }
@@ -129,6 +131,7 @@ class ProjectNotifier extends _$ProjectNotifier {
   }) async {
     try {
       AppLogger.i('ProjectNotifier', 'Updating project: $id');
+      final syncEngine = ref.read(syncEngineProvider.notifier);
       final row = await _dao.getById(id);
       if (row == null) {
         AppLogger.w('ProjectNotifier', 'Update target project not found: $id');
@@ -151,14 +154,15 @@ class ProjectNotifier extends _$ProjectNotifier {
         ),
       );
       AppLogger.i('ProjectNotifier', 'Project update successful');
-      ref.read(syncEngineProvider.notifier).fullSync();
+      syncEngine.fullSync();
     } catch (e, stack) {
       AppLogger.e('ProjectNotifier', 'Failed to update project', e, stack);
     }
   }
 
   Future<void> archive(String id) async {
+    final syncEngine = ref.read(syncEngineProvider.notifier);
     await _dao.softDelete(id);
-    ref.read(syncEngineProvider.notifier).fullSync();
+    syncEngine.fullSync();
   }
 }

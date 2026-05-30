@@ -80,6 +80,7 @@ class SubjectNotifier extends _$SubjectNotifier {
       AppLogger.i('SubjectNotifier', 'Creating subject: $name');
       const uuid = Uuid();
       final currentProject = await ref.read(lastOpenedProjectProvider.future);
+      final syncEngine = ref.read(syncEngineProvider.notifier);
       if (currentProject == null) {
         AppLogger.w('SubjectNotifier', 'Cannot create subject: No active project');
         return null;
@@ -102,7 +103,7 @@ class SubjectNotifier extends _$SubjectNotifier {
         ),
       );
       AppLogger.i('SubjectNotifier', 'Subject created successfully');
-      ref.read(syncEngineProvider.notifier).fullSync();
+      syncEngine.fullSync();
       return newId;
     } catch (e, stack) {
       AppLogger.e('SubjectNotifier', 'Failed to create subject', e, stack);
@@ -113,6 +114,7 @@ class SubjectNotifier extends _$SubjectNotifier {
   Future<void> updateSubject(Subject updated) async {
     try {
       AppLogger.i('SubjectNotifier', 'Updating subject: ${updated.id}');
+      final syncEngine = ref.read(syncEngineProvider.notifier);
       await _dao.upsert(
         SubjectsCompanion(
           id: Value(updated.id),
@@ -129,7 +131,7 @@ class SubjectNotifier extends _$SubjectNotifier {
           targetWeeklyHours: Value(updated.targetWeeklyHours),
         ),
       );
-      ref.read(syncEngineProvider.notifier).fullSync();
+      syncEngine.fullSync();
     } catch (e, stack) {
       AppLogger.e('SubjectNotifier', 'Failed to update subject', e, stack);
     }
@@ -138,10 +140,11 @@ class SubjectNotifier extends _$SubjectNotifier {
   Future<void> delete(String id) async {
     try {
       AppLogger.i('SubjectNotifier', 'Deleting subject: $id');
+      final syncEngine = ref.read(syncEngineProvider.notifier);
       final milestoneDao = SubjectMilestoneDao(_db);
       await milestoneDao.deleteAllForSubject(id);
       await _dao.delete(id);
-      ref.read(syncEngineProvider.notifier).fullSync();
+      syncEngine.fullSync();
     } catch (e, stack) {
       AppLogger.e('SubjectNotifier', 'Failed to delete subject', e, stack);
     }
@@ -299,6 +302,7 @@ class MilestoneNotifier extends _$MilestoneNotifier {
   Future<void> add(String subjectId, String title) async {
     try {
       const uuid = Uuid();
+      final syncEngine = ref.read(syncEngineProvider.notifier);
       // Get current max sortOrder for this subject
       final existing = await _dao.watchBySubject(subjectId).first;
       final maxOrder = existing.isEmpty
@@ -313,7 +317,7 @@ class MilestoneNotifier extends _$MilestoneNotifier {
           sortOrder: Value(maxOrder + 1),
         ),
       );
-      ref.read(syncEngineProvider.notifier).fullSync();
+      syncEngine.fullSync();
     } catch (e, stack) {
       AppLogger.e('MilestoneNotifier', 'Failed to add milestone', e, stack);
     }
@@ -321,6 +325,7 @@ class MilestoneNotifier extends _$MilestoneNotifier {
 
   Future<void> rename(String id, String newTitle) async {
     try {
+      final syncEngine = ref.read(syncEngineProvider.notifier);
       await _dao.update(
         SubjectMilestonesCompanion(
           id: Value(id),
@@ -335,13 +340,14 @@ class MilestoneNotifier extends _$MilestoneNotifier {
 
   Future<void> toggleComplete(String id) async {
     try {
+      final syncEngine = ref.read(syncEngineProvider.notifier);
       // Get current state
       final row = await (_db.select(_db.subjectMilestones)
             ..where((t) => t.id.equals(id)))
           .getSingleOrNull();
       if (row == null) return;
       await _dao.updateCompletion(id, isCompleted: !row.isCompleted);
-      ref.read(syncEngineProvider.notifier).fullSync();
+      syncEngine.fullSync();
     } catch (e, stack) {
       AppLogger.e('MilestoneNotifier', 'Failed to toggle milestone', e, stack);
     }
@@ -349,8 +355,9 @@ class MilestoneNotifier extends _$MilestoneNotifier {
 
   Future<void> deleteMilestone(String id) async {
     try {
+      final syncEngine = ref.read(syncEngineProvider.notifier);
       await _dao.delete(id);
-      ref.read(syncEngineProvider.notifier).fullSync();
+      syncEngine.fullSync();
     } catch (e, stack) {
       AppLogger.e('MilestoneNotifier', 'Failed to delete milestone', e, stack);
     }
@@ -358,8 +365,9 @@ class MilestoneNotifier extends _$MilestoneNotifier {
 
   Future<void> reorder(String subjectId, List<({String id, int sortOrder})> items) async {
     try {
+      final syncEngine = ref.read(syncEngineProvider.notifier);
       await _dao.reorder(items);
-      ref.read(syncEngineProvider.notifier).fullSync();
+      syncEngine.fullSync();
     } catch (e, stack) {
       AppLogger.e('MilestoneNotifier', 'Failed to reorder milestones', e, stack);
     }

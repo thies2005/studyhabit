@@ -251,6 +251,8 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
         startTimestamp: DateTime.now(),
         pausedDurationSeconds: 0,
         lastPausedAt: null,
+        isOvertime: false,
+        overtimeSeconds: 0,
       );
 
       _startLocalTimer();
@@ -302,6 +304,7 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
       'pausedDurationSeconds': state.pausedDurationSeconds,
       'totalSeconds': state.totalSeconds,
       'isRunning': state.isRunning,
+      'isOvertime': state.isOvertime,
     });
   }
 
@@ -404,6 +407,8 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
 
   Future<void> _onPhaseCompleteImpl({bool fromSkip = false}) async {
     if (state.phase == TimerPhase.work) {
+      if (state.isOvertime && !fromSkip) return; // Prevent duplicate handling
+
       final settings = ref.read(themeSettingsProvider).value;
       final continuousFocus = settings?.continuousFocus ?? true;
 
@@ -529,6 +534,8 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
         startTimestamp: DateTime.now(),
         pausedDurationSeconds: 0,
         lastPausedAt: DateTime.now(),
+        isOvertime: false,
+        overtimeSeconds: 0,
       );
 
       final themeSettings = ref.read(themeSettingsProvider).value;
@@ -546,6 +553,7 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
       'pausedDurationSeconds': state.pausedDurationSeconds,
       'totalSeconds': state.totalSeconds,
       'isRunning': state.isRunning,
+      'isOvertime': state.isOvertime,
     });
     _persistState();
   }
@@ -661,6 +669,8 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
         startTimestamp: DateTime.now(),
         pausedDurationSeconds: 0,
         lastPausedAt: DateTime.now(),
+        isOvertime: false,
+        overtimeSeconds: 0,
       );
 
       final themeSettings = ref.read(themeSettingsProvider).value;

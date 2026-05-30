@@ -139,6 +139,25 @@ class SyncEngine extends _$SyncEngine {
     state = SyncStatus.syncing;
     AppLogger.i('SyncEngine', 'Starting full synchronization...');
 
+    // One-time migration: bump updatedAt of old offline sessions
+    final hasMigrated = _prefs.getBool('sync.hasMigratedOfflineSessions') ?? false;
+    if (!hasMigrated) {
+      final lastSyncedAtMs = _prefs.getInt(_lastSyncedKey) ?? 0;
+      if (lastSyncedAtMs > 0) {
+        final cutoff = DateTime.fromMillisecondsSinceEpoch(lastSyncedAtMs);
+        final oldSessions = await (_db.select(_db.studySessions)..where((t) => t.updatedAt.isSmallerOrEqualValue(cutoff))).get();
+        if (oldSessions.isNotEmpty) {
+          AppLogger.i('SyncEngine', 'Migrating ${oldSessions.length} old offline sessions to trigger sync...');
+          for (final session in oldSessions) {
+            await (_db.update(_db.studySessions)..where((t) => t.id.equals(session.id))).write(
+              StudySessionsCompanion(updatedAt: Value(DateTime.now().add(const Duration(seconds: 1)))),
+            );
+          }
+        }
+      }
+      await _prefs.setBool('sync.hasMigratedOfflineSessions', true);
+    }
+
     try {
       final since = lastSyncedAt;
       final dio = ref.read(apiClientProvider);
