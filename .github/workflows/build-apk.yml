@@ -1,4 +1,4 @@
-name: Build & Release Beta APK
+name: Build & Release Beta APK and Windows App
 
 on:
   push:
@@ -13,28 +13,17 @@ concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: true
 
-# ──────────────────────────────────────────────
-# Required GitHub Secrets:
-#   KEYSTORE_BASE64   — base64-encoded .jks keystore file
-#   KEYSTORE_PASSWORD — keystore password
-#   KEY_ALIAS         — key alias inside the keystore
-#   KEY_PASSWORD      — password for the specific key
-#
-# To generate a keystore and encode it:
-#   keytool -genkeypair -v -keystore release.keystore \
-#     -alias studytracker -keyalg RSA -keysize 2048 -validity 10000 \
-#     -storepass YOUR_STORE_PASS -keypass YOUR_KEY_PASS
-#
-#   base64 -w 0 release.keystore > keystore.b64
-#   → paste contents of keystore.b64 into KEYSTORE_BASE64 secret
-# ──────────────────────────────────────────────
-
 jobs:
-  build:
-    name: Build APK
+  build-android:
+    name: Build Android APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
     if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      version_name: ${{ steps.version.outputs.version_name }}
+      build_number: ${{ steps.version.outputs.build_number }}
+      short_sha: ${{ steps.version.outputs.short_sha }}
 
     steps:
       # ── Setup ──────────────────────────────
@@ -163,37 +152,124 @@ jobs:
           path: ${{ steps.rename.outputs.release_apk }}
           retention-days: 14
 
-      # ── Create beta GitHub Release ─────────
-      - name: Create Beta Release
-        if: github.event_name == 'push'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: "Beta ${{ steps.version.outputs.version_name }} (#${{ steps.version.outputs.build_number }})"
-          prerelease: true
-          body: |
-            ## 🧪 Beta Build
-
-            | Detail | Value |
-            |--------|-------|
-            | **Version** | `${{ steps.version.outputs.version_name }}` |
-            | **Build** | `#${{ steps.version.outputs.build_number }}` |
-            | **Commit** | `${{ steps.version.outputs.short_sha }}` |
-            | **Branch** | `${{ github.ref_name }}` |
-            | **Date** | $(date +%Y-%m-%d) |
-
-            ### Downloads
-            - `StudyTracker-v…-release.apk` — signed release build
-
-            > This is an automated **beta** build. Not intended for production use.
-          files: |
-            ${{ steps.rename.outputs.release_apk }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       # ── Cleanup keystore ───────────────────
       - name: Cleanup signing artifacts
         if: always()
         run: |
           rm -f android/app/release.keystore
           rm -f android/app/key.properties
+
+  build-windows:
+    name: Build Windows App
+    runs-on: windows-latest
+    timeout-minutes: 40
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "zulu"
+          java-version: "17"
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          cache: true
+
+      - name: Get Flutter dependencies
+        run: flutter pub get
+
+      # Local version bump so compiled windows binary version matches android perfectly
+      - name: Auto-bump version name and versionCode locally
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        shell: pwsh
+        run: |
+          $content = Get-Content pubspec.yaml -Raw
+          if ($content -match 'version:\s*([0-9.]+)\+([0-9]+)') {
+            $verName = $Matches[1]
+            $verCode = [int]$Matches[2]
+            $parts = $verName.Split('.')
+            $major = $parts[0]
+            $minor = $parts[1]
+            $patch = [int]$parts[2]
+            $newPatch = $patch + 1
+            $newCode = $verCode + 1
+            $newVer = "${major}.${minor}.${newPatch}+${newCode}"
+            $content = $content -replace 'version:\s*[0-9.]+\+[0-9]+', "version: $newVer"
+            Set-Content pubspec.yaml $content
+            Write-Output "Bumped version locally to $newVer"
+          }
+
+      - name: Generate code (build_runner)
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Build Windows (release)
+        run: flutter build windows --release
+
+      # Compress Windows build output to a ZIP file
+      - name: Package Windows Build
+        shell: pwsh
+        run: |
+          $version = (Select-String -Path pubspec.yaml -Pattern "^version:").Line.Split(" ")[1].Split("+")[0]
+          $zipName = "StudyTracker-v${version}-b${env:GITHUB_RUN_NUMBER}-windows.zip"
+          Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath build/$zipName
+          echo "zip_path=build/$zipName" >> $env:GITHUB_ENV
+          echo "zip_name=$zipName" >> $env:GITHUB_ENV
+
+      # Upload artifacts
+      - name: Upload Windows ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: studytracker-windows
+          path: build/*.zip
+          retention-days: 14
+
+  release:
+    name: Create Unified Release
+    needs: [build-android, build-windows]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    steps:
+      - name: Download Android Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: studytracker-release
+          path: build-artifacts
+
+      - name: Download Windows Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: studytracker-windows
+          path: build-artifacts
+
+      - name: Create Beta Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.build-android.outputs.tag }}
+          name: "Beta ${{ needs.build-android.outputs.version_name }} (#${{ needs.build-android.outputs.build_number }})"
+          prerelease: true
+          body: |
+            ## 🧪 Beta Build
+
+            | Detail | Value |
+            |--------|-------|
+            | **Version** | `${{ needs.build-android.outputs.version_name }}` |
+            | **Build** | `#${{ needs.build-android.outputs.build_number }}` |
+            | **Commit** | `${{ needs.build-android.outputs.short_sha }}` |
+            | **Branch** | `${{ github.ref_name }}` |
+            | **Date** | $(date +%Y-%m-%d) |
+
+            ### Downloads
+            - `StudyTracker-v…-release.apk` — signed release build (Android)
+            - `StudyTracker-v…-windows.zip` — packaged release build (Windows)
+
+            > This is an automated **beta** build. Not intended for production use.
+          files: |
+            build-artifacts/**/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,6 +1,9 @@
+import 'dart:io';
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:window_manager/window_manager.dart';
 
 import 'app.dart';
 import 'core/database/daos/session_dao.dart';
@@ -15,6 +18,20 @@ import 'core/services/sync_timer.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  if (!kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
+    await windowManager.ensureInitialized();
+    WindowOptions windowOptions = const WindowOptions(
+      size: Size(1000, 700),
+      minimumSize: Size(450, 600),
+      center: true,
+      title: "Study Tracker",
+    );
+    await windowManager.waitUntilReadyToShow(windowOptions, () async {
+      await windowManager.show();
+      await windowManager.focus();
+    });
+  }
 
   // Initialize SharedPreferences early for synchronous loading in notifiers
   await TimerPersistenceService.init();
@@ -37,6 +54,10 @@ void main() async {
   AppLogger.i('App', 'StudyTracker starting up...');
 
   final container = ProviderContainer();
+
+  if (!kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
+    windowManager.addListener(DesktopFocusListener(container));
+  }
 
   // Perform startup session cleanup
   try {
@@ -91,5 +112,16 @@ void main() async {
     container: container,
     child: const StudyTrackerApp(),
   ));
+}
+
+class DesktopFocusListener extends WindowListener {
+  DesktopFocusListener(this.container);
+  final ProviderContainer container;
+
+  @override
+  void onWindowFocus() {
+    AppLogger.i('DesktopFocusListener', 'Window focused, triggering instant sync...');
+    container.read(syncEngineProvider.notifier).syncNow();
+  }
 }
 

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:drift/drift.dart';
 import 'package:flutter/material.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -39,7 +40,7 @@ class FreeTimerNotifier extends _$FreeTimerNotifier with WidgetsBindingObserver 
     ref.onDispose(() {
       _tickTimer?.cancel();
       WidgetsBinding.instance.removeObserver(this);
-      if (_listenerRegistered) {
+      if (_listenerRegistered && (Platform.isAndroid || Platform.isIOS)) {
         FlutterForegroundTask.removeTaskDataCallback(_onReceiveTaskData);
         _listenerRegistered = false;
       }
@@ -191,7 +192,7 @@ class FreeTimerNotifier extends _$FreeTimerNotifier with WidgetsBindingObserver 
         isFreeTimer: const Value(true),
       ),
     );
-    ref.read(syncEngineProvider.notifier).debouncedSync();
+    ref.read(syncEngineProvider.notifier).syncNow();
   }
 
   void pause() {
@@ -202,7 +203,7 @@ class FreeTimerNotifier extends _$FreeTimerNotifier with WidgetsBindingObserver 
     );
     _syncForegroundTaskData();
     _persistState();
-    ref.read(syncEngineProvider.notifier).debouncedSync();
+    ref.read(syncEngineProvider.notifier).syncNow();
   }
 
   void resume() {
@@ -217,7 +218,7 @@ class FreeTimerNotifier extends _$FreeTimerNotifier with WidgetsBindingObserver 
     );
     _syncForegroundTaskData();
     _persistState();
-    ref.read(syncEngineProvider.notifier).debouncedSync();
+    ref.read(syncEngineProvider.notifier).syncNow();
   }
 
   Future<void> stop() async {
@@ -247,7 +248,7 @@ class FreeTimerNotifier extends _$FreeTimerNotifier with WidgetsBindingObserver 
     if (elapsedMinutes <= 0) {
       try {
         await _sessionDao?.delete(state.activeSessionId!);
-        ref.read(syncEngineProvider.notifier).debouncedSync();
+        ref.read(syncEngineProvider.notifier).syncNow();
       } catch (e) {
         debugPrint('Error deleting dummy session: $e');
       }
@@ -283,7 +284,7 @@ class FreeTimerNotifier extends _$FreeTimerNotifier with WidgetsBindingObserver 
               endedAt: Value(endedAt),
             ),
           );
-          ref.read(syncEngineProvider.notifier).debouncedSync();
+          ref.read(syncEngineProvider.notifier).syncNow();
         }
       } catch (e) {
         debugPrint('Error updating session in DB: $e');
@@ -337,6 +338,7 @@ class FreeTimerNotifier extends _$FreeTimerNotifier with WidgetsBindingObserver 
   }
 
   Future<void> _startForegroundService() async {
+    if (!Platform.isAndroid && !Platform.isIOS) return;
     // Check if service is already running effectively
     if (await FlutterForegroundTask.isRunningService) {
       _syncForegroundTaskData();
@@ -373,6 +375,7 @@ class FreeTimerNotifier extends _$FreeTimerNotifier with WidgetsBindingObserver 
   }
 
   Future<void> _stopForegroundService() async {
+    if (!Platform.isAndroid && !Platform.isIOS) return;
     try {
       await FlutterForegroundTask.stopService();
     } on TimeoutException {
@@ -383,6 +386,7 @@ class FreeTimerNotifier extends _$FreeTimerNotifier with WidgetsBindingObserver 
   }
 
   void _ensureListener() {
+    if (!Platform.isAndroid && !Platform.isIOS) return;
     if (!_listenerRegistered) {
       FlutterForegroundTask.addTaskDataCallback(_onReceiveTaskData);
       _listenerRegistered = true;
@@ -402,6 +406,7 @@ class FreeTimerNotifier extends _$FreeTimerNotifier with WidgetsBindingObserver 
   }
 
   void _syncForegroundTaskData() {
+    if (!Platform.isAndroid && !Platform.isIOS) return;
     if (!state.isRunning) return;
     
     // We send timestamps so the background task can calculate accurately

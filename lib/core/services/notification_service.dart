@@ -23,6 +23,11 @@ class NotificationService {
   Future<void> initialize() async {
     if (_initialized) return;
 
+    if (!Platform.isAndroid && !Platform.isIOS) {
+      _initialized = true;
+      return;
+    }
+
     tz.initializeTimeZones();
 
     // Set the local timezone based on the device's UTC offset
@@ -94,6 +99,7 @@ class NotificationService {
     required int durationMinutes,
     required int pomodorosCompleted,
   }) async {
+    if (!Platform.isAndroid && !Platform.isIOS) return;
     try {
       const androidDetails = AndroidNotificationDetails(
         'study_session_complete',
@@ -124,6 +130,7 @@ class NotificationService {
     required Duration delay,
     required String subjectName,
   }) async {
+    if (!Platform.isAndroid && !Platform.isIOS) return;
     try {
       // Cancel existing reminders
       await _plugin.cancel(1);
@@ -158,6 +165,7 @@ class NotificationService {
   }
 
   Future<void> cancelReminder() async {
+    if (!Platform.isAndroid && !Platform.isIOS) return;
     try {
       await _plugin.cancel(1);
     } catch (e) {
@@ -169,6 +177,7 @@ class NotificationService {
     required int hour,
     required int minute,
   }) async {
+    if (!Platform.isAndroid && !Platform.isIOS) return;
     try {
       await _plugin.cancel(2);
 
@@ -216,6 +225,7 @@ class NotificationService {
   }
 
   Future<void> cancelDailyReminder() async {
+    if (!Platform.isAndroid && !Platform.isIOS) return;
     try {
       await _plugin.cancel(2);
     } catch (e) {

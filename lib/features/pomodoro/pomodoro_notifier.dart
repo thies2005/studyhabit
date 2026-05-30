@@ -78,7 +78,7 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
       WidgetsBinding.instance.removeObserver(this);
       _localTimer?.cancel();
       _localTimer = null;
-      if (_listenerRegistered) {
+      if (_listenerRegistered && (Platform.isAndroid || Platform.isIOS)) {
         FlutterForegroundTask.removeTaskDataCallback(_onReceiveTaskData);
         _listenerRegistered = false;
       }
@@ -200,6 +200,7 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
   }
 
   void _ensureListener() {
+    if (!Platform.isAndroid && !Platform.isIOS) return;
     if (!_listenerRegistered) {
       FlutterForegroundTask.addTaskDataCallback(_onReceiveTaskData);
       _listenerRegistered = true;
@@ -227,10 +228,12 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
           notifText = _formatTime(state.remainingSeconds);
         }
 
-        FlutterForegroundTask.updateService(
-          notificationTitle: notifTitle,
-          notificationText: notifText,
-        );
+        if (Platform.isAndroid || Platform.isIOS) {
+          FlutterForegroundTask.updateService(
+            notificationTitle: notifTitle,
+            notificationText: notifText,
+          );
+        }
       }
     });
   }
@@ -262,6 +265,7 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
   }
 
   Future<void> _startForegroundService() async {
+    if (!Platform.isAndroid && !Platform.isIOS) return;
     // Check if service is already running effectively
     if (await FlutterForegroundTask.isRunningService) {
       return;
@@ -367,7 +371,7 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
           sourceId: Value(config.sourceId),
         ),
       );
-      ref.read(syncEngineProvider.notifier).debouncedSync();
+      ref.read(syncEngineProvider.notifier).syncNow();
     } catch (e) {
       AppLogger.e('PomodoroNotifier', 'Error inserting session', e);
       return;
@@ -548,13 +552,15 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
   }
 
   void _syncForegroundTaskData() {
-    FlutterForegroundTask.sendDataToTask({
-      'startTimestamp': state.startTimestamp?.millisecondsSinceEpoch,
-      'pausedDurationSeconds': state.pausedDurationSeconds,
-      'totalSeconds': state.totalSeconds,
-      'isRunning': state.isRunning,
-      'isOvertime': state.isOvertime,
-    });
+    if (Platform.isAndroid || Platform.isIOS) {
+      FlutterForegroundTask.sendDataToTask({
+        'startTimestamp': state.startTimestamp?.millisecondsSinceEpoch,
+        'pausedDurationSeconds': state.pausedDurationSeconds,
+        'totalSeconds': state.totalSeconds,
+        'isRunning': state.isRunning,
+        'isOvertime': state.isOvertime,
+      });
+    }
     _persistState();
   }
 
@@ -566,7 +572,7 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
     );
     _stopLocalTimer();
     _syncForegroundTaskData();
-    ref.read(syncEngineProvider.notifier).debouncedSync();
+    ref.read(syncEngineProvider.notifier).syncNow();
   }
 
   void resume() {
@@ -586,7 +592,7 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
     _startLocalTimer();
     _syncForegroundTaskData();
     _persistState();
-    ref.read(syncEngineProvider.notifier).debouncedSync();
+    ref.read(syncEngineProvider.notifier).syncNow();
   }
 
   Future<void> stop() async {
@@ -635,12 +641,14 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
       AppLogger.e('PomodoroNotifier', 'Error checking daily goal XP', e);
     }
 
-    try {
-      await FlutterForegroundTask.stopService();
-    } on TimeoutException {
-      AppLogger.w('PomodoroNotifier', 'stopService timed out');
-    } catch (e) {
-      AppLogger.e('PomodoroNotifier', 'Error stopping foreground task service', e);
+    if (Platform.isAndroid || Platform.isIOS) {
+      try {
+        await FlutterForegroundTask.stopService();
+      } on TimeoutException {
+        AppLogger.w('PomodoroNotifier', 'stopService timed out');
+      } catch (e) {
+        AppLogger.e('PomodoroNotifier', 'Error stopping foreground task service', e);
+      }
     }
 
     // Cancel any pending reminder
@@ -679,7 +687,7 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
       }
 
       _syncForegroundTaskData();
-      ref.read(syncEngineProvider.notifier).debouncedSync();
+      ref.read(syncEngineProvider.notifier).syncNow();
     }
   }
 
@@ -795,7 +803,11 @@ class PomodoroNotifier extends _$PomodoroNotifier with WidgetsBindingObserver {
         endPage: Value(endPage ?? sessionRow.endPage),
       ),
     );
-    ref.read(syncEngineProvider.notifier).debouncedSync();
+    if (endedAt != null) {
+      ref.read(syncEngineProvider.notifier).syncNow();
+    } else {
+      ref.read(syncEngineProvider.notifier).debouncedSync();
+    }
   }
 
   Future<void> updateSessionPageRange({

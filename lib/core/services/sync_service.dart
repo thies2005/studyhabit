@@ -84,6 +84,11 @@ class SyncEngine extends _$SyncEngine {
     });
   }
 
+  Future<void> syncNow() async {
+    _syncTimer?.cancel();
+    await fullSync();
+  }
+
   Future<void> fullSync() async {
     // 1. Pre-flight checks
     final authState = ref.read(authProvider);
