@@ -3,6 +3,21 @@ import { z, ZodError } from 'zod';
 import { SyncService } from '../services/syncService.js';
 import { prisma } from '../db.js';
 
+// S3 fix: Per-user mutex to prevent concurrent sync operations
+const userSyncLocks = new Map<string, Promise<void>>();
+
+function withUserLock<T>(userId: string, fn: () => Promise<T>): Promise<T> {
+  const existing = userSyncLocks.get(userId) ?? Promise.resolve();
+  const newLock = existing.then(() => fn()).finally(() => {
+    // Clean up only if we're still the latest lock
+    if (userSyncLocks.get(userId) === newLock) {
+      userSyncLocks.delete(userId);
+    }
+  });
+  userSyncLocks.set(userId, newLock.then(() => {}));
+  return newLock;
+}
+
 const router = Router();
 
 const pushSchema = z.object({
@@ -62,6 +77,11 @@ router.get('/pull', async (req, res, next) => {
 
 router.post('/full', async (req, res, next) => {
   try {
+    const since = req.query.since ? String(req.query.since) : undefined;
+    if (!since) {
+      return res.status(400).json({ error: 'Missing "since" query parameter for sync pull' });
+    }
+
     const payload = pushSchema.parse(req.body) as unknown as {
       projects?: unknown[];
       subjects?: unknown[];
@@ -76,20 +96,14 @@ router.post('/full', async (req, res, next) => {
       userSettings?: { settings: unknown; updatedAt: string | Date };
     };
 
-    const pushResult = await SyncService.pushChanges(req.user.userId, payload as any);
-
-    const since = req.query.since ? String(req.query.since) : undefined;
-    if (!since) {
-      return res.status(400).json({ error: 'Missing "since" query parameter for sync pull' });
-    }
-    const pullData = await SyncService.fullPull(req.user.userId, since);
-
-    res.json({
-      data: {
-        push: pushResult,
-        pull: pullData,
-      },
+    // S3 fix: Serialize concurrent syncs for the same user
+    const result = await withUserLock(req.user.userId, async () => {
+      const pushResult = await SyncService.pushChanges(req.user.userId, payload as any);
+      const pullData = await SyncService.fullPull(req.user.userId, since);
+      return { push: pushResult, pull: pullData };
     });
+
+    res.json({ data: result });
   } catch (error: unknown) {
     if (error instanceof ZodError) {
       return res.status(400).json({ error: 'Validation error', details: error.errors });

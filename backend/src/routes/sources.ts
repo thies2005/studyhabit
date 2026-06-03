@@ -85,7 +85,7 @@ router.post('/', async (req, res, next) => {
       return res.status(404).json({ error: 'Subject not found' });
     }
 
-    const source = await prisma.source.create({ data });
+    const source = await prisma.source.create({ data: { ...data, updatedAt: new Date() } });
 
     await XpService.addXpAndMinutes(req.user.userId, 5, 0);
 
@@ -110,7 +110,7 @@ router.patch('/:id', async (req, res, next) => {
 
     const source = await prisma.source.update({
       where: { id },
-      data,
+      data: { ...data, updatedAt: new Date() },
     });
 
     res.json({ data: source });

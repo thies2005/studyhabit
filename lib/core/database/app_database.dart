@@ -153,6 +153,8 @@ class Topics extends Table {
 
   IntColumn get order => integer()();
 
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
 
   BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
@@ -170,6 +172,8 @@ class Chapters extends Table {
   TextColumn get name => text()();
 
   IntColumn get order => integer()();
+
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
 
@@ -363,7 +367,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration {
@@ -418,6 +422,11 @@ class AppDatabase extends _$AppDatabase {
           await m.addColumn(skillLabels, skillLabels.isDeleted);
           await m.addColumn(sources, sources.isDeleted);
           await m.addColumn(subjectMilestones, subjectMilestones.isDeleted);
+        }
+        if (from < 10) {
+          // S2 fix: Add createdAt to Topics and Chapters for sync
+          await m.addColumn(topics, topics.createdAt);
+          await m.addColumn(chapters, chapters.createdAt);
         }
       },
     );

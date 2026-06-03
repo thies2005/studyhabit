@@ -244,7 +244,7 @@ export class SyncService {
       prisma.achievement.findMany({
         where: { userId, ...whereClause },
       }),
-      prisma.userStats.findUnique({ where: { userId } }),
+      prisma.userStats.findFirst({ where: { userId, ...whereClause } }),
       allSubjectIds.length
         ? prisma.subjectMilestone.findMany({
             where: { subjectId: { in: allSubjectIds }, ...whereClause },
@@ -336,7 +336,7 @@ export class SyncService {
             continue;
           }
 
-          const { updatedAt, ...dataToSave } = validated;
+          const dataToSave = { ...validated, updatedAt: new Date(validated.updatedAt) };
           await tx.project.upsert({
             where: { id: validated.id },
             create: { ...dataToSave, userId },
@@ -375,7 +375,7 @@ export class SyncService {
             continue;
           }
 
-          const { updatedAt, ...dataToSave } = validated;
+          const dataToSave = { ...validated, updatedAt: new Date(validated.updatedAt) };
           await tx.subject.upsert({
             where: { id: validated.id },
             create: dataToSave,
@@ -415,7 +415,7 @@ export class SyncService {
             continue;
           }
 
-          const { updatedAt, ...dataToSave } = validated;
+          const dataToSave = { ...validated, updatedAt: new Date(validated.updatedAt) };
           await tx.topic.upsert({
             where: { id: validated.id },
             create: dataToSave,
@@ -455,7 +455,7 @@ export class SyncService {
             continue;
           }
 
-          const { updatedAt, ...dataToSave } = validated;
+          const dataToSave = { ...validated, updatedAt: new Date(validated.updatedAt) };
           await tx.chapter.upsert({
             where: { id: validated.id },
             create: dataToSave,
@@ -494,7 +494,7 @@ export class SyncService {
             continue;
           }
 
-          const { updatedAt, ...dataToSave } = validated;
+          const dataToSave = { ...validated, updatedAt: new Date(validated.updatedAt) };
           await tx.studySession.upsert({
             where: { id: validated.id },
             create: dataToSave,
@@ -533,7 +533,7 @@ export class SyncService {
             continue;
           }
 
-          const { updatedAt, ...dataToSave } = validated;
+          const dataToSave = { ...validated, updatedAt: new Date(validated.updatedAt) };
           await tx.source.upsert({
             where: { id: validated.id },
             create: dataToSave,
@@ -572,7 +572,7 @@ export class SyncService {
             continue;
           }
 
-          const { updatedAt, ...dataToSave } = validated;
+          const dataToSave = { ...validated, updatedAt: new Date(validated.updatedAt) };
           await tx.skillLabel.upsert({
             where: { id: validated.id },
             create: dataToSave,
@@ -595,23 +595,42 @@ export class SyncService {
           // Validate and strip unknown fields
           const validated = achievementSchema.parse(item);
 
-          if (validated.unlockedAt) {
-            errors.push({ entity: 'achievement', id: validated.key, error: 'unlock_not_allowed_via_sync' });
-            continue;
-          }
-
           const existing = await tx.achievement.findUnique({
             where: { userId_key: { userId, key: validated.key } },
           });
-          if (existing && validated.progress <= existing.progress) continue;
+
+          // S6 fix: Allow unlock sync — keep earliest unlockedAt
+          const incomingUnlock = validated.unlockedAt ? new Date(validated.unlockedAt) : null;
+          let finalUnlockedAt: Date | null = null;
+          if (existing?.unlockedAt && incomingUnlock) {
+            // Both unlocked — keep earliest
+            finalUnlockedAt = existing.unlockedAt < incomingUnlock ? existing.unlockedAt : incomingUnlock;
+          } else {
+            finalUnlockedAt = existing?.unlockedAt ?? incomingUnlock;
+          }
+
+          const newProgress = Math.max(validated.progress, existing?.progress ?? 0);
+
+          // Skip if no meaningful change
+          if (existing && newProgress === existing.progress && 
+              ((finalUnlockedAt === null && existing.unlockedAt === null) ||
+               (finalUnlockedAt?.getTime() === existing.unlockedAt?.getTime()))) {
+            continue;
+          }
 
           await tx.achievement.upsert({
             where: { userId_key: { userId, key: validated.key } },
-            create: { ...validated, userId, unlockedAt: null },
+            create: {
+              key: validated.key,
+              userId,
+              progress: newProgress,
+              unlockedAt: finalUnlockedAt,
+              updatedAt: new Date(validated.updatedAt),
+            },
             update: {
-              ...(validated.progress > (existing?.progress ?? 0)
-                ? { progress: validated.progress }
-                : {}),
+              progress: newProgress,
+              unlockedAt: finalUnlockedAt,
+              updatedAt: new Date(validated.updatedAt),
             },
           });
           a++;
@@ -635,39 +654,22 @@ export class SyncService {
             where: { userId },
           });
           if (existing) {
-            const updates: {
-              totalXp?: number;
-              currentLevel?: number;
-              currentStreak?: number;
-              longestStreak?: number;
-              lastStudyDate?: Date;
-              totalStudyMinutes?: number;
-              freezeTokens?: number;
-            } = {};
-            if (validated.totalXp > existing.totalXp) {
-              updates.totalXp = validated.totalXp;
-            }
-            if (validated.currentLevel > existing.currentLevel) {
-              updates.currentLevel = validated.currentLevel;
-            }
-            if (validated.currentStreak > existing.currentStreak) {
-              updates.currentStreak = validated.currentStreak;
-              updates.longestStreak = Math.max(
-                existing.longestStreak,
-                validated.currentStreak
-              );
-            }
-            if (validated.lastStudyDate && (!existing.lastStudyDate || new Date(validated.lastStudyDate) > existing.lastStudyDate)) {
-              updates.lastStudyDate = new Date(validated.lastStudyDate);
-            }
-            if (validated.totalStudyMinutes > existing.totalStudyMinutes) {
-              updates.totalStudyMinutes = validated.totalStudyMinutes;
-            }
-            if (validated.freezeTokens > existing.freezeTokens) {
-              updates.freezeTokens = validated.freezeTokens;
-            }
-            if (Object.keys(updates).length > 0) {
-              await tx.userStats.update({ where: { userId }, data: updates });
+            // Use last-write-wins: accept all stats if client is newer
+            const result = lastWriteWins(validated, existing);
+            if (result.accepted) {
+              await tx.userStats.update({
+                where: { userId },
+                data: {
+                  totalXp: validated.totalXp,
+                  currentLevel: validated.currentLevel,
+                  currentStreak: validated.currentStreak,
+                  longestStreak: validated.longestStreak,
+                  lastStudyDate: validated.lastStudyDate ? new Date(validated.lastStudyDate) : null,
+                  totalStudyMinutes: validated.totalStudyMinutes,
+                  freezeTokens: validated.freezeTokens,
+                  updatedAt: new Date(validated.updatedAt),
+                },
+              });
               applied.userStats = 1;
             } else {
               conflicts.userStats = 1;
@@ -684,6 +686,7 @@ export class SyncService {
                 lastStudyDate: validated.lastStudyDate ? new Date(validated.lastStudyDate) : null,
                 totalStudyMinutes: validated.totalStudyMinutes,
                 freezeTokens: validated.freezeTokens,
+                updatedAt: new Date(validated.updatedAt),
               }
             });
             applied.userStats = 1;
@@ -711,9 +714,11 @@ export class SyncService {
             create: {
               userId,
               settings: validated.settings as any,
+              updatedAt: new Date(validated.updatedAt),
             },
             update: {
               settings: validated.settings as any,
+              updatedAt: new Date(validated.updatedAt),
             },
           });
           applied.userSettings = 1;
@@ -747,7 +752,7 @@ export class SyncService {
             continue;
           }
 
-          const { updatedAt, ...dataToSave } = validated;
+          const dataToSave = { ...validated, updatedAt: new Date(validated.updatedAt) };
           await tx.subjectMilestone.upsert({
             where: { id: validated.id },
             create: dataToSave,

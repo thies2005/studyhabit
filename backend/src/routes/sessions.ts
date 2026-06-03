@@ -126,6 +126,7 @@ router.post('/', async (req, res, next) => {
         confidenceRating: data.confidenceRating,
         notes: data.notes,
         xpEarned,
+        updatedAt: new Date(),
       },
     });
 
@@ -214,6 +215,7 @@ router.patch('/:id', async (req, res, next) => {
       confidenceRating?: number | null;
       notes?: string | null;
       xpEarned?: number;
+      updatedAt?: Date;
     } = {};
 
     if (data.startedAt) updateData.startedAt = new Date(data.startedAt);
@@ -241,6 +243,9 @@ router.patch('/:id', async (req, res, next) => {
       );
       updateData.xpEarned = newXpEarned;
     }
+
+    // Ensure updatedAt is updated on every modification
+    updateData.updatedAt = new Date();
 
     const session = await prisma.studySession.update({
       where: { id },

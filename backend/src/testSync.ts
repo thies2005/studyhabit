@@ -53,7 +53,7 @@ async function main() {
     ]
   };
 
-  const pushResult = await SyncService.fullPush(userId, pushPayload);
+  const pushResult = await SyncService.pushChanges(userId, pushPayload as any);
   console.log('Push Result:', pushResult);
 
   console.log('Pulling with since = 2 hours ago...');

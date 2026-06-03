@@ -52,7 +52,7 @@ model Project {
   defaultLongBreakEvery    Int       @default(4)
   studyReminderMinutes     Int       @default(30)
   isDeleted                Boolean   @default(false)
-  updatedAt                DateTime  @updatedAt
+  updatedAt                DateTime  @default(now())
   subjects                 Subject[]
 
   @@index([userId])
@@ -71,7 +71,7 @@ model Subject {
   xpTotal                Int                @default(0)
   createdAt              DateTime           @default(now())
   isDeleted              Boolean            @default(false)
-  updatedAt              DateTime           @updatedAt
+  updatedAt              DateTime           @default(now())
   completenessMode       String             @default("none")
   targetHours            Float?
   targetWeeklyHours      Float?
@@ -96,7 +96,7 @@ model Topic {
   skillLabels SkillLabel[]
   createdAt   DateTime       @default(now())
   isDeleted   Boolean        @default(false)
-  updatedAt   DateTime       @updatedAt
+  updatedAt   DateTime       @default(now())
 
   @@index([subjectId])
 }
@@ -112,7 +112,7 @@ model Chapter {
   skillLabels SkillLabel[]
   createdAt   DateTime       @default(now())
   isDeleted   Boolean        @default(false)
-  updatedAt   DateTime       @updatedAt
+  updatedAt   DateTime       @default(now())
 
   @@index([topicId])
 }
@@ -139,7 +139,7 @@ model StudySession {
   isFreeTimer            Boolean   @default(false)
   createdAt              DateTime  @default(now())
   isDeleted              Boolean   @default(false)
-  updatedAt              DateTime  @updatedAt
+  updatedAt              DateTime  @default(now())
 
   @@index([subjectId])
   @@index([startedAt])
@@ -163,7 +163,7 @@ model Source {
   notes           String?
   addedAt         DateTime @default(now())
   isDeleted       Boolean  @default(false)
-  updatedAt       DateTime @updatedAt
+  updatedAt       DateTime @default(now())
 
   @@index([subjectId])
   @@index([subjectId, addedAt])
@@ -179,7 +179,7 @@ model SkillLabel {
   chapter   Chapter? @relation(fields: [chapterId], references: [id], onDelete: SetNull)
   label     String   @default("beginner")
   isDeleted Boolean  @default(false)
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @default(now())
 
   @@index([subjectId])
   @@index([subjectId, topicId])
@@ -195,7 +195,7 @@ model Achievement {
   unlockedAt DateTime?
   progress   Float     @default(0)
   createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  updatedAt  DateTime  @default(now())
 
   @@unique([userId, key])
   @@index([userId])
@@ -213,7 +213,7 @@ model UserStats {
   totalStudyMinutes Int       @default(0)
   freezeTokens      Int       @default(0)
   createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  updatedAt         DateTime  @default(now())
 }
 
 model SubjectMilestone {
@@ -226,7 +226,7 @@ model SubjectMilestone {
   completedAt DateTime?
   createdAt   DateTime  @default(now())
   isDeleted   Boolean   @default(false)
-  updatedAt   DateTime  @updatedAt
+  updatedAt   DateTime  @default(now())
 
   @@index([subjectId])
 }
@@ -237,5 +237,5 @@ model UserSettings {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   settings  Json
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @default(now())
 }

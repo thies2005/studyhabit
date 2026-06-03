@@ -54,6 +54,11 @@ class SyncEngine extends _$SyncEngine {
           }
         }();
       }
+      // S7 fix: Cancel debounce timer on logout
+      if (wasAuthed && !isAuthed) {
+        _syncTimer?.cancel();
+        _syncTimer = null;
+      }
     });
 
     return SyncStatus.idle;
@@ -126,9 +131,21 @@ class SyncEngine extends _$SyncEngine {
     if (userId.isNotEmpty) {
       final lastSyncedUserId = _prefs.getString(_lastSyncedUserKey);
       if (lastSyncedUserId != userId) {
+        // P3 fix: Clear local DB when switching users to prevent data pollution
+        AppLogger.i('SyncEngine', 'Detected user switch (from $lastSyncedUserId to $userId). Clearing local database...');
+        await _db.delete(_db.studySessions).go();
+        await _db.delete(_db.skillLabels).go();
+        await _db.delete(_db.sources).go();
+        await _db.delete(_db.chapters).go();
+        await _db.delete(_db.topics).go();
+        await _db.delete(_db.subjectMilestones).go();
+        await _db.delete(_db.subjects).go();
+        await _db.delete(_db.projects).go();
+        await _db.delete(_db.achievements).go();
+        await _db.delete(_db.userStatsTable).go();
         await _prefs.setString(_lastSyncedUserKey, userId);
         await _prefs.setInt(_lastSyncedKey, 0);
-        AppLogger.i('SyncEngine', 'Detected new user. Reset lastSyncedAt to epoch.');
+        AppLogger.i('SyncEngine', 'Local DB cleared. Reset lastSyncedAt to epoch.');
       } else {
         final ms = _prefs.getInt(_lastSyncedKey) ?? 0;
         if (ms > 0) {
@@ -586,6 +603,7 @@ class SyncEngine extends _$SyncEngine {
         'subjectId': r.subjectId,
         'name': r.name,
         'order': r.order,
+        'createdAt': r.createdAt.toUtc().toIso8601String(),
         'isDeleted': r.isDeleted,
         'updatedAt': r.updatedAt.toUtc().toIso8601String(),
       };
@@ -595,6 +613,7 @@ class SyncEngine extends _$SyncEngine {
         subjectId: j['subjectId'],
         name: j['name'],
         order: j['order'] ?? 0,
+        createdAt: j['createdAt'] != null ? DateTime.parse(j['createdAt']) : DateTime.now(),
         isDeleted: j['isDeleted'] as bool? ?? false,
         updatedAt: DateTime.parse(j['updatedAt']),
       );
@@ -604,6 +623,7 @@ class SyncEngine extends _$SyncEngine {
         'topicId': r.topicId,
         'name': r.name,
         'order': r.order,
+        'createdAt': r.createdAt.toUtc().toIso8601String(),
         'isDeleted': r.isDeleted,
         'updatedAt': r.updatedAt.toUtc().toIso8601String(),
       };
@@ -613,6 +633,7 @@ class SyncEngine extends _$SyncEngine {
         topicId: j['topicId'],
         name: j['name'],
         order: j['order'] ?? 0,
+        createdAt: j['createdAt'] != null ? DateTime.parse(j['createdAt']) : DateTime.now(),
         isDeleted: j['isDeleted'] as bool? ?? false,
         updatedAt: DateTime.parse(j['updatedAt']),
       );
@@ -739,7 +760,7 @@ class SyncEngine extends _$SyncEngine {
 
   Map<String, dynamic> _achievementToJson(AchievementRow r) => {
         'key': r.key,
-        'unlockedAt': null,
+        'unlockedAt': r.unlockedAt?.toUtc().toIso8601String(),
         'progress': r.progress,
         'updatedAt': r.updatedAt.toUtc().toIso8601String(),
       };
