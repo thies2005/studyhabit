@@ -2,11 +2,11 @@ import 'package:drift/drift.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:uuid/uuid.dart';
 
-import 'package:studytracker/core/database/app_database.dart';
-import 'package:studytracker/core/models/topic.dart';
-import 'package:studytracker/core/models/model_mapper.dart';
-import 'package:studytracker/core/providers/database_provider.dart';
-import 'package:studytracker/core/services/app_logger.dart';
+import 'package:studyhabit/core/database/app_database.dart';
+import 'package:studyhabit/core/models/topic.dart';
+import 'package:studyhabit/core/models/model_mapper.dart';
+import 'package:studyhabit/core/providers/database_provider.dart';
+import 'package:studyhabit/core/services/app_logger.dart';
 
 part 'topic_providers.g.dart';
 

@@ -1,4 +1,4 @@
-name: studytracker
+name: studyhabit
 description: A Flutter study tracking app with gamification.
 publish_to: 'none'
 version: 1.0.60+66
@@ -64,9 +64,17 @@ dev_dependencies:
   riverpod_lint: ^3.0.3
   custom_lint: ^0.8.1
   flutter_lints: ^4.0.0
+  msix: ^3.16.1
 
 flutter:
   uses-material-design: true
 
 dependency_overrides:
   path_provider_android: ^2.3.1
+
+msix_config:
+  display_name: Study Habit
+  publisher_display_name: Study Habit Team
+  identity_name: com.studyhabit.app
+  # logo_path: windows/runner/resources/app_icon.ico
+  msix_version: 1.0.0.0 # Will be updated dynamically by CI

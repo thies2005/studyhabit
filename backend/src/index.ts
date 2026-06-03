@@ -103,7 +103,7 @@ process.on('unhandledRejection', async (reason) => {
 });
 
 const server = app.listen(config.PORT, () => {
-  console.log(`StudyTracker API v1.0 running on port ${config.PORT}`);
+  console.log(`StudyHabit API v1.0 running on port ${config.PORT}`);
   console.log(`Environment: ${config.NODE_ENV}`);
 });
 

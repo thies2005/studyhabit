@@ -6,7 +6,7 @@ const options: swaggerJsdoc.Options = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'StudyTracker API',
+      title: 'StudyHabit API',
       version: '1.0.0',
       description: 'Multi-user study tracking backend with Pomodoro timer, XP/gamification, sync, and device management',
     },

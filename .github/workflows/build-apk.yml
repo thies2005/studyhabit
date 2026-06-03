@@ -119,7 +119,7 @@ jobs:
           BUILD_NUMBER=$GITHUB_RUN_NUMBER
           BUILD_DATE=$(date +%Y%m%d)
           APK_DIR="build/app/outputs/flutter-apk"
-          RELEASE_NAME="StudyTracker-v${VERSION_NAME}-b${BUILD_NUMBER}-${BUILD_DATE}-release.apk"
+          RELEASE_NAME="StudyHabit-v${VERSION_NAME}-b${BUILD_NUMBER}-${BUILD_DATE}-release.apk"
           mv "${APK_DIR}/app-release.apk" "${APK_DIR}/${RELEASE_NAME}"
           echo "release_apk=${APK_DIR}/${RELEASE_NAME}" >> "$GITHUB_OUTPUT"
           echo "Renamed APK: ${RELEASE_NAME}"
@@ -148,7 +148,7 @@ jobs:
       - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
-          name: studytracker-release
+          name: studyhabit-release
           path: ${{ steps.rename.outputs.release_apk }}
           retention-days: 14
 
@@ -211,22 +211,24 @@ jobs:
       - name: Build Windows (release)
         run: flutter build windows --release
 
-      # Compress Windows build output to a ZIP file
+      # Package Windows build to MSIX
       - name: Package Windows Build
         shell: pwsh
         run: |
-          $version = (Select-String -Path pubspec.yaml -Pattern "^version:").Line.Split(" ")[1].Split("+")[0]
-          $zipName = "StudyTracker-v${version}-b${env:GITHUB_RUN_NUMBER}-windows.zip"
-          Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath build/$zipName
-          echo "zip_path=build/$zipName" >> $env:GITHUB_ENV
-          echo "zip_name=$zipName" >> $env:GITHUB_ENV
+          $versionStr = (Select-String -Path pubspec.yaml -Pattern "^version:").Line.Split(" ")[1]
+          $verName = $versionStr.Split("+")[0]
+          $msixVersion = "$verName.0"
+          $msixName = "StudyHabit-v${verName}-b${env:GITHUB_RUN_NUMBER}-windows.msix"
+          dart run msix:create --version $msixVersion --output-path "build/$msixName"
+          echo "msix_path=build/$msixName" >> $env:GITHUB_ENV
+          echo "msix_name=$msixName" >> $env:GITHUB_ENV
 
       # Upload artifacts
-      - name: Upload Windows ZIP
+      - name: Upload Windows MSIX
         uses: actions/upload-artifact@v4
         with:
-          name: studytracker-windows
-          path: build/*.zip
+          name: studyhabit-windows
+          path: build/*.msix
           retention-days: 14
 
   release:
@@ -238,13 +240,13 @@ jobs:
       - name: Download Android Artifact
         uses: actions/download-artifact@v4
         with:
-          name: studytracker-release
+          name: studyhabit-release
           path: build-artifacts
 
       - name: Download Windows Artifact
         uses: actions/download-artifact@v4
         with:
-          name: studytracker-windows
+          name: studyhabit-windows
           path: build-artifacts
 
       - name: Create Beta Release
@@ -265,8 +267,8 @@ jobs:
             | **Date** | $(date +%Y-%m-%d) |
 
             ### Downloads
-            - `StudyTracker-v…-release.apk` — signed release build (Android)
-            - `StudyTracker-v…-windows.zip` — packaged release build (Windows)
+            - `StudyHabit-v…-release.apk` — signed release build (Android)
+            - `StudyHabit-v…-windows.msix` — installer package (Windows)
 
             > This is an automated **beta** build. Not intended for production use.
           files: |

@@ -136,7 +136,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          'StudyTracker Sync',
+                          'StudyHabit Sync',
                           style: theme.textTheme.headlineMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                             letterSpacing: -0.5,

@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "de.schuelken" "\0"
-            VALUE "FileDescription", "studytracker" "\0"
+            VALUE "FileDescription", "studyhabit" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "studytracker" "\0"
+            VALUE "InternalName", "studyhabit" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 de.schuelken. All rights reserved." "\0"
-            VALUE "OriginalFilename", "studytracker.exe" "\0"
-            VALUE "ProductName", "studytracker" "\0"
+            VALUE "OriginalFilename", "studyhabit.exe" "\0"
+            VALUE "ProductName", "studyhabit" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

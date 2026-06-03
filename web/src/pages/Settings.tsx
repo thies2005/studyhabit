@@ -145,7 +145,7 @@ export default function Settings() {
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-onSurface font-heading">Settings</h1>
             <p className="mt-1 text-sm text-gray-400 font-body">
-              Customize your StudyTracker experience
+              Customize your StudyHabit experience
             </p>
           </div>
 
@@ -417,7 +417,7 @@ export default function Settings() {
               <div>
                 <h4 className="text-sm font-bold text-primary font-heading mb-1">Mobile App Required</h4>
                 <p className="text-sm text-primary/80 font-body">
-                  Features like data export, backup import, and local database management are exclusively available in the StudyTracker mobile application.
+                  Features like data export, backup import, and local database management are exclusively available in the StudyHabit mobile application.
                 </p>
               </div>
             </div>

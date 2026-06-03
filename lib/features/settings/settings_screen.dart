@@ -798,7 +798,7 @@ class _SettingsContent extends ConsumerWidget {
 
       final result = await Share.shareXFiles([
         XFile(file.path),
-      ], text: 'StudyTracker Export');
+      ], text: 'StudyHabit Export');
 
       if (!context.mounted) return;
 

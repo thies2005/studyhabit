@@ -1,4 +1,4 @@
-# StudyTracker
+# StudyHabit
 
 A full-featured study tracking application with gamification, Pomodoro timer, and cross-platform support. Track your study sessions, manage subjects and topics, earn XP, and visualize your progress with charts and achievements.
 
@@ -21,7 +21,7 @@ A full-featured study tracking application with gamification, Pomodoro timer, an
 ## Architecture
 
 ```
-studytracker/
+studyhabit/
 ├── lib/                    # Flutter mobile app (Dart)
 │   ├── core/
 │   │   ├── database/       # Drift SQLite (10 tables)

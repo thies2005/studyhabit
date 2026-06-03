@@ -182,25 +182,25 @@ class _BrandSection extends StatelessWidget {
     switch (brand.toLowerCase()) {
       case 'samsung':
         return [
-          'Settings > Apps > StudyTracker > Battery > Unrestricted',
-          'Settings > Device Care > Battery > Background usage limits > Never sleeping apps > Add StudyTracker',
+          'Settings > Apps > StudyHabit > Battery > Unrestricted',
+          'Settings > Device Care > Battery > Background usage limits > Never sleeping apps > Add StudyHabit',
         ];
       case 'xiaomi':
         return [
-          'Settings > Apps > Manage apps > StudyTracker > Battery saver > No restrictions',
+          'Settings > Apps > Manage apps > StudyHabit > Battery saver > No restrictions',
           'Enable "Autostart" in app settings',
         ];
       case 'huawei':
         return [
-          'Settings > Battery > App launch > StudyTracker > Disable "Manage automatically" > Enable "Manual management" (all 3 toggles)',
+          'Settings > Battery > App launch > StudyHabit > Disable "Manage automatically" > Enable "Manual management" (all 3 toggles)',
         ];
       case 'oneplus':
         return [
-          'Settings > Battery > Battery optimization > StudyTracker > Don\'t optimize',
+          'Settings > Battery > Battery optimization > StudyHabit > Don\'t optimize',
         ];
       default:
         return [
-          'Settings > Apps > StudyTracker > Battery > Unrestricted or "Don\'t optimize"',
+          'Settings > Apps > StudyHabit > Battery > Unrestricted or "Don\'t optimize"',
           'Ensure background data is enabled.',
         ];
     }

@@ -97,7 +97,7 @@ const achievementDescriptions: Record<string, { title: string; description: stri
   },
   all_badges: {
     title: 'Badge Collector',
-    description: 'Unlock all achievement badges. You are a true StudyTracker master!',
+    description: 'Unlock all achievement badges. You are a true StudyHabit master!',
   },
 };
 

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:studytracker/shared/widgets/animated_counter.dart';
+import 'package:studyhabit/shared/widgets/animated_counter.dart';
 
 class SessionReviewSheet extends StatefulWidget {
   const SessionReviewSheet({

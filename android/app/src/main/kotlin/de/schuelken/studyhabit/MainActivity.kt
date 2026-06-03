@@ -1,4 +1,4 @@
-package de.schuelken.studytracker
+package de.schuelken.studyhabit
 
 import io.flutter.embedding.android.FlutterActivity
 

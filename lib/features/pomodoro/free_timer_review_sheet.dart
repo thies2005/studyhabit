@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:studytracker/shared/widgets/animated_counter.dart';
+import 'package:studyhabit/shared/widgets/animated_counter.dart';
 
 class FreeTimerReviewSheet extends StatefulWidget {
   const FreeTimerReviewSheet({

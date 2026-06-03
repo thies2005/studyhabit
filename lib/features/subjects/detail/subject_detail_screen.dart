@@ -73,7 +73,7 @@ class _SubjectDetailContent extends ConsumerWidget {
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        title: const Text('StudyTracker', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('StudyHabit', style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: false,
         backgroundColor: Colors.transparent,
         elevation: 0,

@@ -8,14 +8,14 @@ import 'core/theme/app_theme.dart';
 import 'core/services/sync_service.dart';
 import 'core/network/connectivity_provider.dart';
 
-class StudyTrackerApp extends ConsumerStatefulWidget {
-  const StudyTrackerApp({super.key});
+class StudyHabitApp extends ConsumerStatefulWidget {
+  const StudyHabitApp({super.key});
 
   @override
-  ConsumerState<StudyTrackerApp> createState() => _StudyTrackerAppState();
+  ConsumerState<StudyHabitApp> createState() => _StudyHabitAppState();
 }
 
-class _StudyTrackerAppState extends ConsumerState<StudyTrackerApp> with WidgetsBindingObserver {
+class _StudyHabitAppState extends ConsumerState<StudyHabitApp> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
@@ -84,7 +84,7 @@ class _StudyTrackerAppState extends ConsumerState<StudyTrackerApp> with WidgetsB
                 context,
               ).copyWith(textScaler: TextScaler.linear(settings.fontScale)),
               child: MaterialApp.router(
-                title: 'StudyTracker',
+                title: 'StudyHabit',
                 theme: lightTheme,
                 darkTheme: darkTheme,
                 themeMode: settings.themeMode,

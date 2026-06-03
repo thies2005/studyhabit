@@ -24,7 +24,7 @@ class AppShellScaffold extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('StudyTracker'),
+        title: const Text('StudyHabit'),
         leading: IconButton(
           onPressed: () {
             showModalBottomSheet<void>(

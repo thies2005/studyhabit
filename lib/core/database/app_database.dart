@@ -363,7 +363,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   static QueryExecutor _openConnection() {
-    return driftDatabase(name: 'studytracker.sqlite');
+    return driftDatabase(name: 'studyhabit.sqlite');
   }
 
   @override

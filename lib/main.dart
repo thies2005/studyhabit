@@ -25,7 +25,7 @@ void main() async {
       size: Size(1000, 700),
       minimumSize: Size(450, 600),
       center: true,
-      title: "Study Tracker",
+      title: "Study Habit",
     );
     await windowManager.waitUntilReadyToShow(windowOptions, () async {
       await windowManager.show();
@@ -51,7 +51,7 @@ void main() async {
     return true;
   };
 
-  AppLogger.i('App', 'StudyTracker starting up...');
+  AppLogger.i('App', 'StudyHabit starting up...');
 
   final container = ProviderContainer();
 
@@ -110,7 +110,7 @@ void main() async {
 
   runApp(UncontrolledProviderScope(
     container: container,
-    child: const StudyTrackerApp(),
+    child: const StudyHabitApp(),
   ));
 }
 

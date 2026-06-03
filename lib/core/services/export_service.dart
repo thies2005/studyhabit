@@ -232,7 +232,7 @@ class ExportService {
           .toIso8601String()
           .replaceAll(':', '-')
           .split('.')[0];
-      final filePath = '${tempDir.path}/studytracker_$timestamp.json';
+      final filePath = '${tempDir.path}/studyhabit_$timestamp.json';
 
       // Collect settings from SharedPreferences
       final prefs = await SharedPreferences.getInstance();
