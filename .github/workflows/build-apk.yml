@@ -211,24 +211,30 @@ jobs:
       - name: Build Windows (release)
         run: flutter build windows --release
 
-      # Package Windows build to MSIX
+      # Package Windows build to EXE Installer
       - name: Package Windows Build
         shell: pwsh
         run: |
           $versionStr = (Select-String -Path pubspec.yaml -Pattern "^version:").Line.Split(" ")[1]
           $verName = $versionStr.Split("+")[0]
-          $msixVersion = "$verName.0"
-          $msixName = "StudyHabit-v${verName}-b${env:GITHUB_RUN_NUMBER}-windows.msix"
-          dart run msix:create --version $msixVersion --output-path "build/$msixName"
-          echo "msix_path=build/$msixName" >> $env:GITHUB_ENV
-          echo "msix_name=$msixName" >> $env:GITHUB_ENV
+          $exeName = "StudyHabit-v${verName}-b${env:GITHUB_RUN_NUMBER}-windows-setup"
+          
+          # Replace version in installer.iss
+          $issContent = Get-Content installer.iss -Raw
+          $issContent = $issContent -replace 'AppVersion=.*', "AppVersion=$verName"
+          $issContent = $issContent -replace 'OutputBaseFilename=.*', "OutputBaseFilename=$exeName"
+          Set-Content installer.iss $issContent
+          
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
+          echo "exe_path=build/$exeName.exe" >> $env:GITHUB_ENV
+          echo "exe_name=$exeName.exe" >> $env:GITHUB_ENV
 
       # Upload artifacts
-      - name: Upload Windows MSIX
+      - name: Upload Windows EXE
         uses: actions/upload-artifact@v4
         with:
           name: studyhabit-windows
-          path: build/*.msix
+          path: build/*.exe
           retention-days: 14
 
   release:
@@ -268,7 +274,7 @@ jobs:
 
             ### Downloads
             - `StudyHabit-v…-release.apk` — signed release build (Android)
-            - `StudyHabit-v…-windows.msix` — installer package (Windows)
+            - `StudyHabit-v…-windows-setup.exe` — setup wizard (Windows)
 
             > This is an automated **beta** build. Not intended for production use.
           files: |
