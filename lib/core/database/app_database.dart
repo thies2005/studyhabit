@@ -1,7 +1,12 @@
+import 'dart:io';
+
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 
 import '../models/enums.dart';
+import '../services/app_logger.dart';
 
 part 'app_database.g.dart';
 
@@ -362,8 +367,176 @@ class SubjectMilestones extends Table {
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
+  /// Filename (without directory) used for the SQLite database on disk.
+  /// drift_flutter appends `.sqlite` automatically, so we pass the bare stem
+  /// to `driftDatabase(name: ...)` and reference this constant when checking
+  /// for legacy files.
+  static const String _kDatabaseFileName = 'studyhabit.sqlite';
+
   static QueryExecutor _openConnection() {
-    return driftDatabase(name: 'studyhabit.sqlite');
+    return driftDatabase(
+      name: 'studyhabit',
+      native: const DriftNativeOptions(
+        databaseDirectory: _resolveDatabaseDirectory,
+      ),
+    );
+  }
+
+  /// Resolves the directory used to store the SQLite database file.
+  ///
+  /// On mobile platforms (Android/iOS), [getApplicationDocumentsDirectory]
+  /// works reliably. On desktop platforms (Linux/Windows/macOS), however,
+  /// that directory may not exist, may be read-only (Snap/Flatpak sandboxes),
+  /// or may be reported as `null` by the platform plugin (e.g. when
+  /// `XDG_DOCUMENTS_DIR` is unset on Linux), which causes SQLite to fail with
+  /// `SQLITE_CANTOPEN` (error 14).
+  ///
+  /// To fix that we:
+  ///   1. Prefer [getApplicationSupportDirectory], which is the correct
+  ///      location for app-owned data and is created automatically by the
+  ///      platform plugin when missing.
+  ///   2. Fall back to [getApplicationDocumentsDirectory] for older installs.
+  ///   3. Always make sure the chosen directory exists before returning it.
+  ///   4. Migrate any existing database file left by previous versions
+  ///      (which wrote into the documents directory under a slightly different
+  ///      name) into the resolved directory so existing users keep their data.
+  static Future<Object> _resolveDatabaseDirectory() async {
+    final candidates = <String>[];
+
+    try {
+      final support = await getApplicationSupportDirectory();
+      candidates.add(support.path);
+    } catch (e) {
+      AppLogger.w(
+        'AppDatabase',
+        'getApplicationSupportDirectory unavailable: $e',
+      );
+    }
+
+    try {
+      final docs = await getApplicationDocumentsDirectory();
+      candidates.add(docs.path);
+    } catch (e) {
+      AppLogger.w(
+        'AppDatabase',
+        'getApplicationDocumentsDirectory unavailable: $e',
+      );
+    }
+
+    if (candidates.isEmpty) {
+      // Should be unreachable because path_provider always returns a value
+      // on supported platforms, but bail out early instead of crashing.
+      throw StateError(
+        'No writable database directory could be resolved for this platform. '
+        'Ensure path_provider is configured for the current target.',
+      );
+    }
+
+    for (final candidate in candidates) {
+      if (await _ensureUsableDirectory(candidate)) {
+        await _migrateLegacyDatabase(candidate);
+        return candidate;
+      }
+    }
+
+    // Every candidate was unwritable — surface a clear error rather than
+    // letting drift report a cryptic SQLITE_CANTOPEN further down the line.
+    throw StateError(
+      'No writable database directory could be opened. Tried: ${candidates.join(", ")}',
+    );
+  }
+
+  /// Moves any existing database file from previous install locations into
+  /// [targetDirectory]. All of these legacy layouts are handled:
+  ///
+  ///   - `<documents>/studyhabit.sqlite.sqlite`
+  ///     (caused by the previous `name: 'studyhabit.sqlite'` argument;
+  ///     drift_flutter appends another `.sqlite`)
+  ///   - `<documents>/studyhabit.sqlite`
+  ///     (bare file produced when only the directory was different)
+  ///   - `<documents>/studytracker.sqlite.sqlite` and `studytracker.sqlite`
+  ///     (the original app name before the StudyHabit rename)
+  ///
+  /// If a database already exists at the target location, legacy files are
+  /// left untouched so we never overwrite newer data.
+  ///
+  /// [legacyDirectoryProvider] is exposed for tests so they can inject a fake
+  /// documents directory. In production it defaults to
+  /// [getApplicationDocumentsDirectory].
+  static Future<void> _migrateLegacyDatabase(
+    String targetDirectory, {
+    Future<Directory> Function()? legacyDirectoryProvider,
+  }) async {
+    try {
+      final targetFile = File(p.join(targetDirectory, _kDatabaseFileName));
+      if (targetFile.existsSync()) {
+        return; // Nothing to do; current location already populated.
+      }
+
+      final lookup = legacyDirectoryProvider ?? getApplicationDocumentsDirectory;
+      Directory legacyDir;
+      try {
+        legacyDir = await lookup();
+      } catch (_) {
+        return;
+      }
+
+      // Order matters: prefer the most recent name first so we don't pick up
+      // an abandoned studytracker file from before the rename if a more recent
+      // studyhabit file exists.
+      final legacyCandidates = <File>[
+        File(p.join(legacyDir.path, 'studyhabit.sqlite.sqlite')),
+        File(p.join(legacyDir.path, 'studyhabit.sqlite')),
+        File(p.join(legacyDir.path, 'studytracker.sqlite.sqlite')),
+        File(p.join(legacyDir.path, 'studytracker.sqlite')),
+      ];
+
+      for (final legacy in legacyCandidates) {
+        if (legacy.existsSync()) {
+          AppLogger.i(
+            'AppDatabase',
+            'Migrating legacy database from ${legacy.path} to ${targetFile.path}',
+          );
+          // Try a fast rename first; fall back to copy+delete across volumes.
+          try {
+            await legacy.rename(targetFile.path);
+          } catch (_) {
+            await legacy.copy(targetFile.path);
+            try {
+              await legacy.delete();
+            } catch (_) {
+              // Non-fatal: we've already copied the data.
+            }
+          }
+          return;
+        }
+      }
+    } catch (e) {
+      AppLogger.w('AppDatabase', 'Legacy database migration failed: $e');
+    }
+  }
+
+  /// Verifies that [path] is a directory we can write into, creating it if
+  /// necessary. Returns `false` if the directory cannot be created or written.
+  static Future<bool> _ensureUsableDirectory(String path) async {
+    try {
+      final dir = Directory(path);
+      if (!dir.existsSync()) {
+        await dir.create(recursive: true);
+      }
+      // Probe write permissions with a short-lived temp file.
+      final probe = File(p.join(path, '.drift_probe'));
+      await probe.writeAsString('ok', flush: true);
+      try {
+        await probe.delete();
+      } catch (_) {
+        // Non-fatal: the probe was created, so we have write access.
+      }
+      return true;
+    } catch (e) {
+      AppLogger.w('AppDatabase', 'Directory "$path" is not usable: $e');
+      return false;
+    }
   }
 
   @override
