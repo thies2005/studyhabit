@@ -85,9 +85,13 @@ router.post('/', async (req, res, next) => {
       return res.status(404).json({ error: 'Subject not found' });
     }
 
-    const source = await prisma.source.create({ data: { ...data, updatedAt: new Date() } });
+    const source = await prisma.$transaction(async (tx) => {
+      const source = await tx.source.create({ data: { ...data, updatedAt: new Date() } });
 
-    await XpService.addXpAndMinutes(req.user.userId, 5, 0);
+      await XpService.addXpAndMinutes(req.user.userId, 5, 0, tx);
+
+      return source;
+    });
 
     res.status(201).json({ data: source });
   } catch (error: unknown) {

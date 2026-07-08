@@ -113,76 +113,84 @@ router.post('/', async (req, res, next) => {
       data.confidenceRating
     );
 
-    const session = await prisma.studySession.create({
-      data: {
-        subjectId: data.subjectId,
-        topicId: data.topicId,
-        chapterId: data.chapterId,
-        startedAt: data.startedAt ? new Date(data.startedAt) : new Date(),
-        endedAt: data.endedAt ? new Date(data.endedAt) : null,
-        plannedDurationMinutes: data.plannedDurationMinutes,
-        actualDurationMinutes: data.actualDurationMinutes,
-        pomodorosCompleted: data.pomodorosCompleted,
-        confidenceRating: data.confidenceRating,
-        notes: data.notes,
+    // Create the session plus all derived XP/streak/achievement side effects in
+    // a single transaction, so a failure partway through cannot leave the DB in
+    // an inconsistent state (e.g. session recorded but XP never credited).
+    const { session, newAchievements } = await prisma.$transaction(async (tx) => {
+      const session = await tx.studySession.create({
+        data: {
+          subjectId: data.subjectId,
+          topicId: data.topicId,
+          chapterId: data.chapterId,
+          startedAt: data.startedAt ? new Date(data.startedAt) : new Date(),
+          endedAt: data.endedAt ? new Date(data.endedAt) : null,
+          plannedDurationMinutes: data.plannedDurationMinutes,
+          actualDurationMinutes: data.actualDurationMinutes,
+          pomodorosCompleted: data.pomodorosCompleted,
+          confidenceRating: data.confidenceRating,
+          notes: data.notes,
+          xpEarned,
+          updatedAt: new Date(),
+        },
+      });
+
+      await tx.subject.update({
+        where: { id: data.subjectId },
+        data: { xpTotal: { increment: xpEarned } },
+      });
+
+      await XpService.addXpAndMinutes(
+        req.user.userId,
         xpEarned,
-        updatedAt: new Date(),
-      },
-    });
+        data.actualDurationMinutes,
+        tx
+      );
 
-    await prisma.subject.update({
-      where: { id: data.subjectId },
-      data: { xpTotal: { increment: xpEarned } },
-    });
+      // Update streak if this is a new study day
+      const userStats = await tx.userStats.findUnique({
+        where: { userId: req.user.userId },
+      });
+      if (userStats) {
+        const sessionDate = new Date(session.startedAt);
+        const lastStudyDate = userStats.lastStudyDate ? new Date(userStats.lastStudyDate) : null;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        sessionDate.setHours(0, 0, 0, 0);
+        const isNewStudyDay = !lastStudyDate ||
+          lastStudyDate.getTime() !== sessionDate.getTime();
 
-    await XpService.addXpAndMinutes(
-      req.user.userId,
-      xpEarned,
-      data.actualDurationMinutes
-    );
+        if (isNewStudyDay) {
+          const yesterday = new Date(today);
+          yesterday.setDate(yesterday.getDate() - 1);
+          const isConsecutive = lastStudyDate &&
+            lastStudyDate.getTime() >= yesterday.getTime();
 
-    // Update streak if this is a new study day
-    const userStats = await prisma.userStats.findUnique({
-      where: { userId: req.user.userId },
-    });
-    if (userStats) {
-      const sessionDate = new Date(session.startedAt);
-      const lastStudyDate = userStats.lastStudyDate ? new Date(userStats.lastStudyDate) : null;
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      sessionDate.setHours(0, 0, 0, 0);
-      const isNewStudyDay = !lastStudyDate ||
-        lastStudyDate.getTime() !== sessionDate.getTime();
-      
-      if (isNewStudyDay) {
-        const yesterday = new Date(today);
-        yesterday.setDate(yesterday.getDate() - 1);
-        const isConsecutive = lastStudyDate &&
-          lastStudyDate.getTime() >= yesterday.getTime();
+          const oldStreak = userStats.currentStreak;
+          const newStreak = isConsecutive ? oldStreak + 1 : 1;
+          const longestStreak = Math.max(newStreak, userStats.longestStreak);
 
-        const oldStreak = userStats.currentStreak;
-        const newStreak = isConsecutive ? oldStreak + 1 : 1;
-        const longestStreak = Math.max(newStreak, userStats.longestStreak);
+          // Award XP only for milestones that were just crossed
+          // (old < threshold AND new >= threshold)
+          const streakXp = XpService.xpForStreakMilestones(oldStreak, newStreak);
+          if (streakXp > 0) {
+            await XpService.addXpAndMinutes(req.user.userId, streakXp, 0, tx);
+          }
 
-        // Award XP only for milestones that were just crossed
-        // (old < threshold AND new >= threshold)
-        const streakXp = XpService.xpForStreakMilestones(oldStreak, newStreak);
-        if (streakXp > 0) {
-          await XpService.addXpAndMinutes(req.user.userId, streakXp, 0);
+          await tx.userStats.update({
+            where: { userId: req.user.userId },
+            data: {
+              currentStreak: newStreak,
+              longestStreak,
+              lastStudyDate: sessionDate,
+            },
+          });
         }
-
-        await prisma.userStats.update({
-          where: { userId: req.user.userId },
-          data: {
-            currentStreak: newStreak,
-            longestStreak,
-            lastStudyDate: sessionDate,
-          },
-        });
       }
-    }
 
-    const newAchievements = await AchievementService.checkAndUnlock(req.user.userId);
+      const newAchievements = await AchievementService.checkAndUnlock(req.user.userId, tx);
+
+      return { session, newAchievements };
+    });
 
     res.status(201).json({ data: { ...session, newAchievements } });
   } catch (error: unknown) {
@@ -247,22 +255,26 @@ router.patch('/:id', async (req, res, next) => {
     // Ensure updatedAt is updated on every modification
     updateData.updatedAt = new Date();
 
-    const session = await prisma.studySession.update({
-      where: { id },
-      data: updateData,
-    });
+    const session = await prisma.$transaction(async (tx) => {
+      const session = await tx.studySession.update({
+        where: { id },
+        data: updateData,
+      });
 
-    // If XP changed, update subject XP and user stats
-    if (xpChanged) {
-      const xpDelta = session.xpEarned - existing.xpEarned;
-      if (xpDelta !== 0) {
-        await prisma.subject.update({
-          where: { id: session.subjectId },
-          data: { xpTotal: { increment: xpDelta } },
-        });
-        await XpService.addXpAndMinutes(req.user.userId, xpDelta, 0);
+      // If XP changed, update subject XP and user stats atomically
+      if (xpChanged) {
+        const xpDelta = session.xpEarned - existing.xpEarned;
+        if (xpDelta !== 0) {
+          await tx.subject.update({
+            where: { id: session.subjectId },
+            data: { xpTotal: { increment: xpDelta } },
+          });
+          await XpService.addXpAndMinutes(req.user.userId, xpDelta, 0, tx);
+        }
       }
-    }
+
+      return session;
+    });
 
     res.json({ data: session });
   } catch (error: unknown) {

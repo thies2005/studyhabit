@@ -23,13 +23,15 @@ services:
     environment:
       DATABASE_URL: postgresql://${DB_USER:-studyhabit}:${DB_PASSWORD}@db:5432/${DB_NAME:-studyhabit}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?Set JWT_REFRESH_SECRET in .env}
+      # JWT_REFRESH_SECRET is no longer used (refresh tokens are opaque), but
+      # kept here for backward-compat with existing .env files.
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-unused}
       JWT_ACCESS_EXPIRY: ${JWT_ACCESS_EXPIRY:-15m}
       JWT_REFRESH_EXPIRY: ${JWT_REFRESH_EXPIRY:-7d}
       MAX_DEVICES_PER_USER: ${MAX_DEVICES_PER_USER:-5}
       NODE_ENV: production
       PORT: 3001
-      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      CORS_ORIGIN: ${CORS_ORIGIN:-https://studyhabit.schuelken.uk}
       RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-900000}
       RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-100}
     depends_on:
@@ -43,7 +45,7 @@ services:
       timeout: 5s
       start_period: 30s
     command: >
-      sh -c "npx prisma db push --skip-generate && node dist/index.js"
+      sh -c "npx prisma migrate deploy && node dist/index.js"
 
   web:
     build:

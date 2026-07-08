@@ -160,7 +160,14 @@ const subjectMilestoneSchema = z.object({
 });
 
 const userSettingsSchema = z.object({
-  settings: z.record(z.unknown()),
+  settings: z
+    .record(z.unknown())
+    .refine((obj) => Object.keys(obj).length <= 200, {
+      message: 'Settings may have at most 200 keys',
+    })
+    .refine((obj) => Buffer.byteLength(JSON.stringify(obj)) <= 64 * 1024, {
+      message: 'Settings payload must be at most 64KB',
+    }),
   isDeleted: z.boolean().optional(),
   updatedAt: z.string().or(z.date()),
 });
@@ -184,7 +191,15 @@ function lastWriteWins(incoming: TimestampedEntity, existing: TimestampedEntity 
 
 export class SyncService {
   static async fullPull(userId: string, since: string): Promise<SyncPullResponse> {
-    const whereClause = { updatedAt: { gt: new Date(since) } };
+    // Defensive parse: an invalid `since` previously became an Invalid Date,
+    // making `updatedAt: { gt: InvalidDate }` silently match nothing. The
+    // route layer now validates the format; this guard fails loudly if the
+    // contract is ever bypassed.
+    const sinceDate = new Date(since);
+    if (Number.isNaN(sinceDate.getTime())) {
+      throw new Error('Invalid "since" timestamp; expected an ISO 8601 datetime');
+    }
+    const whereClause = { updatedAt: { gt: sinceDate } };
 
     // 1. Get all IDs for scoping (not just updated ones)
     const userProjects = await prisma.project.findMany({ where: { userId }, select: { id: true } });

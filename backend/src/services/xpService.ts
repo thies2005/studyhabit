@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../db.js';
 
 export class XpService {
@@ -89,21 +90,23 @@ export class XpService {
   static async addXpAndMinutes(
     userId: string,
     xp: number,
-    studyMinutes: number
+    studyMinutes: number,
+    tx?: Prisma.TransactionClient
   ): Promise<void> {
-    const userStats = await prisma.userStats.findUnique({
+    const client = tx ?? prisma;
+    const userStats = await client.userStats.findUnique({
       where: { userId },
     });
 
     if (!userStats) {
-      await prisma.userStats.create({
+      await client.userStats.create({
         data: { userId, totalXp: xp, totalStudyMinutes: studyMinutes },
       });
     } else {
       const newTotalXp = userStats.totalXp + xp;
       const newLevel = this.calculateLevel(newTotalXp);
 
-      await prisma.userStats.update({
+      await client.userStats.update({
         where: { userId },
         data: {
           totalXp: newTotalXp,

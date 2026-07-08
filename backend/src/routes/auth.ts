@@ -209,7 +209,15 @@ router.patch('/password', sensitiveLimiter, authMiddleware, async (req, res, nex
       return res.status(400).json({ error: result.error });
     }
 
-    res.json({ data: { message: 'Password updated successfully' } });
+    // All refresh tokens were revoked by changePassword; the client must clear
+    // its stored tokens and re-authenticate. Signal this explicitly.
+    res.json({
+      data: {
+        message: 'Password updated successfully',
+        revokedSessions: result.revokedSessions ?? 0,
+        requiresReauth: true,
+      },
+    });
   } catch (error: unknown) {
     if (error instanceof ZodError) {
       return res.status(400).json({ error: 'Validation error', details: error.errors });

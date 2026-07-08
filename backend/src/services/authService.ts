@@ -190,12 +190,30 @@ export class AuthService {
     });
   }
 
+  // A lazily-computed, valid bcrypt hash used to keep login timing uniform when
+  // the email is unknown. The previous constant was 49 chars (bcrypt requires
+  // 60), which made `bcrypt.compare` throw and turned unknown-email logins into
+  // a 500 — a user-enumeration oracle by status code. Generating it lazily (and
+  // caching) avoids paying the hash cost at module load on every cold start.
+  private static dummyHashPromise: Promise<string> | null = null;
+  private static getDummyHash(): Promise<string> {
+    if (!this.dummyHashPromise) {
+      this.dummyHashPromise = bcrypt.hash(crypto.randomBytes(16).toString('hex'), 12);
+    }
+    return this.dummyHashPromise;
+  }
+
   static async login(email: string, password: string) {
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
-      // Add dummy bcrypt compare to match timing and prevent timing side-channel attacks
-      const DUMMY_HASH = '$2b$12$dummyHashToPreventTimingAttackAAAAAAAAAAAA';
-      await bcrypt.compare(password, DUMMY_HASH);
+      // Dummy bcrypt compare so unknown-email and wrong-password take the same
+      // path (and return the same 401). Wrapped in try/catch as defense in
+      // depth so a hashing failure can never surface as a 500 here.
+      try {
+        await bcrypt.compare(password, await this.getDummyHash());
+      } catch {
+        /* swallow: timing mitigation only; return null below */
+      }
       return null;
     }
 
@@ -209,7 +227,7 @@ export class AuthService {
     userId: string,
     currentPassword: string,
     newPassword: string
-  ): Promise<{ success: boolean; error?: string }> {
+  ): Promise<{ success: boolean; revokedSessions?: number; error?: string }> {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return { success: false, error: 'User not found' };
 
@@ -217,12 +235,16 @@ export class AuthService {
     if (!valid) return { success: false, error: 'Current password is incorrect' };
 
     const newHash = await bcrypt.hash(newPassword, 12);
+    // Revoke all refresh tokens so other devices/sessions must re-authenticate.
+    // Outstanding access JWTs remain valid only until their short (15m) expiry.
+    const revoked = await this.revokeAllUserTokens(userId);
+
     await prisma.user.update({
       where: { id: userId },
       data: { passwordHash: newHash },
     });
 
-    return { success: true };
+    return { success: true, revokedSessions: revoked };
   }
 
   static async deleteAccount(userId: string): Promise<void> {
