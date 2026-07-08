@@ -11,6 +11,7 @@ export default function Layout() {
 
 
   const handleLogout = async () => {
+    if (!window.confirm('Log out of StudyHabit?')) return;
     await logout();
     navigate('/login');
   };
@@ -28,8 +29,11 @@ export default function Layout() {
       <button
         className="md:hidden fixed top-4 left-4 z-50 p-2 bg-surfaceContainerHighest rounded-lg text-onSurface"
         onClick={() => setSidebarOpen(!isSidebarOpen)}
+        aria-label={isSidebarOpen ? 'Close menu' : 'Open menu'}
+        aria-expanded={isSidebarOpen}
+        aria-controls="main-sidebar"
       >
-        <span className="material-symbols-rounded">menu</span>
+        <span className="material-symbols-rounded" aria-hidden="true">menu</span>
       </button>
 
       {/* Mobile Overlay */}
@@ -37,11 +41,14 @@ export default function Layout() {
         <div
           className="md:hidden fixed inset-0 bg-black/50 z-40"
           onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
         />
       )}
 
       {/* Left Sidebar */}
       <aside
+        id="main-sidebar"
+        aria-label="Main navigation"
         className={`
           fixed md:static inset-y-0 left-0 z-40
           w-72 bg-surfaceContainer border-r border-surfaceContainerHigh
@@ -68,13 +75,14 @@ export default function Layout() {
                 key={item.to}
                 to={item.to}
                 onClick={() => setSidebarOpen(false)}
+                aria-current={isActive ? 'page' : undefined}
                 className={`flex items-center space-x-4 px-5 py-4 rounded-full font-heading font-medium transition-all duration-300 ${
                   isActive
                     ? 'bg-primary-container text-primary-onContainer shadow-md'
                     : 'text-onSurfaceVariant hover:bg-surfaceContainerHigh hover:text-onSurface'
                 }`}
               >
-                <span className="material-symbols-rounded text-2xl">{item.icon}</span>
+                <span className="material-symbols-rounded text-2xl" aria-hidden="true">{item.icon}</span>
                 <span>{item.label}</span>
               </Link>
             );
@@ -89,7 +97,7 @@ export default function Layout() {
             onClick={() => setSidebarOpen(false)}
             className="flex items-center space-x-4 px-5 py-4 rounded-full text-onSurfaceVariant hover:bg-surfaceContainerHigh hover:text-onSurface transition-all duration-300 font-heading font-medium"
           >
-            <span className="material-symbols-rounded text-2xl">settings</span>
+            <span className="material-symbols-rounded text-2xl" aria-hidden="true">settings</span>
             <span className="font-medium">Settings</span>
           </Link>
 
@@ -98,7 +106,7 @@ export default function Layout() {
             onClick={handleLogout}
             className="w-full flex items-center space-x-4 px-5 py-4 rounded-full text-error hover:bg-error-container/20 transition-all duration-300 font-heading font-medium"
           >
-            <span className="material-symbols-rounded text-2xl">logout</span>
+            <span className="material-symbols-rounded text-2xl" aria-hidden="true">logout</span>
             <span className="font-medium">Log Out</span>
           </button>
         </div>
@@ -111,25 +119,6 @@ export default function Layout() {
           <div className="flex items-center justify-between">
             <div className="flex-1 ml-12 md:ml-0">
               <ProjectSwitcher />
-            </div>
-
-            <div className="flex items-center space-x-2 sm:space-x-4 md:space-x-6">
-              {/* Notifications */}
-              <button className="relative p-2 text-onSurfaceVariant hover:bg-surfaceContainerHigh hover:text-onSurface rounded-full transition-all duration-300">
-                <span className="material-symbols-rounded text-2xl">notifications</span>
-                <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-error rounded-full border-2 border-background"></span>
-              </button>
-
-              {/* Timer */}
-              <button className="hidden sm:block p-2 text-onSurfaceVariant hover:bg-surfaceContainerHigh hover:text-onSurface rounded-full transition-all duration-300">
-                <span className="material-symbols-rounded text-2xl">timer</span>
-              </button>
-
-              {/* Start Session Button */}
-              <button className="flex items-center space-x-2 px-4 sm:px-6 py-2 sm:py-3 bg-primary hover:bg-primary-container text-background hover:text-primary-onContainer rounded-full font-heading font-bold transition-all duration-300 hover:scale-105 active:scale-95 shadow-lg hover:shadow-primary/20">
-                <span className="material-symbols-rounded text-xl">play_arrow</span>
-                <span className="hidden sm:inline">Start</span>
-              </button>
             </div>
           </div>
         </header>

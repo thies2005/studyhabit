@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useDialog } from '../hooks/useDialog';
 
 
 const presetSeeds = [
@@ -38,6 +39,7 @@ export default function CreateSubjectDialog({ isOpen, onClose, onSubmit }: Creat
   const [defaultBreakMinutes, setDefaultBreakMinutes] = useState(5);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const dialogRef = useDialog({ isOpen, onClose });
 
   if (!isOpen) return null;
 
@@ -79,18 +81,19 @@ export default function CreateSubjectDialog({ isOpen, onClose, onSubmit }: Creat
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
-      <div className="bg-surfaceContainerHighest border border-outlineVariant rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl animate-scaleUp">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Create New Subject" className="bg-surfaceContainerHighest border border-outlineVariant rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl animate-scaleUp">
         {/* Header */}
         <div className="px-6 py-5 border-b border-outlineVariant flex justify-between items-center">
           <h2 className="text-xl font-bold text-onSurface font-heading flex items-center gap-2">
-            <span className="material-symbols-rounded text-primary">book</span>
+            <span className="material-symbols-rounded text-primary" aria-hidden="true">book</span>
             Create New Subject
           </h2>
           <button
             onClick={onClose}
+            aria-label="Close dialog"
             className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-surface hover:text-white transition-colors"
           >
-            <span className="material-symbols-rounded text-lg">close</span>
+            <span className="material-symbols-rounded text-lg" aria-hidden="true">close</span>
           </button>
         </div>
 

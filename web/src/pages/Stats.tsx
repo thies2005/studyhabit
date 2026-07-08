@@ -9,8 +9,6 @@ import {
   PieChart,
   Pie,
   Cell,
-  LineChart,
-  Line,
   ResponsiveContainer,
 } from 'recharts';
 import apiClient from '../api/client';
@@ -47,20 +45,6 @@ const WeeklyChartTooltip = ({ active, payload, label }: TooltipRendererProps) =>
   return null;
 };
 
-const XpChartTooltip = ({ active, payload, label }: TooltipRendererProps) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-surfaceContainerHigh border border-outlineVariant rounded-xl p-3 shadow-lg">
-        <p className="text-sm font-medium text-onSurface font-heading mb-1">{label}</p>
-        <p className="text-sm text-primary font-data">
-          {(payload[0]?.value ?? 0).toLocaleString()} XP
-        </p>
-      </div>
-    );
-  }
-  return null;
-};
-
 export default function Stats() {
   const [overview, setOverview] = useState({
     totalHours: 0,
@@ -72,15 +56,16 @@ export default function Stats() {
   });
   const [weeklyActivity, setWeeklyActivity] = useState<any[]>([]);
   const [subjectDistribution, setSubjectDistribution] = useState<any[]>([]);
-  const [xpProgress, setXpProgress] = useState<any[]>([]);
   const [heatmap, setHeatmap] = useState<any[]>([]);
   const [subjectBreakdown, setSubjectBreakdown] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
         setLoading(true);
+        setError(false);
         const [overviewRes, heatmapRes, subjectsRes] = await Promise.all([
           apiClient.get('/stats/overview'),
           apiClient.get('/stats/heatmap'),
@@ -159,20 +144,15 @@ export default function Stats() {
         });
         setSubjectBreakdown(mappedBreakdown);
 
-        // Map XP progress
-        const mappedXpProgress = Array.from({ length: 30 }, (_, i) => {
-          const d = new Date();
-          d.setDate(d.getDate() - (29 - i));
-          return {
-            day: i + 1,
-            date: d.toLocaleDateString([], { month: 'short', day: 'numeric' }),
-            xp: Math.round(overviewData.totalXp - (29 - i) * 100),
-          };
-        });
-        setXpProgress(mappedXpProgress);
+        // XP progress chart intentionally omitted: the server does not expose a
+        // per-day XP history endpoint, so the previous implementation fabricated
+        // a curve from the current XP total (Math.round(totalXp - (29-i)*100))
+        // and presented it as real analytics. Render an honest empty state
+        // below until a real history endpoint exists.
 
-      } catch (error) {
-        console.error('Failed to fetch stats:', error);
+      } catch (err) {
+        console.error('Failed to fetch stats:', err);
+        setError(true);
       } finally {
         setLoading(false);
       }
@@ -218,6 +198,26 @@ export default function Stats() {
           {loading ? (
             <div className="text-center py-12">
               <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : error ? (
+            <div className="bg-surfaceContainerHigh rounded-3xl p-8 text-center max-w-md mx-auto">
+              <span className="material-symbols-rounded text-5xl text-onSurfaceVariant block mb-3" aria-hidden="true">
+                error
+              </span>
+              <h2 className="text-lg font-medium text-onSurface font-heading mb-2">
+                Couldn&apos;t load your stats
+              </h2>
+              <p className="text-sm text-gray-400 font-body mb-4">
+                Something went wrong while fetching your performance data. Please try again.
+              </p>
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary text-onPrimary text-sm font-medium hover:bg-primary/90 transition-colors"
+              >
+                <span className="material-symbols-rounded text-base" aria-hidden="true">refresh</span>
+                Retry
+              </button>
             </div>
           ) : (
             <>
@@ -331,47 +331,21 @@ export default function Stats() {
                 </div>
               )}
 
-              {/* XP Progress Line Chart */}
-              {xpProgress.length > 0 && (
-                <div className="bg-surfaceContainerHigh rounded-3xl p-6 mb-6 shadow-md">
-                  <h3 className="text-lg font-medium text-onSurface font-heading mb-4">XP Progress</h3>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={xpProgress}>
-                      <defs>
-                        <linearGradient id="xpGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#85D2E0" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="#85D2E0" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#323536" />
-                      <XAxis
-                        dataKey="date"
-                        stroke="#9CA3AF"
-                        fontSize={12}
-                        tickLine={false}
-                        axisLine={false}
-                      />
-                      <YAxis
-                        stroke="#9CA3AF"
-                        fontSize={12}
-                        tickLine={false}
-                        axisLine={false}
-                        tickFormatter={(value) => `${(value / 1000).toFixed(1)}k`}
-                      />
-                      <Tooltip content={<XpChartTooltip />} cursor={{ stroke: '#85D2E0', strokeWidth: 1 }} />
-                      <Line
-                        type="monotone"
-                        dataKey="xp"
-                        stroke="#85D2E0"
-                        strokeWidth={2}
-                        dot={false}
-                        activeDot={{ r: 4 }}
-                        fill="url(#xpGradient)"
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
+              {/* XP Progress — empty state (per-day XP history not yet available) */}
+              <div className="bg-surfaceContainerHigh rounded-3xl p-6 mb-6 shadow-md">
+                <h3 className="text-lg font-medium text-onSurface font-heading mb-4">XP Progress</h3>
+                <div className="flex flex-col items-center justify-center py-10 text-center">
+                  <span className="material-symbols-rounded text-5xl text-onSurfaceVariant mb-3" aria-hidden="true">
+                    trending_up
+                  </span>
+                  <p className="text-sm text-gray-300 font-body max-w-sm">
+                    Start logging study sessions to build your XP history and track your progress over time.
+                  </p>
+                  <p className="text-xs text-gray-500 font-body mt-2">
+                    Current total: {overview.totalXp.toLocaleString()} XP · Level {overview.currentLevel} ({overview.levelName})
+                  </p>
                 </div>
-              )}
+              </div>
 
               {/* Activity Heatmap */}
               {heatmap.length > 0 && (

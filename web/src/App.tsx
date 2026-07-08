@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { lazy, Suspense, Component, ReactNode, useEffect } from 'react';
+import { AuthProvider, useAuth } from './hooks/useAuth';
 
 // Lazy loaded pages
 const Login = lazy(() => import('./pages/Login'));
@@ -52,7 +53,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
                 An unexpected error occurred. Please try refreshing the page.
               </p>
             </div>
-            {this.state.error && (
+            {this.state.error && import.meta.env.DEV && (
               <details className="mb-6">
                 <summary className="text-sm text-gray-400 font-body cursor-pointer hover:text-onSurface">
                   Error details
@@ -88,18 +89,18 @@ const LoadingFallback = () => (
 );
 
 const ProtectedRoute = ({ children }: { children: ReactNode }) => {
-  const token = localStorage.getItem('access_token');
-  if (!token) {
+  const { isAuthenticated } = useAuth();
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
   return <>{children}</>;
 };
 
-function App() {
+function AppShell() {
   // Apply theme settings on load
   useThemeSettings();
 
-  // Set dark mode on mount initially as fallback, 
+  // Set dark mode on mount initially as fallback,
   // but useThemeSettings will override it based on user preferences.
   useEffect(() => {
     document.documentElement.classList.add('dark');
@@ -136,6 +137,14 @@ function App() {
         </ErrorBoundary>
       </Suspense>
     </Router>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppShell />
+    </AuthProvider>
   );
 }
 

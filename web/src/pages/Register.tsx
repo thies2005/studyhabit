@@ -10,10 +10,24 @@ export default function Register() {
   const navigate = useNavigate();
   const { register } = useAuth();
 
+  // Mirror the backend zod rule (min 8) and add a basic complexity check so
+  // trivial passwords are rejected before a round-trip.
+  const validatePassword = (pw: string): string | null => {
+    if (pw.length < 8) return 'Password must be at least 8 characters';
+    if (!/[a-z]/.test(pw)) return 'Password must contain a lowercase letter';
+    if (!/[0-9]/.test(pw)) return 'Password must contain a number';
+    return null;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
+    const pwError = validatePassword(password);
+    if (pwError) {
+      setError(pwError);
+      return;
+    }
     if (password !== confirmPassword) {
       setError('Passwords do not match');
       return;
@@ -26,6 +40,19 @@ export default function Register() {
       setError(err instanceof Error ? err.message : 'Registration failed');
     }
   };
+
+  // Rough strength meter (cosmetic; the real gate is validatePassword).
+  const strength = (() => {
+    let score = 0;
+    if (password.length >= 8) score++;
+    if (password.length >= 12) score++;
+    if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score++;
+    if (/[0-9]/.test(password)) score++;
+    if (/[^a-zA-Z0-9]/.test(password)) score++;
+    return Math.min(score, 4);
+  })();
+  const strengthLabels = ['', 'Weak', 'Fair', 'Good', 'Strong'];
+  const strengthColors = ['', 'bg-red-500', 'bg-amber-500', 'bg-yellow-400', 'bg-green-500'];
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background py-12 px-4 sm:px-6 lg:px-8">
@@ -68,11 +95,27 @@ export default function Register() {
                 id="password"
                 type="password"
                 required
+                minLength={8}
                 className="appearance-none relative block w-full px-4 py-3 bg-surfaceContainerHighest border border-outlineVariant rounded-lg placeholder-gray-500 text-onSurface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-body"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                aria-describedby="password-strength password-hint"
               />
+              {password && (
+                <div id="password-strength" className="mt-2 flex items-center gap-2" aria-live="polite">
+                  <div className="flex-1 h-1.5 bg-surfaceContainerHighest rounded-full overflow-hidden">
+                    <div
+                      className={`h-full transition-all ${strengthColors[strength]}`}
+                      style={{ width: `${(strength / 4) * 100}%` }}
+                    />
+                  </div>
+                  <span className="text-xs text-gray-400 font-body w-10">{strengthLabels[strength]}</span>
+                </div>
+              )}
+              <p id="password-hint" className="mt-1.5 text-xs text-gray-500 font-body">
+                At least 8 characters with a lowercase letter and a number.
+              </p>
             </div>
             <div>
               <label htmlFor="confirm-password" className="block text-sm font-medium text-gray-400 mb-2">

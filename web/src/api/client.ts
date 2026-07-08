@@ -1,5 +1,7 @@
 import axios from 'axios';
 
+// Production builds fail at build time (vite.config.ts) if VITE_API_URL is
+// unset, so the localhost fallback only ever applies during local dev.
 let rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
 if (import.meta.env.VITE_API_URL && !import.meta.env.VITE_API_URL.endsWith('/api/v1') && !import.meta.env.VITE_API_URL.endsWith('/api/v1/')) {
   const base = import.meta.env.VITE_API_URL.replace(/\/$/, '');

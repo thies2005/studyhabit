@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useApi } from '../api/hooks';
+import apiClient from '../api/client';
 import type { StatsOverview } from '../types';
 
 const presetSeeds = [
@@ -29,6 +30,8 @@ export default function Settings() {
   // Theme settings
   const [seedColor, setSeedColor] = useState(presetSeeds[0]);
   const [fontScale, setFontScale] = useState<'small' | 'normal' | 'large'>('normal');
+  // 0: system, 1: light, 2: dark
+  const [themeMode, setThemeMode] = useState(2);
 
   // Pomodoro settings
   const [workDuration, setWorkDuration] = useState(25);
@@ -44,44 +47,53 @@ export default function Settings() {
   // Streak settings
   const [gracePeriod, setGracePeriod] = useState(2);
   const freezeTokens = stats?.freezeTokens ?? 0;
+  const [saveError, setSaveError] = useState(false);
+  // Guards against the auto-save effect firing on initial load (re-saving the
+  // values we just fetched) and against saving before the load completes.
+  const hasLoadedSettings = useRef(false);
 
   useEffect(() => {
-    import('../api/client').then(({ default: apiClient }) => {
-      apiClient.get('/settings').then((res) => {
-        const data = res.data.data;
-        if (data) {
-          const seedIndex = data['theme.seedColorIndex'] ?? 0;
-          setSeedColor(presetSeeds[seedIndex] || presetSeeds[0]);
-          
-          const fs = data['theme.fontScale'] ?? 1.0;
-          setFontScale(fs < 0.95 ? 'small' : fs > 1.1 ? 'large' : 'normal');
+    apiClient.get('/settings').then((res) => {
+      const data = res.data.data;
+      if (data) {
+        const seedIndex = data['theme.seedColorIndex'] ?? 0;
+        setSeedColor(presetSeeds[seedIndex] || presetSeeds[0]);
 
-          setWorkDuration(data['pomodoro.workDuration'] ?? 25);
-          setShortBreak(data['pomodoro.shortBreak'] ?? 5);
-          setLongBreak(data['pomodoro.longBreak'] ?? 15);
-          setLongBreakEvery(data['pomodoro.longBreakEvery'] ?? 4);
-          setAutoStartBreaks(data['pomodoro.autoStartBreaks'] ?? false);
-          setVibrationOnComplete(data['pomodoro.vibration'] ?? true);
-          setEnableNotifications(data['notifications.enabled'] ?? true);
-          setGracePeriod(data['streak.gracePeriod'] ?? 2);
-        }
-        setIsLoading(false);
-      }).catch((e) => {
-        console.error('Failed to load settings from server', e);
-        setIsLoading(false);
-      });
+        setThemeMode(data['theme.themeMode'] ?? 2);
+
+        const fs = data['theme.fontScale'] ?? 1.0;
+        setFontScale(fs < 0.95 ? 'small' : fs > 1.1 ? 'large' : 'normal');
+
+        setWorkDuration(data['pomodoro.workDuration'] ?? 25);
+        setShortBreak(data['pomodoro.shortBreak'] ?? 5);
+        setLongBreak(data['pomodoro.longBreak'] ?? 15);
+        setLongBreakEvery(data['pomodoro.longBreakEvery'] ?? 4);
+        setAutoStartBreaks(data['pomodoro.autoStartBreaks'] ?? false);
+        setVibrationOnComplete(data['pomodoro.vibration'] ?? true);
+        setEnableNotifications(data['notifications.enabled'] ?? true);
+        setGracePeriod(data['streak.gracePeriod'] ?? 2);
+      }
+      setIsLoading(false);
+      // Mark loaded on the next tick so the state setters above don't trip the
+      // auto-save effect with "just-fetched" values.
+      requestAnimationFrame(() => { hasLoadedSettings.current = true; });
+    }).catch((e) => {
+      console.error('Failed to load settings from server', e);
+      setIsLoading(false);
     });
   }, []);
 
-  // Save settings whenever they change
+  // Debounced auto-save: only persist user-driven changes (after load), and
+  // coalesce rapid edits (e.g. dragging a slider) into a single request.
   useEffect(() => {
-    if (isLoading) return;
-    
+    if (isLoading || !hasLoadedSettings.current) return;
+
     const seedIndex = presetSeeds.indexOf(seedColor);
     const fontScaleNum = fontScale === 'small' ? 0.9 : fontScale === 'large' ? 1.15 : 1.0;
 
     const payload = {
       'theme.seedColorIndex': seedIndex >= 0 ? seedIndex : 0,
+      'theme.themeMode': themeMode,
       'theme.fontScale': fontScaleNum,
       'pomodoro.workDuration': workDuration,
       'pomodoro.shortBreak': shortBreak,
@@ -94,11 +106,34 @@ export default function Settings() {
       'theme.settingsUpdatedAt': Date.now(),
     };
 
-    import('../api/client').then(({ default: apiClient }) => {
-      apiClient.post('/settings', payload).catch(console.error);
-    });
-  }, [seedColor, fontScale, workDuration, shortBreak, longBreak, longBreakEvery,
+    const timer = setTimeout(() => {
+      apiClient.post('/settings', payload)
+        .then(() => setSaveError(false))
+        .catch((e) => {
+          console.error('Failed to save settings', e);
+          setSaveError(true);
+        });
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [seedColor, fontScale, themeMode, workDuration, shortBreak, longBreak, longBreakEvery,
       autoStartBreaks, vibrationOnComplete, enableNotifications, gracePeriod, isLoading]);
+
+  // Apply theme mode immediately for responsiveness (matches useThemeSettings).
+  useEffect(() => {
+    const root = document.documentElement;
+    if (themeMode === 2) {
+      root.classList.add('dark');
+    } else if (themeMode === 1) {
+      root.classList.remove('dark');
+    } else {
+      if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        root.classList.add('dark');
+      } else {
+        root.classList.remove('dark');
+      }
+    }
+  }, [themeMode]);
 
   const getEmailFromToken = () => {
     try {
@@ -112,7 +147,7 @@ export default function Settings() {
 
       const payload = JSON.parse(jsonPayload);
       return payload.email || '';
-    } catch (e) {
+    } catch {
       return '';
     }
   };
@@ -149,6 +184,14 @@ export default function Settings() {
             </p>
           </div>
 
+          {/* Save status — auto-saves are debounced; surface failures explicitly. */}
+          {saveError && (
+            <div role="alert" className="mb-6 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-sm text-red-300 font-body flex items-center gap-2">
+              <span className="material-symbols-rounded text-base" aria-hidden="true">error</span>
+              Changes couldn&apos;t be saved. They&apos;ll retry on your next edit.
+            </div>
+          )}
+
           {/* Appearance Card */}
           <div className="bg-surfaceContainerHigh rounded-3xl p-6 mb-6">
             <h3 className="text-lg font-medium text-onSurface font-heading mb-4 flex items-center gap-2">
@@ -158,12 +201,22 @@ export default function Settings() {
 
             {/* Theme Mode */}
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-400 font-body mb-3">
+              <label
+                htmlFor="theme-mode"
+                className="block text-sm font-medium text-gray-400 font-body mb-3"
+              >
                 Theme Mode
               </label>
-              <div className="px-4 py-2 bg-surface rounded-lg text-sm text-gray-300 font-body">
-                Dark Mode (currently enabled)
-              </div>
+              <select
+                id="theme-mode"
+                value={themeMode}
+                onChange={(e) => setThemeMode(Number(e.target.value))}
+                className="px-4 py-2 bg-surface rounded-lg text-sm text-gray-200 font-body border border-outlineVariant focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                <option value={2}>Dark</option>
+                <option value={1}>Light</option>
+                <option value={0}>System</option>
+              </select>
             </div>
 
             {/* Seed Color */}

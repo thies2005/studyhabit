@@ -33,7 +33,7 @@ export default function Subjects() {
     try {
       // We need a projectId to create a subject. Fetch projects first.
       const projectsRes = await apiClient.get('/projects');
-      let projects = projectsRes.data.data;
+      const projects = projectsRes.data.data;
       
       let projectId = '';
       if (projects.length === 0) {
@@ -181,29 +181,6 @@ export default function Subjects() {
               ))}
             </div>
           )}
-
-          {/* Upcoming Milestone Card */}
-          <div className="bg-surfaceContainerHigh rounded-3xl p-8 shadow-xl border-l-8 border-tertiary relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity duration-500">
-              <span className="material-symbols-rounded text-8xl text-tertiary">emoji_events</span>
-            </div>
-            <div className="flex items-center space-x-3 mb-4 relative z-10">
-              <span className="material-symbols-rounded text-tertiary text-2xl">emoji_events</span>
-              <span className="px-3 py-1.5 text-xs font-bold bg-tertiary/10 text-tertiary rounded-full tracking-wider">
-                UPCOMING MILESTONE
-              </span>
-            </div>
-            <h3 className="text-xl font-bold text-onSurface font-heading mb-2">Master of Logic</h3>
-            <p className="text-sm text-gray-400 font-body mb-4">
-              Complete advanced exercises in Logic and Reasoning to earn this prestigious badge.
-            </p>
-            <div className="w-full bg-surfaceContainerHighest rounded-full h-3 mb-3 relative z-10">
-              <div className="bg-tertiary h-3 rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(253,184,124,0.5)]" style={{ width: '95%' }}></div>
-            </div>
-            <p className="text-sm text-onSurfaceVariant font-body relative z-10">
-              Finish today's module to earn the 'Precisionist' badge
-            </p>
-          </div>
         </div>
       </main>
       <CreateSubjectDialog

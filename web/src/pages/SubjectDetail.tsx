@@ -11,6 +11,35 @@ import type { SubjectMilestone } from '../types';
 
 type Tab = 'timeline' | 'sources' | 'topics';
 
+// Percentage progress (0-100) through the current XP level, using the same
+// thresholds as the backend XpService (500, 1500, 3500, 7000, 10500, then
+// ×1.5 per level). Previously this used an arbitrary `(totalXp % 1000) / 10`.
+const XP_THRESHOLDS = [0, 500, 1500, 3500, 7000, 10500];
+
+function xpLevelProgress(totalXp: number): number {
+  // Find the band the user is in.
+  let lower = XP_THRESHOLDS[XP_THRESHOLDS.length - 1];
+  let upper = lower;
+  if (totalXp < XP_THRESHOLDS[XP_THRESHOLDS.length - 1]) {
+    for (let i = 1; i < XP_THRESHOLDS.length; i++) {
+      if (totalXp < XP_THRESHOLDS[i]) {
+        lower = XP_THRESHOLDS[i - 1];
+        upper = XP_THRESHOLDS[i];
+        break;
+      }
+    }
+  } else {
+    // Beyond the fixed table: levels grow by ×1.5 (rounded to 100).
+    upper = lower;
+    while (totalXp >= Math.round((upper * 1.5) / 100) * 100) {
+      upper = Math.round((upper * 1.5) / 100) * 100;
+    }
+    lower = upper < XP_THRESHOLDS[XP_THRESHOLDS.length - 1] ? XP_THRESHOLDS[XP_THRESHOLDS.length - 1] : upper;
+  }
+  if (upper === lower) return 100;
+  return ((totalXp - lower) / (upper - lower)) * 100;
+}
+
 // No mock data
 
 export default function SubjectDetail() {
@@ -281,10 +310,6 @@ export default function SubjectDetail() {
                         {sub}
                       </div>
                     ))}
-                    <button className="w-full p-4 text-sm text-primary hover:bg-primary/10 transition-colors font-medium font-body flex items-center justify-center gap-2">
-                      <span className="material-symbols-rounded text-sm">add</span>
-                      Add Subtopic
-                    </button>
                   </div>
                 )}
               </div>
@@ -315,7 +340,7 @@ export default function SubjectDetail() {
                 In Progress
               </span>
               <span className="text-sm text-gray-400 font-body">
-                {displaySubject.totalStudyHours || '42h'} total study
+                {displaySubject.totalStudyHours ?? 0}h total study
               </span>
             </div>
             <h1 className="text-3xl font-bold text-onSurface font-heading mb-2">
@@ -369,7 +394,7 @@ export default function SubjectDetail() {
                   </div>
                 </div>
                 <div className="w-full bg-surfaceContainerHighest rounded-full h-2">
-                  <div className="bg-primary h-2 rounded-full" style={{ width: `${Math.min(((stats?.totalXp || 0) % 1000) / 10, 100)}%` }} />
+                  <div className="bg-primary h-2 rounded-full" style={{ width: `${Math.min(xpLevelProgress(stats?.totalXp ?? 0), 100)}%` }} />
                 </div>
               </div>
 
