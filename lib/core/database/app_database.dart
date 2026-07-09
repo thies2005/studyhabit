@@ -504,8 +504,15 @@ class AppDatabase extends _$AppDatabase {
             await legacy.copy(targetFile.path);
             try {
               await legacy.delete();
-            } catch (_) {
-              // Non-fatal: we've already copied the data.
+            } catch (deleteErr) {
+              // Non-fatal (data was copied), but a plaintext copy of the DB now
+              // remains in the old location. Surface it so the user can remove it.
+              AppLogger.w(
+                'AppDatabase',
+                'Legacy database copied to new location, but the old file at '
+                    '${legacy.path} could not be deleted (cross-volume?). '
+                    'It may contain study data and should be removed manually.',
+              );
             }
           }
           return;
@@ -547,6 +554,21 @@ class AppDatabase extends _$AppDatabase {
     return MigrationStrategy(
       onCreate: (Migrator m) async {
         await m.createAll();
+      },
+      beforeOpen: (details) async {
+        // Guard against an older build opening a newer DB. Drift throws by
+        // default on downgrade, which would crash the app at startup. Surface
+        // a clear, logged error so the failure is diagnosable.
+        if (details.wasCreated) return;
+        final before = details.versionBefore;
+        if (before != null && before > details.versionNow) {
+          AppLogger.e(
+            'AppDatabase',
+            'Database downgrade detected ($before -> ${details.versionNow}). '
+                'An older app version opened a newer database; schema may be '
+                'inconsistent. Consider updating the app.',
+          );
+        }
       },
       onUpgrade: (Migrator m, int from, int to) async {
         if (from < 2) {
