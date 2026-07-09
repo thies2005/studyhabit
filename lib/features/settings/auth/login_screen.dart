@@ -286,12 +286,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
                                 enabled: !isLoading,
                                 decoration: InputDecoration(
                                   labelText: 'Server URL',
-                                  helperText: 'Default: https://studyhabit.schuelken.uk',
+                                  helperText: _serverUrlController.text
+                                          .trim()
+                                          .toLowerCase()
+                                          .startsWith('http://')
+                                      ? 'Warning: http:// sends your credentials unencrypted. Use https:// if the server supports it.'
+                                      : 'Default: https://studyhabit.schuelken.uk',
                                   prefixIcon: const Icon(Icons.dns_outlined),
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(16),
                                   ),
                                 ),
+                                onChanged: (_) =>
+                                    setState(() {}), // refresh helper text
                                 validator: (value) {
                                   if (value != null && value.trim().isNotEmpty) {
                                     if (!value.startsWith('http://') && !value.startsWith('https://')) {

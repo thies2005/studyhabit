@@ -112,14 +112,18 @@ router.post('/', async (req, res, next) => {
       }
     }
 
-    const skillLabel = await prisma.skillLabel.create({ data });
+    const skillLabel = await prisma.$transaction(async (tx) => {
+      const skillLabel = await tx.skillLabel.create({ data });
 
-    // Check if this is an upward skill change from the previous label
-    // Note: On creation, we assume "beginner" was the previous state
-    if (data.label !== 'beginner') {
-      await XpService.addXpAndMinutes(req.user.userId, 100, 0);
-      await AchievementService.checkAndUnlock(req.user.userId);
-    }
+      // Check if this is an upward skill change from the previous label
+      // Note: On creation, we assume "beginner" was the previous state
+      if (data.label !== 'beginner') {
+        await XpService.addXpAndMinutes(req.user.userId, 100, 0, tx);
+        await AchievementService.checkAndUnlock(req.user.userId, tx);
+      }
+
+      return skillLabel;
+    });
 
     res.status(201).json({ data: skillLabel });
   } catch (error: unknown) {
@@ -152,26 +156,34 @@ router.patch('/:id', async (req, res, next) => {
     // Check if skill level increased
     const skillIncreased = isSkillIncrease(existing.label, data.label);
 
-    // Update the skill label
-    const result = await prisma.skillLabel.updateMany({
-      where: {
-        id,
-        subject: { project: { userId: req.user.userId } },
-        isDeleted: false,
-      },
-      data: { label: data.label, updatedAt: new Date() },
+    const updated = await prisma.$transaction(async (tx) => {
+      // Update the skill label
+      const result = await tx.skillLabel.updateMany({
+        where: {
+          id,
+          subject: { project: { userId: req.user.userId } },
+          isDeleted: false,
+        },
+        data: { label: data.label, updatedAt: new Date() },
+      });
+
+      if (result.count === 0) {
+        return null;
+      }
+
+      const updated = await tx.skillLabel.findUnique({ where: { id } });
+
+      // Award XP if skill level increased
+      if (skillIncreased) {
+        await XpService.addXpAndMinutes(req.user.userId, 100, 0, tx);
+        await AchievementService.checkAndUnlock(req.user.userId, tx);
+      }
+
+      return updated;
     });
 
-    if (result.count === 0) {
+    if (!updated) {
       return res.status(404).json({ error: 'SkillLabel not found' });
-    }
-
-    const updated = await prisma.skillLabel.findUnique({ where: { id } });
-
-    // Award XP if skill level increased
-    if (skillIncreased) {
-      await XpService.addXpAndMinutes(req.user.userId, 100, 0);
-      await AchievementService.checkAndUnlock(req.user.userId);
     }
 
     res.json({ data: updated });

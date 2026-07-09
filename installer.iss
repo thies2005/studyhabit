@@ -1,6 +1,8 @@
 [Setup]
 AppName=Study Habit
-AppVersion=1.0.0
+; Keep in sync with the version in pubspec.yaml. CI overwrites this via regex
+; at build time; this default is used for local/dev builds.
+AppVersion=1.0.65
 DefaultDirName={autopf}\Study Habit
 DefaultGroupName=Study Habit
 OutputDir=build

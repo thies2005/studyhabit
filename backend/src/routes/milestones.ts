@@ -85,7 +85,7 @@ router.patch('/:id', async (req, res, next) => {
     const id = String(req.params.id);
     const data = updateMilestoneSchema.parse(req.body);
 
-    const existing = await prisma.subjectMilestone.findUnique({
+    const existing = await prisma.subjectMilestone.findFirst({
       where: { id, isDeleted: false },
       include: { subject: { include: { project: true } } },
     });
@@ -118,7 +118,7 @@ router.delete('/:id', async (req, res, next) => {
   try {
     const id = String(req.params.id);
 
-    const existing = await prisma.subjectMilestone.findUnique({
+    const existing = await prisma.subjectMilestone.findFirst({
       where: { id, isDeleted: false },
       include: { subject: { include: { project: true } } },
     });

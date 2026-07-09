@@ -23,7 +23,16 @@ class AuthState with _$AuthState {
 
 @Riverpod(keepAlive: true)
 class AuthNotifier extends _$AuthNotifier {
-  final FlutterSecureStorage _storage = const FlutterSecureStorage();
+  final FlutterSecureStorage _storage = const FlutterSecureStorage(
+    // Explicitly enable hardened storage options rather than relying on plugin
+    // defaults. resetOnError recovers gracefully if the Keystore key is
+    // invalidated (e.g. after a device PIN change) instead of crashing.
+    aOptions: AndroidOptions(
+      encryptedSharedPreferences: true,
+      resetOnError: true,
+    ),
+    iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
+  );
 
   @override
   AuthState build() {
@@ -160,6 +169,10 @@ class AuthNotifier extends _$AuthNotifier {
       }
     } catch (_) {
       // Fallback
+    }
+    // Platform-aware fallback rather than a misleading 'Mobile Device'.
+    if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
+      return 'Desktop Device';
     }
     return 'Mobile Device';
   }

@@ -62,6 +62,11 @@ jobs:
       - name: Get Flutter dependencies
         run: flutter pub get
 
+      # Non-blocking advisory: surface outdated packages without failing the build.
+      - name: Report outdated dependencies (advisory)
+        run: flutter pub outdated || true
+        continue-on-error: true
+
       # ── Auto-bump version name + versionCode on every push ──
       - name: Auto-bump version name and versionCode
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
@@ -88,21 +93,14 @@ jobs:
           file_pattern: pubspec.yaml
           commit_user_name: github-actions[bot]
           commit_user_email: github-actions[bot]@users.noreply.github.com
-          commit_author: github-actions[bot] <github-actions[bot]@users.noreply.github.com>
-          push_options: --force
+          commit_author: github-actions[bot] <github-actions[bot]@users.noreply.github.com
 
       - name: Generate code (build_runner)
         run: dart run build_runner build --delete-conflicting-outputs
 
       # ── Analyze ────────────────────────────
-      # Remove custom_lint plugin from analysis_options so the analyzer
-      # doesn't try (and fail) to start plugin processes in CI.
-      - name: Disable custom_lint plugin for CI
-        run: |
-          if grep -q 'custom_lint' analysis_options.yaml; then
-            sed -i '/custom_lint/d' analysis_options.yaml
-          fi
-
+      # analysis_options.yaml is the single source of truth for analyzer
+      # config in both local and CI environments. Do not mutate it in CI.
       - name: Run Flutter analyze
         run: flutter analyze --no-fatal-infos
 
@@ -184,7 +182,11 @@ jobs:
       - name: Get Flutter dependencies
         run: flutter pub get
 
-      # Local version bump so compiled windows binary version matches android perfectly
+      # Local version bump so the compiled Windows binary version matches the
+      # Android build. IMPORTANT: this must apply the SAME formula as the
+      # build-android "Auto-bump" step (patch+1, versionCode+1) so the two
+      # builds report identical versions. Both jobs check out the same commit,
+      # so they compute the same result deterministically.
       - name: Auto-bump version name and versionCode locally
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         shell: pwsh

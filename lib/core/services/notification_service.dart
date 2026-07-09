@@ -91,7 +91,9 @@ class NotificationService {
       final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>();
       await androidPlugin?.requestNotificationsPermission();
-      await androidPlugin?.requestExactAlarmsPermission();
+      // Exact-alarm permission is not requested: notifications use inexact
+      // scheduling (AndroidScheduleMode.inexactAllowWhileIdle), so the
+      // SCHEDULE_EXACT_ALARM / USE_EXACT_ALARM permissions are omitted.
     }
   }
 

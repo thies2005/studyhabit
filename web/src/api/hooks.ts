@@ -6,13 +6,15 @@ export function useApi<T>(url: string, options?: { enabled?: boolean }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (signal?: AbortSignal) => {
     try {
       setLoading(true);
       setError(null);
-      const response = await apiClient.get<{ data: T }>(url);
+      const response = await apiClient.get<{ data: T }>(url, { signal });
       setData(response.data.data);
     } catch (err: unknown) {
+      // Ignore aborts from unmounted components / superseded requests.
+      if (err instanceof DOMException && err.name === 'AbortError') return;
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setLoading(false);
@@ -21,11 +23,13 @@ export function useApi<T>(url: string, options?: { enabled?: boolean }) {
 
   useEffect(() => {
     if (options?.enabled !== false) {
-      fetchData();
+      const controller = new AbortController();
+      fetchData(controller.signal);
+      return () => controller.abort();
     }
   }, [fetchData, options?.enabled]);
 
-  return { data, loading, error, refetch: fetchData };
+  return { data, loading, error, refetch: () => fetchData() };
 }
 
 export function useMutation<T, V>() {

@@ -273,7 +273,22 @@ class ImportService {
 
         if (document.settings != null) {
           final prefs = await SharedPreferences.getInstance();
+          // Whitelist the setting keys we accept on import — mirroring the
+          // sync-service allowlist. Without this, a crafted import file could
+          // overwrite security-sensitive keys such as `sync.serverUrl` and
+          // redirect the user's credentials to an attacker host.
+          bool isAllowedSettingKey(String k) =>
+              k.startsWith('theme.') ||
+              k.startsWith('pomodoro.') ||
+              k.startsWith('notifications.') ||
+              k.startsWith('streak.') ||
+              k.startsWith('goal.') ||
+              k == 'active_timer_type' ||
+              k == 'pomodoro_state_json' ||
+              k == 'free_timer_state_json';
+
           for (final entry in document.settings!.entries) {
+            if (!isAllowedSettingKey(entry.key)) continue;
             final value = entry.value;
             if (value is int) {
               await prefs.setInt(entry.key, value);

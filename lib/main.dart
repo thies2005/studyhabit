@@ -28,6 +28,11 @@ void main() async {
       title: "Study Habit",
     );
     await windowManager.waitUntilReadyToShow(windowOptions, () async {
+      // Explicitly enforce title + minimum size — WindowOptions fields aren't
+      // reliably applied by all window_manager backends otherwise, so the
+      // window could be shrunk below the intended minimum or show a stale title.
+      await windowManager.setTitle('Study Habit');
+      await windowManager.setMinimumSize(const Size(450, 600));
       await windowManager.show();
       await windowManager.focus();
     });

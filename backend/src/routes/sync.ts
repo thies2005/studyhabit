@@ -3,22 +3,51 @@ import { z, ZodError } from 'zod';
 import { SyncService } from '../services/syncService.js';
 import { prisma } from '../db.js';
 
-// S3 fix: Per-user mutex to prevent concurrent sync operations
+// S3 fix: Per-user mutex to prevent concurrent sync operations. The in-process
+// Map serializes concurrent requests within a single API instance (fast path).
+// On top of that, a Postgres transaction-level advisory lock serializes sync
+// across replicas/instances, so horizontal scaling can't let two instances run
+// sync/full for the same user at once. The advisory lock auto-releases when the
+// surrounding transaction commits or rolls back.
 const userSyncLocks = new Map<string, Promise<void>>();
 
 function withUserLock<T>(userId: string, fn: () => Promise<T>): Promise<T> {
   const existing = userSyncLocks.get(userId) ?? Promise.resolve();
-  const newLock = existing.then(() => fn()).finally(() => {
-    // Clean up only if we're still the latest lock
-    if (userSyncLocks.get(userId) === newLock) {
-      userSyncLocks.delete(userId);
-    }
-  });
+  const newLock = existing
+    .then(() =>
+      // Acquire a DB-level advisory lock for cross-instance safety, then run
+      // the operation, then release by committing the lock transaction.
+      prisma.$transaction(async (tx) => {
+        // Stable 32-bit key derived from the userId (crc32-style via md5 prefix).
+        const keyResult = await tx.$queryRaw`SELECT ('x' || substr(md5(${userId}::text), 1, 8))::bit(32)::int AS k`;
+        const row = (Array.isArray(keyResult) ? keyResult[0] : null) as
+          | { k?: number }
+          | null;
+        const key = row?.k ?? 0;
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(${key})`;
+        return fn();
+      })
+    )
+    .finally(() => {
+      // Clean up only if we're still the latest lock
+      if (userSyncLocks.get(userId) === newLock) {
+        userSyncLocks.delete(userId);
+      }
+    });
   userSyncLocks.set(userId, newLock.then(() => {}));
   return newLock;
 }
 
 const router = Router();
+
+// Validate the `since` query param (ISO 8601 datetime). Returns the raw string
+// on success or a 400-error message string on failure.
+function parseSince(raw: string | undefined): string | null {
+  if (!raw) return null;
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return null;
+  return raw;
+}
 
 const pushSchema = z.object({
   projects: z.array(z.record(z.unknown())).max(1000).optional(),
@@ -64,9 +93,12 @@ router.post('/push', async (req, res, next) => {
 
 router.get('/pull', async (req, res, next) => {
   try {
-    const since = req.query.since ? String(req.query.since) : undefined;
+    const rawSince = req.query.since ? String(req.query.since) : undefined;
+    const since = parseSince(rawSince);
     if (!since) {
-      return res.status(400).json({ error: 'Missing "since" query parameter for sync pull' });
+      return res.status(400).json({
+        error: 'Missing or invalid "since" query parameter (expected ISO 8601 datetime)',
+      });
     }
     const data = await SyncService.fullPull(req.user.userId, since);
     res.json({ data });
@@ -77,9 +109,12 @@ router.get('/pull', async (req, res, next) => {
 
 router.post('/full', async (req, res, next) => {
   try {
-    const since = req.query.since ? String(req.query.since) : undefined;
+    const rawSince = req.query.since ? String(req.query.since) : undefined;
+    const since = parseSince(rawSince);
     if (!since) {
-      return res.status(400).json({ error: 'Missing "since" query parameter for sync pull' });
+      return res.status(400).json({
+        error: 'Missing or invalid "since" query parameter (expected ISO 8601 datetime)',
+      });
     }
 
     const payload = pushSchema.parse(req.body) as unknown as {

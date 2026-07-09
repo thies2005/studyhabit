@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import apiClient from '../api/client';
+import Modal from './Modal';
 import type { Subject, Topic, Chapter } from '../types';
 
 interface CreateSessionDialogProps {
@@ -105,7 +106,7 @@ export default function CreateSessionDialog({ isOpen, onClose, subjects, onSubmi
         endedAt: endDateTime.toISOString(),
         plannedDurationMinutes: plannedDuration,
         actualDurationMinutes: actualDuration,
-        pomodorosCompleted: Math.floor(actualDuration / 25),
+        pomodorosCompleted: plannedDuration > 0 ? Math.floor(actualDuration / plannedDuration) : 0,
         confidenceRating: confidence,
         notes: notes.trim() || null,
       });
@@ -126,21 +127,21 @@ export default function CreateSessionDialog({ isOpen, onClose, subjects, onSubmi
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
-      <div className="bg-surfaceContainerHighest border border-outlineVariant rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl animate-scaleUp">
-        {/* Header */}
-        <div className="px-6 py-5 border-b border-outlineVariant flex justify-between items-center">
-          <h2 className="text-xl font-bold text-onSurface font-heading flex items-center gap-2">
-            <span className="material-symbols-rounded text-primary">history_edu</span>
-            Log Study Session Manually
-          </h2>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-surface hover:text-white transition-colors"
-          >
-            <span className="material-symbols-rounded text-lg">close</span>
-          </button>
-        </div>
+    <Modal isOpen={isOpen} onClose={onClose} title="Log Study Session Manually" labelledById="session-dialog-title" maxWidthClass="max-w-lg">
+      {/* Header */}
+      <div className="px-6 py-5 border-b border-outlineVariant flex justify-between items-center">
+        <h2 id="session-dialog-title" className="text-xl font-bold text-onSurface font-heading flex items-center gap-2">
+          <span className="material-symbols-rounded text-primary" aria-hidden="true">history_edu</span>
+          Log Study Session Manually
+        </h2>
+        <button
+          onClick={onClose}
+          aria-label="Close dialog"
+          className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-surface hover:text-white transition-colors"
+        >
+          <span className="material-symbols-rounded text-lg" aria-hidden="true">close</span>
+        </button>
+      </div>
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-5 max-h-[80vh] overflow-y-auto">
@@ -340,7 +341,6 @@ export default function CreateSessionDialog({ isOpen, onClose, subjects, onSubmi
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }
