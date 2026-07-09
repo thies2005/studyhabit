@@ -70,4 +70,8 @@ flutter:
   uses-material-design: true
 
 dependency_overrides:
+  # Pinned to resolve a version conflict between the Android backing store
+  # required by path_provider ^2.1.0 and the AGP/Kotlin level used here.
+  # Re-evaluate after upgrading path_provider / the Flutter/Kotlin toolchain,
+  # since overrides can mask incompatibilities and freeze the native plugin.
   path_provider_android: ^2.3.1
