@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../providers/server_url_provider.dart';
@@ -15,15 +16,19 @@ Dio apiClient(Ref ref) {
     receiveTimeout: const Duration(seconds: 15),
   ));
 
-  dio.interceptors.addAll([
-    AuthInterceptor(ref),
-    LogInterceptor(
+  dio.interceptors.add(AuthInterceptor(ref));
+
+  // Only attach the body logger in debug builds. In release, request/response
+  // bodies can contain auth tokens and credentials (login/register payloads),
+  // and the AppLogger keeps an in-memory buffer that could expose them.
+  if (kDebugMode) {
+    dio.interceptors.add(LogInterceptor(
       requestHeader: false,
       responseHeader: false,
       requestBody: true,
       responseBody: true,
-    ),
-  ]);
+    ));
+  }
 
   return dio;
 }

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Google Play requires a justification string for FOREGROUND_SERVICE_SPECIAL_USE.
+         This describes the special-use subtype: a Pomodoro study timer that must keep
+         running while the app is backgrounded so the user's timed study session and
+         completion notification are delivered accurately. -->
+    <string name="fgs_special_use_subtype">Runs the Pomodoro study timer in the background so timed study sessions stay accurate and completion notifications are delivered while the app is not in the foreground.</string>
+</resources>

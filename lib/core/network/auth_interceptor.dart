@@ -7,7 +7,13 @@ import '../services/auth_service.dart';
 
 class AuthInterceptor extends QueuedInterceptor {
   final Ref _ref;
-  final FlutterSecureStorage _storage = const FlutterSecureStorage();
+  final FlutterSecureStorage _storage = const FlutterSecureStorage(
+    aOptions: AndroidOptions(
+      encryptedSharedPreferences: true,
+      resetOnError: true,
+    ),
+    iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
+  );
 
   AuthInterceptor(this._ref);
 
