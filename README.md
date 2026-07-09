@@ -1,17 +1,17 @@
 # StudyHabit
 
-A full-featured study tracking application with gamification, Pomodoro timer, and cross-platform support. Track your study sessions, manage subjects and topics, earn XP, and visualize your progress with charts and achievements.
+A full-featured study tracking application with gamification, Pomodoro timer, and multi-platform support. Currently shipped targets are **Android** and **Windows desktop**, plus a React **web dashboard**. Track your study sessions, manage subjects and topics, earn XP, and visualize your progress with charts and achievements.
 
 ## Features
 
-- **Pomodoro Timer** — Configurable work/break intervals with foreground service for background operation
+- **Pomodoro Timer** — Configurable work/break intervals with a background foreground service on Android (desktop keeps time while the window is open)
 - **Subject & Hierarchy Management** — Organize studies with projects, subjects, topics, and chapters (flat, 2-level, or 3-level hierarchy)
 - **XP & Leveling System** — Earn XP for completing sessions, rating confidence, adding sources, and maintaining streaks. Progress from Novice to Grandmaster
 - **Streak Tracking** — Daily streaks with configurable grace period and freeze tokens
 - **15 Achievements** — Unlock badges for streaks, Pomodoro milestones, hours studied, and more
 - **PDF Viewer** — Built-in PDF reader with progress tracking and auto-save
 - **Source Management** — Attach PDFs, URLs, and video URLs to any subject/topic/chapter
-- **Statistics Dashboard** — Weekly bar charts, subject distribution pie charts, XP line charts, 12-week activity heatmap
+- **Statistics Dashboard** — Weekly bar charts, subject distribution pie charts, 12-week activity heatmap, subject breakdown
 - **Data Export/Import** — Full JSON export with merge or replace import modes
 - **Material 3 Design** — Dynamic theming with 12 seed colors, dark mode, glassmorphism navigation
 - **Offline-First** — Local SQLite database via Drift, works without server
