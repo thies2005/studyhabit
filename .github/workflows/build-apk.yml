@@ -1,4 +1,4 @@
-name: Build & Release Beta APK and Windows App
+name: Build & Release Android APK and Web/Backend CI
 
 on:
   push:
@@ -14,272 +14,65 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-android:
-    name: Build Android APK
+  verify-backend-and-web:
+    name: Verify Backend & Web
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    if: "!contains(github.event.head_commit.message, '[skip ci]')"
-    outputs:
-      tag: ${{ steps.version.outputs.tag }}
-      version_name: ${{ steps.version.outputs.version_name }}
-      build_number: ${{ steps.version.outputs.build_number }}
-      short_sha: ${{ steps.version.outputs.short_sha }}
-
+    timeout-minutes: 15
     steps:
-      # ── Setup ──────────────────────────────
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Backend Typecheck & Build
+        working-directory: backend
+        run: |
+          npm ci
+          DATABASE_URL="postgresql://mock:mock@localhost:5432/mock" npx prisma generate
+          npx tsc --noEmit
+          npm run build
+      - name: Web Lint, Test & Build
+        working-directory: web
+        run: |
+          npm ci
+          npm run lint
+          node --test test/smoke.test.js
+          VITE_API_URL=https://studyhabit.schuelken.uk npm run build
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
+  build-android:
+    name: Build Native Kotlin Android APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: "zulu"
           java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
 
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: "stable"
-          cache: true
-
-      # ── Decode signing keystore ────────────
       - name: Decode keystore from secrets
+        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        working-directory: android
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
-          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/release.keystore
-          echo "storePassword=$KEYSTORE_PASSWORD"  >> android/app/key.properties
-          echo "keyPassword=$KEY_PASSWORD"          >> android/app/key.properties
-          echo "keyAlias=$KEY_ALIAS"                >> android/app/key.properties
-          echo "storeFile=release.keystore"          >> android/app/key.properties
-          echo "storeType=pkcs12"                    >> android/app/key.properties
-          keytool -list -storetype pkcs12 -keystore android/app/release.keystore -storepass "$KEYSTORE_PASSWORD" -noprompt || (echo "::error::Keystore validation failed — KEYSTORE_BASE64 may be corrupt" && exit 1)
+          echo "$KEYSTORE_BASE64" | base64 --decode > app/release.keystore
+          echo "storePassword=$KEYSTORE_PASSWORD" >> app/key.properties
+          echo "keyPassword=$KEY_PASSWORD"         >> app/key.properties
+          echo "keyAlias=$KEY_ALIAS"               >> app/key.properties
+          echo "storeFile=release.keystore"        >> app/key.properties
+          echo "storeType=pkcs12"                  >> app/key.properties
 
-      # ── Dependencies & codegen ─────────────
-      - name: Get Flutter dependencies
-        run: flutter pub get
-
-      # Non-blocking advisory: surface outdated packages without failing the build.
-      - name: Report outdated dependencies (advisory)
-        run: flutter pub outdated || true
-        continue-on-error: true
-
-      # ── Auto-bump version name + versionCode on every push ──
-      - name: Auto-bump version name and versionCode
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+      - name: Run Unit Tests, Lint & Assemble Release APK
+        working-directory: android
         run: |
-          CURRENT=$(grep '^version:' pubspec.yaml | sed 's/version: //')
-          VER_NAME=$(echo "$CURRENT" | cut -d'+' -f1)
-          VER_CODE=$(echo "$CURRENT" | cut -d'+' -f2)
-          MAJOR=$(echo "$VER_NAME" | cut -d'.' -f1)
-          MINOR=$(echo "$VER_NAME" | cut -d'.' -f2)
-          PATCH=$(echo "$VER_NAME" | cut -d'.' -f3)
-          NEW_PATCH=$((PATCH + 1))
-          NEW_CODE=$((VER_CODE + 1))
-          NEW_VER="${MAJOR}.${MINOR}.${NEW_PATCH}+${NEW_CODE}"
-          sed -i "s/^version: .*/version: ${NEW_VER}/" pubspec.yaml
-          echo "Bumped version: ${VER_NAME}+${VER_CODE} → ${MAJOR}.${MINOR}.${NEW_PATCH}+${NEW_CODE}"
-          echo "version=${NEW_VER}" >> "$GITHUB_OUTPUT"
-        id: bump
+          ./gradlew testDebugUnitTest lintDebug assembleRelease
 
-      - name: Commit and push version bump
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "chore(ci): auto-bump versionCode to ${{ steps.bump.outputs.version }} [skip ci]"
-          file_pattern: pubspec.yaml
-          commit_user_name: github-actions[bot]
-          commit_user_email: github-actions[bot]@users.noreply.github.com
-          commit_author: github-actions[bot] <github-actions[bot]@users.noreply.github.com
-
-      - name: Generate code (build_runner)
-        run: dart run build_runner build --delete-conflicting-outputs
-
-      # ── Analyze ────────────────────────────
-      # analysis_options.yaml is the single source of truth for analyzer
-      # config in both local and CI environments. Do not mutate it in CI.
-      - name: Run Flutter analyze
-        run: flutter analyze --no-fatal-infos
-
-      # ── Build ──────────────────────────────
-      - name: Build APK (release, signed)
-        run: flutter build apk --release
-
-      # ── Rename APKs with version, build number, and date ──
-      - name: Rename APK files
-        id: rename
-        run: |
-          PUBSPEC_VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //')
-          VERSION_NAME=$(echo "$PUBSPEC_VERSION" | cut -d'+' -f1)
-          BUILD_NUMBER=$GITHUB_RUN_NUMBER
-          BUILD_DATE=$(date +%Y%m%d)
-          APK_DIR="build/app/outputs/flutter-apk"
-          RELEASE_NAME="StudyHabit-v${VERSION_NAME}-b${BUILD_NUMBER}-${BUILD_DATE}-release.apk"
-          mv "${APK_DIR}/app-release.apk" "${APK_DIR}/${RELEASE_NAME}"
-          echo "release_apk=${APK_DIR}/${RELEASE_NAME}" >> "$GITHUB_OUTPUT"
-          echo "Renamed APK: ${RELEASE_NAME}"
-
-      # ── Compute beta tag version ───────────
-      - name: Compute beta version tag
-        id: version
-        run: |
-          # Read version from pubspec.yaml (e.g. "1.0.0+1")
-          PUBSPEC_VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //')
-          VERSION_NAME=$(echo "$PUBSPEC_VERSION" | cut -d'+' -f1)
-          VERSION_CODE=$(echo "$PUBSPEC_VERSION" | cut -d'+' -f2)
-          SHORT_SHA=$(git rev-parse --short HEAD)
-          BUILD_DATE=$(date +%Y%m%d)
-          BUILD_NUMBER=$GITHUB_RUN_NUMBER
-
-          TAG="beta-${VERSION_NAME}-build.${BUILD_NUMBER}+${BUILD_DATE}-${SHORT_SHA}"
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
-          echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
-          echo "short_sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "## 🏷️ Beta Tag: \`${TAG}\`" >> "$GITHUB_STEP_SUMMARY"
-
-      # ── Upload artifacts ───────────────────
-      - name: Upload Release APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: studyhabit-release
-          path: ${{ steps.rename.outputs.release_apk }}
-          retention-days: 14
-
-      # ── Cleanup keystore ───────────────────
       - name: Cleanup signing artifacts
         if: always()
+        working-directory: android
         run: |
-          rm -f android/app/release.keystore
-          rm -f android/app/key.properties
-
-  build-windows:
-    name: Build Windows App
-    runs-on: windows-latest
-    timeout-minutes: 40
-    if: "!contains(github.event.head_commit.message, '[skip ci]')"
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: "zulu"
-          java-version: "17"
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: "stable"
-          cache: true
-
-      - name: Get Flutter dependencies
-        run: flutter pub get
-
-      # Local version bump so the compiled Windows binary version matches the
-      # Android build. IMPORTANT: this must apply the SAME formula as the
-      # build-android "Auto-bump" step (patch+1, versionCode+1) so the two
-      # builds report identical versions. Both jobs check out the same commit,
-      # so they compute the same result deterministically.
-      - name: Auto-bump version name and versionCode locally
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-        shell: pwsh
-        run: |
-          $content = Get-Content pubspec.yaml -Raw
-          if ($content -match 'version:\s*([0-9.]+)\+([0-9]+)') {
-            $verName = $Matches[1]
-            $verCode = [int]$Matches[2]
-            $parts = $verName.Split('.')
-            $major = $parts[0]
-            $minor = $parts[1]
-            $patch = [int]$parts[2]
-            $newPatch = $patch + 1
-            $newCode = $verCode + 1
-            $newVer = "${major}.${minor}.${newPatch}+${newCode}"
-            $content = $content -replace 'version:\s*[0-9.]+\+[0-9]+', "version: $newVer"
-            Set-Content pubspec.yaml $content
-            Write-Output "Bumped version locally to $newVer"
-          }
-
-      - name: Generate code (build_runner)
-        run: dart run build_runner build --delete-conflicting-outputs
-
-      - name: Build Windows (release)
-        run: flutter build windows --release
-
-      # Package Windows build to EXE Installer
-      - name: Package Windows Build
-        shell: pwsh
-        run: |
-          $versionStr = (Select-String -Path pubspec.yaml -Pattern "^version:").Line.Split(" ")[1]
-          $verName = $versionStr.Split("+")[0]
-          $exeName = "StudyHabit-v${verName}-b${env:GITHUB_RUN_NUMBER}-windows-setup"
-          
-          # Replace version in installer.iss
-          $issContent = Get-Content installer.iss -Raw
-          $issContent = $issContent -replace 'AppVersion=.*', "AppVersion=$verName"
-          $issContent = $issContent -replace 'OutputBaseFilename=.*', "OutputBaseFilename=$exeName"
-          Set-Content installer.iss $issContent
-          
-          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
-          echo "exe_path=build/$exeName.exe" >> $env:GITHUB_ENV
-          echo "exe_name=$exeName.exe" >> $env:GITHUB_ENV
-
-      # Upload artifacts
-      - name: Upload Windows EXE
-        uses: actions/upload-artifact@v4
-        with:
-          name: studyhabit-windows
-          path: build/*.exe
-          retention-days: 14
-
-  release:
-    name: Create Unified Release
-    needs: [build-android, build-windows]
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push'
-    steps:
-      - name: Download Android Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: studyhabit-release
-          path: build-artifacts
-
-      - name: Download Windows Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: studyhabit-windows
-          path: build-artifacts
-
-      - name: Create Beta Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ needs.build-android.outputs.tag }}
-          name: "Beta ${{ needs.build-android.outputs.version_name }} (#${{ needs.build-android.outputs.build_number }})"
-          prerelease: true
-          body: |
-            ## 🧪 Beta Build
-
-            | Detail | Value |
-            |--------|-------|
-            | **Version** | `${{ needs.build-android.outputs.version_name }}` |
-            | **Build** | `#${{ needs.build-android.outputs.build_number }}` |
-            | **Commit** | `${{ needs.build-android.outputs.short_sha }}` |
-            | **Branch** | `${{ github.ref_name }}` |
-            | **Date** | $(date +%Y-%m-%d) |
-
-            ### Downloads
-            - `StudyHabit-v…-release.apk` — signed release build (Android)
-            - `StudyHabit-v…-windows-setup.exe` — setup wizard (Windows)
-
-            > This is an automated **beta** build. Not intended for production use.
-          files: |
-            build-artifacts/**/*
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          rm -f app/release.keystore app/key.properties

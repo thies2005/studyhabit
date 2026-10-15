@@ -1,9 +1,32 @@
-# Preserve generic signatures (crucial for Gson TypeToken)
--keepattributes Signature, *Annotation*, InnerClasses, EnclosingMethod
+# Room SQLite
+-keepclassmembers class * extends androidx.room.RoomDatabase {
+    <init>();
+}
+-keep class * extends androidx.room.RoomDatabase
+-dontwarn androidx.room.paging.**
 
-# Keep Gson's TypeToken class and its subclasses
--keep class com.google.gson.reflect.TypeToken { *; }
--keep class * extends com.google.gson.reflect.TypeToken
+# Kotlinx Serialization
+-keepattributes *Annotation*,InnerClasses
+-dontnote kotlinx.serialization.SerializationKt
+-keepclassmembers class * {
+    *** Companion;
+}
+-keepclasseswithmembers class * {
+    kotlinx.serialization.KSerializer serializer(...);
+}
 
-# Keep flutter_local_notifications classes
--keep class com.dexterous.flutterlocalnotifications.** { *; }
+# Retrofit & OkHttp
+-dontwarn okhttp3.**
+-dontwarn okio.**
+-dontwarn retrofit2.**
+-keepattributes Signature
+-keepattributes Exceptions
+
+# Data classes and entities
+-keep class de.schuelken.studyhabit.core.database.** { *; }
+-keep class de.schuelken.studyhabit.core.network.** { *; }
+-keep class de.schuelken.studyhabit.core.model.** { *; }
+
+# Security Crypto / Tink ErrorProne annotations
+-dontwarn com.google.errorprone.annotations.**
+
