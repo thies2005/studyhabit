@@ -99,11 +99,20 @@ export class XpService {
     });
 
     if (!userStats) {
+      const initialXp = Math.max(0, xp);
+      const initialMinutes = Math.max(0, studyMinutes);
       await client.userStats.create({
-        data: { userId, totalXp: xp, totalStudyMinutes: studyMinutes },
+        data: {
+          userId,
+          totalXp: initialXp,
+          totalStudyMinutes: initialMinutes,
+          currentLevel: this.calculateLevel(initialXp),
+          updatedAt: new Date(),
+        },
       });
     } else {
-      const newTotalXp = userStats.totalXp + xp;
+      const newTotalXp = Math.max(0, userStats.totalXp + xp);
+      const newTotalMinutes = Math.max(0, userStats.totalStudyMinutes + studyMinutes);
       const newLevel = this.calculateLevel(newTotalXp);
 
       await client.userStats.update({
@@ -111,7 +120,8 @@ export class XpService {
         data: {
           totalXp: newTotalXp,
           currentLevel: newLevel,
-          totalStudyMinutes: { increment: studyMinutes },
+          totalStudyMinutes: newTotalMinutes,
+          updatedAt: new Date(),
         },
       });
     }

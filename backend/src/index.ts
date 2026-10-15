@@ -30,15 +30,21 @@ app.use(helmet());
 
 app.set('trust proxy', 1);
 
+const allowedOrigins = config.CORS_ORIGIN === '*'
+  ? '*'
+  : config.CORS_ORIGIN.split(',').map((o) => o.trim()).filter(Boolean);
+
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || config.CORS_ORIGIN === '*') {
+    if (!origin || allowedOrigins === '*') {
       callback(null, true);
+    } else if (allowedOrigins.includes(origin)) {
+      callback(null, origin);
     } else {
-      callback(null, config.CORS_ORIGIN);
+      callback(null, false);
     }
   },
-  credentials: config.CORS_ORIGIN !== '*',
+  credentials: allowedOrigins !== '*',
 }));
 
 app.use(morgan(config.NODE_ENV === 'production' ? 'combined' : 'dev'));

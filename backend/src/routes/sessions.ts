@@ -4,40 +4,83 @@ import { prisma } from '../db.js';
 import { XpService } from '../services/xpService.js';
 import { AchievementService } from '../services/achievementService.js';
 import { parsePagination } from '../types/index.js';
+import { Prisma } from '@prisma/client';
 
 const router = Router();
 
 const sessionSchema = z.object({
   subjectId: z.string().uuid(),
-  topicId: z.string().uuid().optional(),
-  chapterId: z.string().uuid().optional(),
+  topicId: z.string().uuid().nullable().optional(),
+  chapterId: z.string().uuid().nullable().optional(),
   startedAt: z.string().datetime().optional(),
-  endedAt: z.string().datetime().optional(),
-  plannedDurationMinutes: z.number().int().min(5),
+  endedAt: z.string().datetime().nullable().optional(),
+  plannedDurationMinutes: z.number().int().min(0),
   actualDurationMinutes: z.number().int().min(0),
   pomodorosCompleted: z.number().int().min(0),
-  confidenceRating: z.number().int().min(1).max(5).optional(),
-  notes: z.string().optional(),
+  confidenceRating: z.number().int().min(1).max(5).nullable().optional(),
+  notes: z.string().max(5000).nullable().optional(),
+  sourceId: z.string().uuid().nullable().optional(),
+  startPage: z.number().int().min(0).nullable().optional(),
+  endPage: z.number().int().min(0).nullable().optional(),
+  isFreeTimer: z.boolean().optional(),
 });
 
 const updateSessionSchema = z.object({
-  topicId: z.string().uuid().optional(),
-  chapterId: z.string().uuid().optional(),
+  topicId: z.string().uuid().nullable().optional(),
+  chapterId: z.string().uuid().nullable().optional(),
   startedAt: z.string().datetime().optional(),
-  endedAt: z.string().datetime().optional(),
-  plannedDurationMinutes: z.number().int().min(5).optional(),
+  endedAt: z.string().datetime().nullable().optional(),
+  plannedDurationMinutes: z.number().int().min(0).optional(),
   actualDurationMinutes: z.number().int().min(0).optional(),
   pomodorosCompleted: z.number().int().min(0).optional(),
-  confidenceRating: z.number().int().min(1).max(5).optional(),
-  notes: z.string().optional(),
+  confidenceRating: z.number().int().min(1).max(5).nullable().optional(),
+  notes: z.string().max(5000).nullable().optional(),
+  sourceId: z.string().uuid().nullable().optional(),
+  startPage: z.number().int().min(0).nullable().optional(),
+  endPage: z.number().int().min(0).nullable().optional(),
+  isFreeTimer: z.boolean().optional(),
 });
+
+async function verifyHierarchyOwnership(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  subjectId: string,
+  topicId?: string | null,
+  chapterId?: string | null
+): Promise<{ valid: boolean; error?: string; status?: number }> {
+  const subject = await tx.subject.findFirst({
+    where: { id: subjectId, project: { userId, isDeleted: false }, isDeleted: false },
+  });
+  if (!subject) {
+    return { valid: false, error: 'Subject not found', status: 404 };
+  }
+  if (topicId) {
+    const topic = await tx.topic.findFirst({
+      where: { id: topicId, subjectId, isDeleted: false },
+    });
+    if (!topic) {
+      return { valid: false, error: 'Topic does not belong to this subject', status: 400 };
+    }
+    if (chapterId) {
+      const chapter = await tx.chapter.findFirst({
+        where: { id: chapterId, topicId, isDeleted: false },
+      });
+      if (!chapter) {
+        return { valid: false, error: 'Chapter does not belong to this topic', status: 400 };
+      }
+    }
+  } else if (chapterId) {
+    return { valid: false, error: 'Cannot specify chapterId without topicId', status: 400 };
+  }
+  return { valid: true };
+}
 
 router.get('/', async (req, res, next) => {
   try {
     const subjectId = req.query.subjectId ? String(req.query.subjectId) : undefined;
     const { skip, take, page, limit } = parsePagination(req.query as any);
     const where: any = {
-      subject: { project: { userId: req.user.userId } },
+      subject: { project: { userId: req.user.userId, isDeleted: false }, isDeleted: false },
       isDeleted: false,
     };
     if (subjectId) {
@@ -75,7 +118,11 @@ router.get('/:id', async (req, res, next) => {
   try {
     const id = String(req.params.id);
     const session = await prisma.studySession.findFirst({
-      where: { id, subject: { project: { userId: req.user.userId } }, isDeleted: false },
+      where: {
+        id,
+        subject: { project: { userId: req.user.userId, isDeleted: false }, isDeleted: false },
+        isDeleted: false,
+      },
       include: {
         subject: {
           select: {
@@ -99,24 +146,24 @@ router.post('/', async (req, res, next) => {
   try {
     const data = sessionSchema.parse(req.body);
 
-    const subject = await prisma.subject.findFirst({
-      where: { id: data.subjectId, project: { userId: req.user.userId } },
-    });
-
-    if (!subject) {
-      return res.status(404).json({ error: 'Subject not found' });
-    }
-
     const xpEarned = XpService.xpForSession(
       data.actualDurationMinutes,
       data.pomodorosCompleted,
-      data.confidenceRating
+      data.confidenceRating ?? undefined
     );
 
-    // Create the session plus all derived XP/streak/achievement side effects in
-    // a single transaction, so a failure partway through cannot leave the DB in
-    // an inconsistent state (e.g. session recorded but XP never credited).
     const { session, newAchievements } = await prisma.$transaction(async (tx) => {
+      const check = await verifyHierarchyOwnership(
+        tx,
+        req.user.userId,
+        data.subjectId,
+        data.topicId,
+        data.chapterId
+      );
+      if (!check.valid) {
+        throw new Error(`STATUS_${check.status || 400}:${check.error}`);
+      }
+
       const session = await tx.studySession.create({
         data: {
           subjectId: data.subjectId,
@@ -130,6 +177,10 @@ router.post('/', async (req, res, next) => {
           confidenceRating: data.confidenceRating,
           notes: data.notes,
           xpEarned,
+          sourceId: data.sourceId,
+          startPage: data.startPage,
+          endPage: data.endPage,
+          isFreeTimer: data.isFreeTimer ?? false,
           updatedAt: new Date(),
         },
       });
@@ -146,7 +197,6 @@ router.post('/', async (req, res, next) => {
         tx
       );
 
-      // Update streak if this is a new study day
       const userStats = await tx.userStats.findUnique({
         where: { userId: req.user.userId },
       });
@@ -169,8 +219,6 @@ router.post('/', async (req, res, next) => {
           const newStreak = isConsecutive ? oldStreak + 1 : 1;
           const longestStreak = Math.max(newStreak, userStats.longestStreak);
 
-          // Award XP only for milestones that were just crossed
-          // (old < threshold AND new >= threshold)
           const streakXp = XpService.xpForStreakMilestones(oldStreak, newStreak);
           if (streakXp > 0) {
             await XpService.addXpAndMinutes(req.user.userId, streakXp, 0, tx);
@@ -182,6 +230,7 @@ router.post('/', async (req, res, next) => {
               currentStreak: newStreak,
               longestStreak,
               lastStudyDate: sessionDate,
+              updatedAt: new Date(),
             },
           });
         }
@@ -194,6 +243,12 @@ router.post('/', async (req, res, next) => {
 
     res.status(201).json({ data: { ...session, newAchievements } });
   } catch (error: unknown) {
+    if (error instanceof Error && error.message.startsWith('STATUS_')) {
+      const colonIdx = error.message.indexOf(':');
+      const status = parseInt(error.message.substring(7, colonIdx), 10);
+      const message = error.message.substring(colonIdx + 1);
+      return res.status(status).json({ error: message });
+    }
     next(error);
   }
 });
@@ -203,81 +258,115 @@ router.patch('/:id', async (req, res, next) => {
     const id = String(req.params.id);
     const data = updateSessionSchema.parse(req.body);
 
-    const existing = await prisma.studySession.findFirst({
-      where: { id, subject: { project: { userId: req.user.userId } }, isDeleted: false },
-    });
-
-    if (!existing) {
-      return res.status(404).json({ error: 'Session not found' });
-    }
-
-    // Destructure data to exclude any fields that shouldn't be updated
-    const updateData: {
-      topicId?: string | null;
-      chapterId?: string | null;
-      startedAt?: Date;
-      endedAt?: Date | null;
-      plannedDurationMinutes?: number;
-      actualDurationMinutes?: number;
-      pomodorosCompleted?: number;
-      confidenceRating?: number | null;
-      notes?: string | null;
-      xpEarned?: number;
-      updatedAt?: Date;
-    } = {};
-
-    if (data.startedAt) updateData.startedAt = new Date(data.startedAt);
-    if (data.endedAt !== undefined) {
-      updateData.endedAt = data.endedAt ? new Date(data.endedAt) : null;
-    }
-    if (data.topicId !== undefined) updateData.topicId = data.topicId;
-    if (data.chapterId !== undefined) updateData.chapterId = data.chapterId;
-    if (data.plannedDurationMinutes !== undefined) updateData.plannedDurationMinutes = data.plannedDurationMinutes;
-    if (data.actualDurationMinutes !== undefined) updateData.actualDurationMinutes = data.actualDurationMinutes;
-    if (data.pomodorosCompleted !== undefined) updateData.pomodorosCompleted = data.pomodorosCompleted;
-    if (data.confidenceRating !== undefined) updateData.confidenceRating = data.confidenceRating;
-    if (data.notes !== undefined) updateData.notes = data.notes;
-
-    // Recalculate XP if pomodorosCompleted, confidenceRating, or actualDurationMinutes changed
-    const xpChanged = data.pomodorosCompleted !== undefined ||
-      data.confidenceRating !== undefined ||
-      data.actualDurationMinutes !== undefined;
-
-    if (xpChanged) {
-      const newXpEarned = XpService.xpForSession(
-        data.actualDurationMinutes ?? existing.actualDurationMinutes,
-        data.pomodorosCompleted ?? existing.pomodorosCompleted,
-        data.confidenceRating ?? existing.confidenceRating ?? undefined
-      );
-      updateData.xpEarned = newXpEarned;
-    }
-
-    // Ensure updatedAt is updated on every modification
-    updateData.updatedAt = new Date();
-
     const session = await prisma.$transaction(async (tx) => {
-      const session = await tx.studySession.update({
+      const existing = await tx.studySession.findFirst({
+        where: {
+          id,
+          subject: { project: { userId: req.user.userId, isDeleted: false }, isDeleted: false },
+          isDeleted: false,
+        },
+      });
+
+      if (!existing) {
+        throw new Error('STATUS_404:Session not found');
+      }
+
+      const newTopicId = data.topicId !== undefined ? data.topicId : existing.topicId;
+      const newChapterId = data.chapterId !== undefined ? data.chapterId : existing.chapterId;
+
+      if (data.topicId !== undefined || data.chapterId !== undefined) {
+        const check = await verifyHierarchyOwnership(
+          tx,
+          req.user.userId,
+          existing.subjectId,
+          newTopicId,
+          newChapterId
+        );
+        if (!check.valid) {
+          throw new Error(`STATUS_${check.status || 400}:${check.error}`);
+        }
+      }
+
+      const updateData: {
+        topicId?: string | null;
+        chapterId?: string | null;
+        startedAt?: Date;
+        endedAt?: Date | null;
+        plannedDurationMinutes?: number;
+        actualDurationMinutes?: number;
+        pomodorosCompleted?: number;
+        confidenceRating?: number | null;
+        notes?: string | null;
+        sourceId?: string | null;
+        startPage?: number | null;
+        endPage?: number | null;
+        isFreeTimer?: boolean;
+        xpEarned?: number;
+        updatedAt?: Date;
+      } = {};
+
+      if (data.startedAt) updateData.startedAt = new Date(data.startedAt);
+      if (data.endedAt !== undefined) {
+        updateData.endedAt = data.endedAt ? new Date(data.endedAt) : null;
+      }
+      if (data.topicId !== undefined) updateData.topicId = data.topicId;
+      if (data.chapterId !== undefined) updateData.chapterId = data.chapterId;
+      if (data.plannedDurationMinutes !== undefined) updateData.plannedDurationMinutes = data.plannedDurationMinutes;
+      if (data.actualDurationMinutes !== undefined) updateData.actualDurationMinutes = data.actualDurationMinutes;
+      if (data.pomodorosCompleted !== undefined) updateData.pomodorosCompleted = data.pomodorosCompleted;
+      if (data.confidenceRating !== undefined) updateData.confidenceRating = data.confidenceRating;
+      if (data.notes !== undefined) updateData.notes = data.notes;
+      if (data.sourceId !== undefined) updateData.sourceId = data.sourceId;
+      if (data.startPage !== undefined) updateData.startPage = data.startPage;
+      if (data.endPage !== undefined) updateData.endPage = data.endPage;
+      if (data.isFreeTimer !== undefined) updateData.isFreeTimer = data.isFreeTimer;
+
+      const xpChanged = data.pomodorosCompleted !== undefined ||
+        data.confidenceRating !== undefined ||
+        data.actualDurationMinutes !== undefined;
+
+      if (xpChanged) {
+        const newXpEarned = XpService.xpForSession(
+          data.actualDurationMinutes ?? existing.actualDurationMinutes,
+          data.pomodorosCompleted ?? existing.pomodorosCompleted,
+          (data.confidenceRating !== undefined ? data.confidenceRating : existing.confidenceRating) ?? undefined
+        );
+        updateData.xpEarned = newXpEarned;
+      }
+
+      updateData.updatedAt = new Date();
+
+      const updated = await tx.studySession.update({
         where: { id },
         data: updateData,
       });
 
-      // If XP changed, update subject XP and user stats atomically
-      if (xpChanged) {
-        const xpDelta = session.xpEarned - existing.xpEarned;
+      const finalDuration = updateData.actualDurationMinutes ?? existing.actualDurationMinutes;
+      const durationDelta = finalDuration - existing.actualDurationMinutes;
+      const xpDelta = (updateData.xpEarned ?? existing.xpEarned) - existing.xpEarned;
+
+      if (xpDelta !== 0 || durationDelta !== 0) {
         if (xpDelta !== 0) {
+          const sub = await tx.subject.findUnique({ where: { id: existing.subjectId } });
           await tx.subject.update({
-            where: { id: session.subjectId },
-            data: { xpTotal: { increment: xpDelta } },
+            where: { id: existing.subjectId },
+            data: { xpTotal: Math.max(0, (sub?.xpTotal ?? 0) + xpDelta) },
           });
-          await XpService.addXpAndMinutes(req.user.userId, xpDelta, 0, tx);
         }
+        await XpService.addXpAndMinutes(req.user.userId, xpDelta, durationDelta, tx);
       }
 
-      return session;
+      return updated;
     });
 
     res.json({ data: session });
   } catch (error: unknown) {
+    if (error instanceof Error && error.message.startsWith('STATUS_')) {
+      const colonIdx = error.message.indexOf(':');
+      const status = parseInt(error.message.substring(7, colonIdx), 10);
+      const message = error.message.substring(colonIdx + 1);
+      return res.status(status).json({ error: message });
+    }
     next(error);
   }
 });
@@ -285,17 +374,47 @@ router.patch('/:id', async (req, res, next) => {
 router.delete('/:id', async (req, res, next) => {
   try {
     const id = String(req.params.id);
-    const result = await prisma.studySession.updateMany({
-      where: { id, subject: { project: { userId: req.user.userId } } },
-      data: { isDeleted: true, updatedAt: new Date() },
-    });
 
-    if (result.count === 0) {
-      return res.status(404).json({ error: 'Session not found' });
-    }
+    await prisma.$transaction(async (tx) => {
+      const existing = await tx.studySession.findFirst({
+        where: {
+          id,
+          subject: { project: { userId: req.user.userId, isDeleted: false }, isDeleted: false },
+          isDeleted: false,
+        },
+      });
+
+      if (!existing) {
+        throw new Error('STATUS_404:Session not found');
+      }
+
+      await tx.studySession.update({
+        where: { id },
+        data: { isDeleted: true, updatedAt: new Date() },
+      });
+
+      const sub = await tx.subject.findUnique({ where: { id: existing.subjectId } });
+      await tx.subject.update({
+        where: { id: existing.subjectId },
+        data: { xpTotal: Math.max(0, (sub?.xpTotal ?? 0) - existing.xpEarned) },
+      });
+
+      await XpService.addXpAndMinutes(
+        req.user.userId,
+        -existing.xpEarned,
+        -existing.actualDurationMinutes,
+        tx
+      );
+    });
 
     res.status(204).send();
   } catch (error: unknown) {
+    if (error instanceof Error && error.message.startsWith('STATUS_')) {
+      const colonIdx = error.message.indexOf(':');
+      const status = parseInt(error.message.substring(7, colonIdx), 10);
+      const message = error.message.substring(colonIdx + 1);
+      return res.status(status).json({ error: message });
+    }
     next(error);
   }
 });

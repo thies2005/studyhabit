@@ -11,6 +11,16 @@ const router = Router();
 const MAX_SETTINGS_KEYS = 200;
 const MAX_SETTINGS_BYTES = 64 * 1024;
 
+const ALLOWED_PREFIXES = ['theme.', 'pomodoro.', 'notifications.', 'streak.', 'goal.'];
+const ALLOWED_EXACT = new Set(['active_timer_type', 'pomodoro_state_json', 'free_timer_state_json']);
+const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+export function isAllowedSettingsKey(key: string): boolean {
+  if (FORBIDDEN_KEYS.has(key)) return false;
+  if (ALLOWED_EXACT.has(key)) return true;
+  return ALLOWED_PREFIXES.some((prefix) => key.startsWith(prefix));
+}
+
 const settingsSchema = z
   .record(z.unknown())
   .refine((obj) => Object.keys(obj).length <= MAX_SETTINGS_KEYS, {
@@ -18,7 +28,13 @@ const settingsSchema = z
   })
   .refine((obj) => Buffer.byteLength(JSON.stringify(obj)) <= MAX_SETTINGS_BYTES, {
     message: `Settings payload must be at most ${MAX_SETTINGS_BYTES} bytes`,
-  });
+  })
+  .refine(
+    (obj) => Object.keys(obj).every(isAllowedSettingsKey),
+    {
+      message: 'Settings contains invalid or forbidden key',
+    }
+  );
 
 router.get('/', async (req, res, next) => {
   try {
@@ -33,11 +49,18 @@ router.get('/', async (req, res, next) => {
 
 router.post('/', async (req, res, next) => {
   try {
-    const settings = settingsSchema.parse(req.body);
+    const incoming = settingsSchema.parse(req.body);
+    const existing = await prisma.userSettings.findUnique({
+      where: { userId: req.user.userId },
+    });
+    const merged = {
+      ...((existing?.settings as Record<string, unknown>) ?? {}),
+      ...incoming,
+    };
     const updated = await prisma.userSettings.upsert({
       where: { userId: req.user.userId },
-      create: { userId: req.user.userId, settings: settings as any },
-      update: { settings: settings as any },
+      create: { userId: req.user.userId, settings: merged as any, updatedAt: new Date() },
+      update: { settings: merged as any, updatedAt: new Date() },
     });
     res.json({ data: updated.settings });
   } catch (error) {

@@ -2,21 +2,14 @@ import { Router } from 'express';
 import { z, ZodError } from 'zod';
 import { SyncService } from '../services/syncService.js';
 import { prisma } from '../db.js';
+import { Prisma } from '@prisma/client';
 
-// S3 fix: Per-user mutex to prevent concurrent sync operations. The in-process
-// Map serializes concurrent requests within a single API instance (fast path).
-// On top of that, a Postgres transaction-level advisory lock serializes sync
-// across replicas/instances, so horizontal scaling can't let two instances run
-// sync/full for the same user at once. The advisory lock auto-releases when the
-// surrounding transaction commits or rolls back.
 const userSyncLocks = new Map<string, Promise<void>>();
 
-function withUserLock<T>(userId: string, fn: () => Promise<T>): Promise<T> {
+function withUserLock<T>(userId: string, fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
   const existing = userSyncLocks.get(userId) ?? Promise.resolve();
   const newLock = existing
     .then(() =>
-      // Acquire a DB-level advisory lock for cross-instance safety, then run
-      // the operation, then release by committing the lock transaction.
       prisma.$transaction(async (tx) => {
         // Stable 32-bit key derived from the userId (crc32-style via md5 prefix).
         const keyResult = await tx.$queryRaw`SELECT ('x' || substr(md5(${userId}::text), 1, 8))::bit(32)::int AS k`;
@@ -25,8 +18,8 @@ function withUserLock<T>(userId: string, fn: () => Promise<T>): Promise<T> {
           | null;
         const key = row?.k ?? 0;
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(${key})`;
-        return fn();
-      })
+        return fn(tx);
+      }, { timeout: 30000 })
     )
     .finally(() => {
       // Clean up only if we're still the latest lock
@@ -40,8 +33,6 @@ function withUserLock<T>(userId: string, fn: () => Promise<T>): Promise<T> {
 
 const router = Router();
 
-// Validate the `since` query param (ISO 8601 datetime). Returns the raw string
-// on success or a 400-error message string on failure.
 function parseSince(raw: string | undefined): string | null {
   if (!raw) return null;
   const d = new Date(raw);
@@ -68,20 +59,10 @@ const pushSchema = z.object({
 
 router.post('/push', async (req, res, next) => {
   try {
-    const payload = pushSchema.parse(req.body) as unknown as {
-      projects?: unknown[];
-      subjects?: unknown[];
-      topics?: unknown[];
-      chapters?: unknown[];
-      sessions?: unknown[];
-      sources?: unknown[];
-      skillLabels?: unknown[];
-      achievements?: unknown[];
-      userStats?: unknown;
-      subjectMilestones?: unknown[];
-      userSettings?: { settings: unknown; updatedAt: string | Date };
-    };
-    const result = await SyncService.pushChanges(req.user.userId, payload as any);
+    const payload = pushSchema.parse(req.body);
+    const result = await withUserLock(req.user.userId, (tx) =>
+      SyncService.pushChanges(req.user.userId, payload as any, tx)
+    );
     res.json({ data: result });
   } catch (error: unknown) {
     if (error instanceof ZodError) {
@@ -117,24 +98,11 @@ router.post('/full', async (req, res, next) => {
       });
     }
 
-    const payload = pushSchema.parse(req.body) as unknown as {
-      projects?: unknown[];
-      subjects?: unknown[];
-      topics?: unknown[];
-      chapters?: unknown[];
-      sessions?: unknown[];
-      sources?: unknown[];
-      skillLabels?: unknown[];
-      achievements?: unknown[];
-      userStats?: unknown;
-      subjectMilestones?: unknown[];
-      userSettings?: { settings: unknown; updatedAt: string | Date };
-    };
+    const payload = pushSchema.parse(req.body);
 
-    // S3 fix: Serialize concurrent syncs for the same user
-    const result = await withUserLock(req.user.userId, async () => {
-      const pushResult = await SyncService.pushChanges(req.user.userId, payload as any);
-      const pullData = await SyncService.fullPull(req.user.userId, since);
+    const result = await withUserLock(req.user.userId, async (tx) => {
+      const pushResult = await SyncService.pushChanges(req.user.userId, payload as any, tx);
+      const pullData = await SyncService.fullPull(req.user.userId, since, tx);
       return { push: pushResult, pull: pullData };
     });
 
@@ -150,13 +118,12 @@ router.post('/full', async (req, res, next) => {
 router.post('/erase', async (req, res, next) => {
   try {
     const userId = req.user.userId;
-    // Prisma cascades deletes so deleting Projects deletes Subjects, Topics, Chapters, Sessions, Sources, SkillLabels, Milestones
-    await prisma.$transaction([
-      prisma.project.deleteMany({ where: { userId } }),
-      prisma.achievement.deleteMany({ where: { userId } }),
-      prisma.userStats.deleteMany({ where: { userId } }),
-      prisma.userSettings.deleteMany({ where: { userId } }),
-    ]);
+    await withUserLock(userId, async (tx) => {
+      await tx.project.deleteMany({ where: { userId } });
+      await tx.achievement.deleteMany({ where: { userId } });
+      await tx.userStats.deleteMany({ where: { userId } });
+      await tx.userSettings.deleteMany({ where: { userId } });
+    });
     res.json({ success: true });
   } catch (error: unknown) {
     next(error);

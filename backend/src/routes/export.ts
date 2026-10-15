@@ -21,14 +21,14 @@ router.get('/', async (req, res, next) => {
       settingsRow
     ] = await Promise.all([
       prisma.userStats.findUnique({ where: { userId } }),
-      prisma.project.findMany({ where: { userId } }),
-      prisma.subject.findMany({ where: { project: { userId } } }),
-      prisma.topic.findMany({ where: { subject: { project: { userId } } } }),
-      prisma.chapter.findMany({ where: { topic: { subject: { project: { userId } } } } }),
-      prisma.studySession.findMany({ where: { subject: { project: { userId } } } }),
-      prisma.source.findMany({ where: { subject: { project: { userId } } } }),
-      prisma.skillLabel.findMany({ where: { subject: { project: { userId } } } }),
-      prisma.subjectMilestone.findMany({ where: { subject: { project: { userId } } } }),
+      prisma.project.findMany({ where: { userId, isDeleted: false } }),
+      prisma.subject.findMany({ where: { isDeleted: false, project: { userId, isDeleted: false } } }),
+      prisma.topic.findMany({ where: { isDeleted: false, subject: { isDeleted: false, project: { userId, isDeleted: false } } } }),
+      prisma.chapter.findMany({ where: { isDeleted: false, topic: { isDeleted: false, subject: { isDeleted: false, project: { userId, isDeleted: false } } } } }),
+      prisma.studySession.findMany({ where: { isDeleted: false, subject: { isDeleted: false, project: { userId, isDeleted: false } } } }),
+      prisma.source.findMany({ where: { isDeleted: false, subject: { isDeleted: false, project: { userId, isDeleted: false } } } }),
+      prisma.skillLabel.findMany({ where: { isDeleted: false, subject: { isDeleted: false, project: { userId, isDeleted: false } } } }),
+      prisma.subjectMilestone.findMany({ where: { isDeleted: false, subject: { isDeleted: false, project: { userId, isDeleted: false } } } }),
       prisma.achievement.findMany({ where: { userId } }),
       prisma.userSettings.findUnique({ where: { userId } }),
     ]);

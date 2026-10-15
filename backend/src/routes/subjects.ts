@@ -7,21 +7,27 @@ const router = Router();
 
 const subjectSchema = z.object({
   projectId: z.string().uuid(),
-  name: z.string().min(1).max(100),
-  description: z.string().optional(),
+  name: z.string().min(1).max(255),
+  description: z.string().max(2000).nullable().optional(),
   colorValue: z.number().transform(v => v & 0xFFFFFF),
   hierarchyMode: z.enum(['flat', 'twoLevel', 'threeLevel']),
   defaultDurationMinutes: z.number().int().min(5).max(90),
   defaultBreakMinutes: z.number().int().min(1).max(30),
+  completenessMode: z.enum(['none', 'hoursGoal', 'milestones', 'weeklyHoursGoal']).optional(),
+  targetHours: z.number().int().min(0).nullable().optional(),
+  targetWeeklyHours: z.number().int().min(0).nullable().optional(),
 });
 
 const updateSubjectSchema = z.object({
-  name: z.string().min(1).max(100).optional(),
-  description: z.string().optional(),
+  name: z.string().min(1).max(255).optional(),
+  description: z.string().max(2000).nullable().optional(),
   colorValue: z.number().transform(v => v & 0xFFFFFF).optional(),
   hierarchyMode: z.enum(['flat', 'twoLevel', 'threeLevel']).optional(),
   defaultDurationMinutes: z.number().int().min(5).max(90).optional(),
   defaultBreakMinutes: z.number().int().min(1).max(30).optional(),
+  completenessMode: z.enum(['none', 'hoursGoal', 'milestones', 'weeklyHoursGoal']).optional(),
+  targetHours: z.number().int().min(0).nullable().optional(),
+  targetWeeklyHours: z.number().int().min(0).nullable().optional(),
 });
 
 // Schema for validating query parameters
@@ -33,7 +39,9 @@ router.get('/', async (req, res, next) => {
   try {
     const { projectId } = listSubjectsQuerySchema.parse(req.query);
     const { skip, take, page, limit } = parsePagination(req.query as any);
-    const where = projectId ? { projectId, project: { userId: req.user.userId }, isDeleted: false } : { project: { userId: req.user.userId }, isDeleted: false };
+    const where = projectId
+      ? { projectId, project: { userId: req.user.userId, isDeleted: false }, isDeleted: false }
+      : { project: { userId: req.user.userId, isDeleted: false }, isDeleted: false };
     const [subjects, total] = await Promise.all([
       prisma.subject.findMany({
         where,
@@ -42,6 +50,7 @@ router.get('/', async (req, res, next) => {
         take,
         include: {
           sessions: {
+            where: { isDeleted: false },
             select: { actualDurationMinutes: true },
           },
         },
@@ -51,7 +60,7 @@ router.get('/', async (req, res, next) => {
     const subjectsWithMinutes = subjects.map((sub: any) => {
       const totalMinutes = sub.sessions?.reduce((sum: number, s: any) => sum + (s.actualDurationMinutes || 0), 0) || 0;
       const { sessions, ...rest } = sub;
-      return { ...rest, totalStudyMinutes: totalMinutes };
+      return { ...rest, totalStudyMinutes: totalMinutes, totalStudyHours: Number((totalMinutes / 60).toFixed(1)) };
     });
 
     res.json({
@@ -67,15 +76,33 @@ router.get('/:id', async (req, res, next) => {
   try {
     const id = String(req.params.id);
     const subject = await prisma.subject.findFirst({
-      where: { id, project: { userId: req.user.userId }, isDeleted: false },
+      where: { id, project: { userId: req.user.userId, isDeleted: false }, isDeleted: false },
       include: {
-        topics: { include: { chapters: true }, orderBy: { order: 'asc' } },
+        topics: {
+          where: { isDeleted: false },
+          orderBy: { order: 'asc' },
+          include: {
+            chapters: { where: { isDeleted: false }, orderBy: { order: 'asc' } },
+          },
+        },
+        sessions: {
+          where: { isDeleted: false },
+          select: { actualDurationMinutes: true },
+        },
       },
     });
     if (!subject) {
       return res.status(404).json({ error: 'Subject not found' });
     }
-    res.json({ data: subject });
+    const totalStudyMinutes = subject.sessions.reduce((sum, s) => sum + (s.actualDurationMinutes || 0), 0);
+    const { sessions, ...rest } = subject;
+    res.json({
+      data: {
+        ...rest,
+        totalStudyMinutes,
+        totalStudyHours: Number((totalStudyMinutes / 60).toFixed(1)),
+      },
+    });
   } catch (error: unknown) {
     next(error);
   }
@@ -87,7 +114,7 @@ router.post('/', async (req, res, next) => {
 
     // Verify project ownership before creating subject
     const project = await prisma.project.findFirst({
-      where: { id: data.projectId, userId: req.user.userId },
+      where: { id: data.projectId, userId: req.user.userId, isDeleted: false },
     });
     if (!project) {
       return res.status(404).json({ error: 'Project not found' });
@@ -105,7 +132,7 @@ router.patch('/:id', async (req, res, next) => {
     const id = String(req.params.id);
     const data = updateSubjectSchema.parse(req.body);
     const result = await prisma.subject.updateMany({
-      where: { id, project: { userId: req.user.userId }, isDeleted: false },
+      where: { id, project: { userId: req.user.userId, isDeleted: false }, isDeleted: false },
       data: { ...data, updatedAt: new Date() },
     });
 
@@ -124,7 +151,7 @@ router.delete('/:id', async (req, res, next) => {
   try {
     const id = String(req.params.id);
     const result = await prisma.subject.updateMany({
-      where: { id, project: { userId: req.user.userId } },
+      where: { id, project: { userId: req.user.userId, isDeleted: false }, isDeleted: false },
       data: { isDeleted: true, updatedAt: new Date() },
     });
 
@@ -150,7 +177,7 @@ export function createProjectSubjectRoutes(): Router {
 
       // Verify project ownership
       const project = await prisma.project.findFirst({
-        where: { id: projectId, userId: req.user.userId },
+        where: { id: projectId, userId: req.user.userId, isDeleted: false },
       });
 
       if (!project) {
@@ -165,6 +192,7 @@ export function createProjectSubjectRoutes(): Router {
           take,
           include: {
             sessions: {
+              where: { isDeleted: false },
               select: { actualDurationMinutes: true },
             },
           },
@@ -175,7 +203,7 @@ export function createProjectSubjectRoutes(): Router {
       const subjectsWithMinutes = subjects.map((sub: any) => {
         const totalMinutes = sub.sessions?.reduce((sum: number, s: any) => sum + (s.actualDurationMinutes || 0), 0) || 0;
         const { sessions, ...rest } = sub;
-        return { ...rest, totalStudyMinutes: totalMinutes };
+        return { ...rest, totalStudyMinutes: totalMinutes, totalStudyHours: Number((totalMinutes / 60).toFixed(1)) };
       });
 
       res.json({
@@ -195,7 +223,7 @@ export function createProjectSubjectRoutes(): Router {
 
       // Verify project ownership before creating subject
       const project = await prisma.project.findFirst({
-        where: { id: projectId, userId: req.user.userId },
+        where: { id: projectId, userId: req.user.userId, isDeleted: false },
       });
       if (!project) {
         return res.status(404).json({ error: 'Project not found' });
