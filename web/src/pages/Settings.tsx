@@ -5,30 +5,17 @@ import { useApi } from '../api/hooks';
 import apiClient from '../api/client';
 import type { StatsOverview } from '../types';
 
-const presetSeeds = [
-  '#006874', // Deep Teal
-  '#4F378B', // Purple
-  '#004A77', // Blue
-  '#005313', // Green
-  '#93000A', // Red
-  '#7D264A', // Pink
-  '#8D1500', // Orange
-  '#5D4200', // Amber
-  '#004F50', // Cyan
-  '#0008A6', // Indigo
-  '#00522B', // Emerald
-  '#332D41', // Slate
-];
+import { PRESET_SEEDS, applyThemeToDom } from '../hooks/useThemeSettings';
 
 export default function Settings() {
-  const { logout } = useAuth();
+  const { logout, userEmail } = useAuth();
   const navigate = useNavigate();
   const { data: stats } = useApi<StatsOverview>('/stats/overview');
 
   const [isLoading, setIsLoading] = useState(true);
 
   // Theme settings
-  const [seedColor, setSeedColor] = useState(presetSeeds[0]);
+  const [seedColor, setSeedColor] = useState(PRESET_SEEDS[0].seed);
   const [fontScale, setFontScale] = useState<'small' | 'normal' | 'large'>('normal');
   // 0: system, 1: light, 2: dark
   const [themeMode, setThemeMode] = useState(2);
@@ -46,7 +33,6 @@ export default function Settings() {
 
   // Streak settings
   const [gracePeriod, setGracePeriod] = useState(2);
-  const freezeTokens = stats?.freezeTokens ?? 0;
   const [saveError, setSaveError] = useState(false);
   // Guards against the auto-save effect firing on initial load (re-saving the
   // values we just fetched) and against saving before the load completes.
@@ -57,7 +43,7 @@ export default function Settings() {
       const data = res.data.data;
       if (data) {
         const seedIndex = data['theme.seedColorIndex'] ?? 0;
-        setSeedColor(presetSeeds[seedIndex] || presetSeeds[0]);
+        setSeedColor(PRESET_SEEDS[seedIndex]?.seed || PRESET_SEEDS[0].seed);
 
         setThemeMode(data['theme.themeMode'] ?? 2);
 
@@ -83,12 +69,23 @@ export default function Settings() {
     });
   }, []);
 
+  // Apply theme mode, seed color, and font scale immediately for live preview
+  useEffect(() => {
+    const seedIndex = PRESET_SEEDS.findIndex(s => s.seed === seedColor);
+    const fontScaleNum = fontScale === 'small' ? 0.9 : fontScale === 'large' ? 1.15 : 1.0;
+    applyThemeToDom({
+      'theme.themeMode': themeMode,
+      'theme.seedColorIndex': seedIndex >= 0 ? seedIndex : 0,
+      'theme.fontScale': fontScaleNum,
+    });
+  }, [themeMode, seedColor, fontScale]);
+
   // Debounced auto-save: only persist user-driven changes (after load), and
   // coalesce rapid edits (e.g. dragging a slider) into a single request.
   useEffect(() => {
     if (isLoading || !hasLoadedSettings.current) return;
 
-    const seedIndex = presetSeeds.indexOf(seedColor);
+    const seedIndex = PRESET_SEEDS.findIndex(s => s.seed === seedColor);
     const fontScaleNum = fontScale === 'small' ? 0.9 : fontScale === 'large' ? 1.15 : 1.0;
 
     const payload = {
@@ -118,39 +115,6 @@ export default function Settings() {
     return () => clearTimeout(timer);
   }, [seedColor, fontScale, themeMode, workDuration, shortBreak, longBreak, longBreakEvery,
       autoStartBreaks, vibrationOnComplete, enableNotifications, gracePeriod, isLoading]);
-
-  // Apply theme mode immediately for responsiveness (matches useThemeSettings).
-  useEffect(() => {
-    const root = document.documentElement;
-    if (themeMode === 2) {
-      root.classList.add('dark');
-    } else if (themeMode === 1) {
-      root.classList.remove('dark');
-    } else {
-      if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-        root.classList.add('dark');
-      } else {
-        root.classList.remove('dark');
-      }
-    }
-  }, [themeMode]);
-
-  const getEmailFromToken = () => {
-    try {
-      const token = localStorage.getItem('access_token');
-      if (!token) return '';
-      const base64Url = token.split('.')[1];
-      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-      const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function(c) {
-          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-      }).join(''));
-
-      const payload = JSON.parse(jsonPayload);
-      return payload.email || '';
-    } catch {
-      return '';
-    }
-  };
 
   const handleLogout = async () => {
     await logout();
@@ -225,15 +189,15 @@ export default function Settings() {
                 Seed Color
               </label>
               <div className="flex flex-wrap gap-3">
-                {presetSeeds.map((color) => (
+                {PRESET_SEEDS.map((preset) => (
                   <button
-                    key={color}
-                    onClick={() => setSeedColor(color)}
+                    key={preset.seed}
+                    onClick={() => setSeedColor(preset.seed)}
                     className={`w-10 h-10 rounded-full transition-all hover:scale-110 ${
-                      seedColor === color ? 'ring-2 ring-white ring-offset-2 ring-offset-[#323536]' : ''
+                      seedColor === preset.seed ? 'ring-2 ring-white ring-offset-2 ring-offset-[#323536]' : ''
                     }`}
-                    style={{ backgroundColor: color }}
-                    title={color}
+                    style={{ backgroundColor: preset.seed }}
+                    title={preset.seed}
                   />
                 ))}
               </div>
@@ -453,7 +417,7 @@ export default function Settings() {
                 </p>
               </div>
               <span className="px-3 py-1 bg-tertiary/20 text-tertiary text-sm font-medium rounded-full font-body">
-                {freezeTokens} tokens
+                {stats?.freezeTokens ?? 0} tokens
               </span>
             </div>
           </div>
@@ -490,7 +454,7 @@ export default function Settings() {
                 </div>
                 <div>
                   <p className="text-sm font-bold text-onSurface font-heading">Cloud Sync Active</p>
-                  <p className="text-xs text-gray-400 font-body">{getEmailFromToken()}</p>
+                  <p className="text-xs text-gray-400 font-body">{userEmail || 'Active'}</p>
                 </div>
               </div>
               <span className="px-3 py-1 bg-green-500/20 text-green-400 text-xs font-medium rounded-full font-body">

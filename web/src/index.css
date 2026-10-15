@@ -7,9 +7,25 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: dark;
-  background-color: #0F1416;
-  color: #E1E3E4;
+  color-scheme: light;
+  --color-bg: #F5FAFB;
+  --color-surface: #EFF4F6;
+  --color-surface-lowest: #FFFFFF;
+  --color-surface-low: #E9EFF1;
+  --color-surface-container: #E3EAEB;
+  --color-surface-high: #DDE4E6;
+  --color-surface-highest: #D7DFE1;
+  --color-on-surface: #171C1E;
+  --color-on-surface-variant: #3F484B;
+  --color-outline: #6F797B;
+  --color-outline-variant: #BFC8CA;
+  --color-primary: #006874;
+  --color-primary-container: #9EEFFD;
+  --color-on-primary-container: #001F24;
+  --font-scale: 1;
+  font-size: calc(16px * var(--font-scale));
+  background-color: var(--color-bg);
+  color: var(--color-on-surface);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -17,12 +33,31 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+html.dark {
+  color-scheme: dark;
+  --color-bg: #0F1416;
+  --color-surface: #111416;
+  --color-surface-lowest: #070F11;
+  --color-surface-low: #151C1F;
+  --color-surface-container: #192023;
+  --color-surface-high: #232A2E;
+  --color-surface-highest: #2E3539;
+  --color-on-surface: #E1E3E4;
+  --color-on-surface-variant: #BFC8CA;
+  --color-outline: #899295;
+  --color-outline-variant: #3F484B;
+  --color-primary: #85D2E0;
+  --color-primary-container: #004F58;
+  --color-on-primary-container: #A1EFFF;
+}
+
 body {
   margin: 0;
   display: flex;
   min-width: 320px;
   min-height: 100vh;
-  background-color: #0F1416;
+  background-color: var(--color-bg);
+  color: var(--color-on-surface);
   font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
 }
 
@@ -30,7 +65,7 @@ body {
   width: 100%;
 }
 
-/* Custom scrollbar for dark theme */
+/* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -41,13 +76,13 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #2E3539;
+  background: var(--color-surface-highest, #2E3539);
   border-radius: 8px;
-  border: 2px solid #0F1416;
+  border: 2px solid var(--color-bg, #0F1416);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #3F484B;
+  background: var(--color-outline-variant, #3F484B);
 }
 
 /* Font families */
@@ -66,10 +101,10 @@ body {
 
 /* Material 3 Expressive utilities */
 .glass {
-  background: rgba(25, 32, 35, 0.7);
+  background: var(--color-surface-container, rgba(25, 32, 35, 0.7));
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--color-outline-variant, rgba(255, 255, 255, 0.05));
 }
 
 .material-symbols-rounded {
@@ -84,7 +119,7 @@ body {
    focusable elements. Mouse clicks are unaffected (:focus-visible only
    matches keyboard/programmatic focus). */
 :focus-visible {
-  outline: 2px solid #85D2E0;
+  outline: 2px solid var(--color-primary, #85D2E0);
   outline-offset: 2px;
   border-radius: 4px;
 }

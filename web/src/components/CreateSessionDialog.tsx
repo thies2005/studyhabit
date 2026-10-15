@@ -253,7 +253,7 @@ export default function CreateSessionDialog({ isOpen, onClose, subjects, onSubmi
               </label>
               <input
                 type="number"
-                min="0"
+                min="5"
                 max="480"
                 value={plannedDuration}
                 onChange={(e) => setPlannedDuration(Number(e.target.value))}

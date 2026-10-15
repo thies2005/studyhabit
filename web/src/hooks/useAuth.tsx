@@ -1,9 +1,10 @@
-import { useState, useCallback, createContext, useContext, type ReactNode } from 'react';
+import { useState, useCallback, useEffect, createContext, useContext, type ReactNode } from 'react';
 import apiClient from '../api/client';
 
 interface AuthState {
   accessToken: string | null;
   refreshToken: string | null;
+  userEmail: string | null;
 }
 
 interface AuthContextValue extends AuthState {
@@ -13,36 +14,54 @@ interface AuthContextValue extends AuthState {
   logout: () => Promise<void>;
 }
 
-// Auth tokens live in localStorage (persisted across reloads). They are read
-// into context once on mount so every consumer observes a single source of
-// truth and login/logout broadcast consistently. See SECURITY.md for the
-// localStorage-vs-httpOnly-cookie tradeoff.
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 function readTokens(): AuthState {
   return {
     accessToken: localStorage.getItem('access_token'),
     refreshToken: localStorage.getItem('refresh_token'),
+    userEmail: localStorage.getItem('user_email'),
   };
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [auth, setAuth] = useState<AuthState>(readTokens);
 
+  useEffect(() => {
+    if (auth.accessToken && !auth.userEmail) {
+      apiClient.get('/auth/me')
+        .then((res) => {
+          const email = res.data.data?.email;
+          if (email) {
+            localStorage.setItem('user_email', email);
+            setAuth((prev) => ({ ...prev, userEmail: email }));
+          }
+        })
+        .catch(() => {});
+    }
+  }, [auth.accessToken, auth.userEmail]);
+
   const login = useCallback(async (email: string, password: string) => {
     const response = await apiClient.post('/auth/login', { email, password });
-    const { accessToken, refreshToken } = response.data.data;
+    const { accessToken, refreshToken, user } = response.data.data;
+    const finalEmail = user?.email || email;
     localStorage.setItem('access_token', accessToken);
     localStorage.setItem('refresh_token', refreshToken);
-    setAuth({ accessToken, refreshToken });
+    localStorage.setItem('user_email', finalEmail);
+    setAuth({ accessToken, refreshToken, userEmail: finalEmail });
   }, []);
 
   const register = useCallback(async (email: string, password: string) => {
     const response = await apiClient.post('/auth/register', { email, password });
-    const { accessToken, refreshToken } = response.data.data;
+    const { accessToken, refreshToken, user } = response.data.data;
+    if (!accessToken || !refreshToken) {
+      throw new Error(response.data?.message || 'An account with this email may already exist. Please sign in.');
+    }
+    const finalEmail = user?.email || email;
     localStorage.setItem('access_token', accessToken);
     localStorage.setItem('refresh_token', refreshToken);
-    setAuth({ accessToken, refreshToken });
+    localStorage.setItem('user_email', finalEmail);
+    setAuth({ accessToken, refreshToken, userEmail: finalEmail });
   }, []);
 
   const logout = useCallback(async () => {
@@ -56,7 +75,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
-    setAuth({ accessToken: null, refreshToken: null });
+    localStorage.removeItem('user_email');
+    setAuth({ accessToken: null, refreshToken: null, userEmail: null });
   }, []);
 
   const value: AuthContextValue = {

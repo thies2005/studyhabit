@@ -1,25 +1,29 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../api/client';
 import type { Subject } from '../types';
 import CreateSubjectDialog from '../components/CreateSubjectDialog';
+import { useProject } from '../contexts/ProjectContext';
+import { calculateLevel } from '../utils/xp';
 
 export default function Subjects() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const navigate = useNavigate();
+  const { currentProjectId, createProject } = useProject();
 
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchSubjects();
-  }, []);
-
-  const fetchSubjects = async () => {
+  const fetchSubjects = useCallback(async () => {
     try {
+      setLoading(true);
       setError(null);
-      const response = await apiClient.get('/subjects');
+      const params: Record<string, string> = {};
+      if (currentProjectId) {
+        params.projectId = currentProjectId;
+      }
+      const response = await apiClient.get('/subjects', { params });
       setSubjects(response.data.data);
     } catch (error: any) {
       setError(error.message || 'Failed to load subjects');
@@ -27,27 +31,21 @@ export default function Subjects() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentProjectId]);
+
+  useEffect(() => {
+    fetchSubjects();
+  }, [fetchSubjects]);
 
   const handleCreateSubject = async (subjectData: any) => {
     try {
-      // We need a projectId to create a subject. Fetch projects first.
-      const projectsRes = await apiClient.get('/projects');
-      const projects = projectsRes.data.data;
-      
-      let projectId = '';
-      if (projects.length === 0) {
-        // Create a default project if the user has none
-        const newProjectRes = await apiClient.post('/projects', {
-          name: 'My Project',
-          colorValue: 0x006874, // Deep Teal
-        });
-        projectId = newProjectRes.data.data.id;
-      } else {
-        projectId = projects[0].id;
+      let targetProjectId = currentProjectId;
+      if (!targetProjectId) {
+        const newProject = await createProject('My Project', 0x006874);
+        targetProjectId = newProject.id;
       }
 
-      subjectData.projectId = projectId;
+      subjectData.projectId = targetProjectId;
       
       const response = await apiClient.post('/subjects', subjectData);
       const newSubject = response.data.data;
@@ -60,21 +58,6 @@ export default function Subjects() {
 
   const formatColor = (colorValue: number) => {
     return `#${colorValue.toString(16).padStart(6, '0')}`;
-  };
-
-  const getLevel = (xp: number): number => {
-    if (xp < 500) return 1;
-    if (xp < 1500) return 2;
-    if (xp < 3500) return 3;
-    if (xp < 7000) return 4;
-    if (xp < 10500) return 5;
-    let level = 5;
-    let threshold = 7000;
-    while (xp >= Math.round((threshold * 1.5) / 100) * 100) {
-      threshold = Math.round((threshold * 1.5) / 100) * 100;
-      level++;
-    }
-    return level;
   };
 
   const getSubjectIcon = (index: number) => {
@@ -146,7 +129,7 @@ export default function Subjects() {
                       <span className="material-symbols-rounded">{getSubjectIcon(index)}</span>
                     </div>
                     <span className="px-3 py-1 bg-primary/20 text-primary text-sm font-medium rounded-full">
-                      Lvl {getLevel(subject.xpTotal)}
+                      Lvl {calculateLevel(subject.xpTotal)}
                     </span>
                   </div>
 

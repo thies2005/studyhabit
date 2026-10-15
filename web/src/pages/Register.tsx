@@ -59,11 +59,11 @@ export default function Register() {
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
           <div className="flex justify-center mb-4">
-            <span className="text-6xl">📚</span>
+            <span className="text-6xl text-primary material-symbols-rounded">school</span>
           </div>
-          <h2 className="text-3xl font-bold text-onSurface font-heading">Create Account</h2>
+          <h2 className="text-3xl font-bold text-onSurface font-heading">StudyHabit</h2>
           <p className="mt-2 text-sm text-gray-400 font-body">
-            Join Study Sanctuary today
+            Create your account
           </p>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>

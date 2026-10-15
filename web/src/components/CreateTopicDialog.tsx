@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useDialog } from '../hooks/useDialog';
+import Modal from './Modal';
 
 interface CreateTopicDialogProps {
   isOpen: boolean;
@@ -11,7 +11,6 @@ interface CreateTopicDialogProps {
 export default function CreateTopicDialog({ isOpen, onClose, onSubmit, currentTopicCount }: CreateTopicDialogProps) {
   const [name, setName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const dialogRef = useDialog({ isOpen, onClose });
 
   if (!isOpen) return null;
 
@@ -32,54 +31,52 @@ export default function CreateTopicDialog({ isOpen, onClose, onSubmit, currentTo
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
-      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Create Topic" className="bg-surfaceContainerHighest border border-outlineVariant rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-scaleUp">
-        <div className="px-6 py-5 border-b border-outlineVariant flex justify-between items-center">
-          <h2 className="text-xl font-bold text-onSurface font-heading">Create Topic</h2>
-          <button
-            onClick={onClose}
-            aria-label="Close dialog"
-            className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-surface hover:text-white transition-colors"
-          >
-            <span className="material-symbols-rounded text-lg" aria-hidden="true">close</span>
-          </button>
+    <Modal isOpen={isOpen} onClose={onClose} title="Create Topic" maxWidthClass="max-w-md">
+      <div className="px-6 py-5 border-b border-outlineVariant flex justify-between items-center">
+        <h2 className="text-xl font-bold text-onSurface font-heading">Create Topic</h2>
+        <button
+          onClick={onClose}
+          aria-label="Close dialog"
+          className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-surface hover:text-white transition-colors"
+        >
+          <span className="material-symbols-rounded text-lg" aria-hidden="true">close</span>
+        </button>
+      </div>
+
+      <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        <div>
+          <label className="block text-sm font-medium text-gray-400 font-body mb-2">
+            Topic Name
+          </label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="w-full px-4 py-3 bg-surface border border-outlineVariant focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors"
+            placeholder="e.g., Data Structures"
+            autoFocus
+            required
+          />
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
-          <div>
-            <label className="block text-sm font-medium text-gray-400 font-body mb-2">
-              Topic Name
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full px-4 py-3 bg-surface border border-outlineVariant focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors"
-              placeholder="e.g., Data Structures"
-              autoFocus
-              required
-            />
-          </div>
-
-          <div className="flex gap-3 pt-4 border-t border-outlineVariant">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={isSubmitting}
-              className="flex-1 py-3 bg-surface hover:bg-gray-800 text-gray-300 font-bold rounded-xl transition-colors font-body text-sm"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting || !name.trim()}
-              className="flex-1 py-3 bg-primary hover:bg-primary-container text-white font-bold rounded-xl transition-colors font-body text-sm disabled:opacity-50"
-            >
-              {isSubmitting ? 'Creating...' : 'Create Topic'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <div className="flex gap-3 pt-4 border-t border-outlineVariant">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSubmitting}
+            className="flex-1 py-3 bg-surface hover:bg-gray-800 text-gray-300 font-bold rounded-xl transition-colors font-body text-sm"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={isSubmitting || !name.trim()}
+            className="flex-1 py-3 bg-primary hover:bg-primary-container text-white font-bold rounded-xl transition-colors font-body text-sm disabled:opacity-50"
+          >
+            {isSubmitting ? 'Creating...' : 'Create Topic'}
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 }

@@ -1,47 +1,21 @@
 import { Link, useNavigate } from 'react-router-dom';
 import type { StatsOverview, SessionWithSubject } from '../types';
 import { useApi } from '../api/hooks';
-
-// Level names from spec
-const LEVEL_NAMES = ['Novice', 'Apprentice', 'Scholar', 'Adept', 'Expert', 'Master', 'Grandmaster'];
-
-// Calculate XP threshold for level (from spec)
-const calculateLevelThreshold = (level: number): number => {
-  if (level === 1) return 0;
-  if (level === 2) return 500;
-  if (level === 3) return 1500;
-  if (level === 4) return 3500;
-  if (level === 5) return 7000;
-  // Level 6+ formula
-  let threshold = 7000;
-  for (let i = 6; i <= level; i++) {
-    threshold = Math.round(threshold * 1.5 / 100) * 100;
-  }
-  return threshold;
-};
-
-// Calculate progress within current level
-const calculateLevelProgress = (currentLevel: number, totalXp: number): number => {
-  if (currentLevel >= 7) return 1; // Grandmaster is max level
-  const currentLevelThreshold = calculateLevelThreshold(currentLevel);
-  const nextLevelThreshold = calculateLevelThreshold(currentLevel + 1);
-  const xpInCurrentLevel = totalXp - currentLevelThreshold;
-  const xpNeededForNextLevel = nextLevelThreshold - currentLevelThreshold;
-  return xpNeededForNextLevel > 0 ? xpInCurrentLevel / xpNeededForNextLevel : 1;
-};
-
-const getLevelName = (level: number): string => {
-  return LEVEL_NAMES[Math.min(level - 1, LEVEL_NAMES.length - 1)] || 'Grandmaster';
-};
+import { useProject } from '../contexts/ProjectContext';
+import { levelThreshold, getLevelName, getLevelProgress } from '../utils/xp';
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { currentProjectId } = useProject();
+
+  const statsUrl = currentProjectId ? `/stats/overview?projectId=${currentProjectId}` : '/stats/overview';
+  const sessionsUrl = currentProjectId ? `/sessions?projectId=${currentProjectId}&limit=3` : '/sessions?limit=3';
 
   // Fetch stats overview
-  const { data: stats, loading: statsLoading, error: statsError, refetch: refetchStats } = useApi<StatsOverview>('/stats/overview');
+  const { data: stats, loading: statsLoading, error: statsError, refetch: refetchStats } = useApi<StatsOverview>(statsUrl);
 
   // Fetch sessions for today and recent sessions
-  const { data: sessions, loading: sessionsLoading, error: sessionsError, refetch: refetchSessions } = useApi<SessionWithSubject[]>('/sessions?limit=3');
+  const { data: sessions, loading: sessionsLoading, error: sessionsError, refetch: refetchSessions } = useApi<SessionWithSubject[]>(sessionsUrl);
 
   const loading = (statsLoading && !stats) || (sessionsLoading && !sessions);
   // Only treat statsError as fatal if it's not a 404
@@ -49,8 +23,8 @@ export default function Dashboard() {
   const isFatalError = (statsError && !isStatsNotFound) || sessionsError;
 
   const defaultStats: StatsOverview = {
-    totalHours: 0, weekHours: 0, currentStreak: 0, currentLevel: 1, 
-    levelName: 'Beginner', totalXp: 0, totalStudyMinutes: 0, longestStreak: 0, freezeTokens: 0
+    totalHours: 0, weekHours: 0, todayHours: 0, currentStreak: 0, currentLevel: 1, 
+    levelName: 'Novice', totalXp: 0, totalStudyMinutes: 0, longestStreak: 0, freezeTokens: 0
   };
 
   const currentStats = stats || defaultStats;
@@ -64,14 +38,16 @@ export default function Dashboard() {
     return `#${colorValue.toString(16).padStart(6, '0')}`;
   };
 
-  // Calculate today's hours from sessions
-  const todayHours = sessions?.reduce((total, session) => {
-    const sessionDate = new Date(session.startedAt);
-    const today = new Date();
-    return sessionDate.toDateString() === today.toDateString()
-      ? total + (session.actualDurationMinutes / 60)
-      : total;
-  }, 0) || 0;
+  // Use todayHours from backend stats if available, otherwise calculate from sessions
+  const todayHours = currentStats.todayHours !== undefined
+    ? currentStats.todayHours
+    : (sessions?.reduce((total, session) => {
+        const sessionDate = new Date(session.startedAt);
+        const today = new Date();
+        return sessionDate.toDateString() === today.toDateString()
+          ? total + (session.actualDurationMinutes / 60)
+          : total;
+      }, 0) || 0);
 
   return (
     <div className="px-4 py-6 sm:px-0">
@@ -119,20 +95,22 @@ export default function Dashboard() {
             </div>
 
             {/* XP Bar */}
-            <div className="mt-4">
-              <div className="text-3xl font-bold text-onSurface mt-2 font-heading">{currentStats.currentLevel}</div>
-              <div className="text-xs text-primary mt-1 font-medium">{currentStats.levelName}</div>
-            </div>
-            <div className="ml-4 flex-grow">
-              <div className="flex justify-between text-xs text-gray-400 mb-1">
-                <span>{currentStats.totalXp} XP</span>
-                <span>{calculateLevelThreshold(currentStats.currentLevel + 1) - currentStats.totalXp} XP to Level {currentStats.currentLevel + 1}</span>
+            <div className="mt-4 flex items-center gap-4">
+              <div className="text-center min-w-[3rem]">
+                <div className="text-3xl font-bold text-onSurface font-heading">{currentStats.currentLevel}</div>
+                <div className="text-xs text-primary font-medium">{getLevelName(currentStats.currentLevel)}</div>
               </div>
-              <div className="w-full bg-surface-container rounded-full h-2">
-                <div 
-                  className="bg-primary h-2 rounded-full transition-all duration-1000 ease-out" 
-                  style={{ width: `${Math.max(5, calculateLevelProgress(currentStats.currentLevel, currentStats.totalXp) * 100)}%` }}
-                ></div>
+              <div className="flex-grow">
+                <div className="flex justify-between text-xs text-gray-400 mb-1">
+                  <span>{currentStats.totalXp} XP</span>
+                  <span>{levelThreshold(currentStats.currentLevel + 1) - currentStats.totalXp} XP to Level {currentStats.currentLevel + 1}</span>
+                </div>
+                <div className="w-full bg-surfaceContainerHighest rounded-full h-2">
+                  <div 
+                    className="bg-primary h-2 rounded-full transition-all duration-1000 ease-out" 
+                    style={{ width: `${Math.max(5, getLevelProgress(currentStats.totalXp).progressPercent)}%` }}
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -172,7 +150,7 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <div className="bg-surfaceContainerHigh rounded-3xl p-6 shadow-md border border-transparent hover:border-outlineVariant transition-colors">
               <div className="flex items-center space-x-3">
-                <span className="text-3xl">⏱</span>
+                <span className="material-symbols-rounded text-2xl text-primary">schedule</span>
                 <div>
                   <p className="text-sm text-gray-400 font-body">Total Hours</p>
                   <p className="text-2xl font-bold text-onSurface font-data">
@@ -183,7 +161,7 @@ export default function Dashboard() {
             </div>
             <div className="bg-surfaceContainerHigh rounded-3xl p-6 shadow-md border border-transparent hover:border-outlineVariant transition-colors">
               <div className="flex items-center space-x-3">
-                <span className="text-3xl">📅</span>
+                <span className="material-symbols-rounded text-2xl text-secondary">calendar_today</span>
                 <div>
                   <p className="text-sm text-gray-400 font-body">This Week</p>
                   <p className="text-2xl font-bold text-onSurface font-data">
@@ -194,7 +172,7 @@ export default function Dashboard() {
             </div>
             <div className="bg-surfaceContainerHigh rounded-3xl p-6 shadow-md border border-transparent hover:border-outlineVariant transition-colors">
               <div className="flex items-center space-x-3">
-                <span className="text-3xl">🔥</span>
+                <span className="material-symbols-rounded text-2xl text-tertiary">local_fire_department</span>
                 <div>
                   <p className="text-sm text-gray-400 font-body">Streak</p>
                   <p className="text-2xl font-bold text-onSurface font-data">
@@ -205,7 +183,7 @@ export default function Dashboard() {
             </div>
             <div className="bg-surfaceContainerHigh rounded-3xl p-6 shadow-md border border-transparent hover:border-outlineVariant transition-colors">
               <div className="flex items-center space-x-3">
-                <span className="text-3xl">⭐</span>
+                <span className="material-symbols-rounded text-2xl text-amber-400">star</span>
                 <div>
                   <p className="text-sm text-gray-400 font-body">Level</p>
                   <p className="text-2xl font-bold text-onSurface font-data">
@@ -270,7 +248,7 @@ export default function Dashboard() {
               </div>
               <div className="flex items-center justify-between relative z-10">
                 <div className="flex items-center space-x-4">
-                  <span className="text-4xl">🔥</span>
+                  <span className="material-symbols-rounded text-4xl text-tertiary">local_fire_department</span>
                   <div>
                     <p className="text-3xl font-bold font-heading">{currentStats.currentStreak} Day Streak</p>
                     <p className="text-sm opacity-90 font-body">

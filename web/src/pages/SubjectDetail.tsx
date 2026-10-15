@@ -1,46 +1,27 @@
 import { useParams, Link } from 'react-router-dom';
 import { useState } from 'react';
 import { useApi } from '../api/hooks';
-import type { Subject } from '../types';
+import type { Subject, SubjectMilestone } from '../types';
 import CreateSessionDialog from '../components/CreateSessionDialog';
 import CreateTopicDialog from '../components/CreateTopicDialog';
 import CreateSourceDialog from '../components/CreateSourceDialog';
 import ManageMilestonesDialog from '../components/ManageMilestonesDialog';
 import apiClient from '../api/client';
-import type { SubjectMilestone } from '../types';
+import { getLevelProgress } from '../utils/xp';
 
 type Tab = 'timeline' | 'sources' | 'topics';
 
-// Percentage progress (0-100) through the current XP level, using the same
-// thresholds as the backend XpService (500, 1500, 3500, 7000, 10500, then
-// ×1.5 per level). Previously this used an arbitrary `(totalXp % 1000) / 10`.
-const XP_THRESHOLDS = [0, 500, 1500, 3500, 7000, 10500];
+const SKILL_LEVELS = ['beginner', 'intermediate', 'advanced', 'expert'] as const;
 
-function xpLevelProgress(totalXp: number): number {
-  // Find the band the user is in.
-  let lower = XP_THRESHOLDS[XP_THRESHOLDS.length - 1];
-  let upper = lower;
-  if (totalXp < XP_THRESHOLDS[XP_THRESHOLDS.length - 1]) {
-    for (let i = 1; i < XP_THRESHOLDS.length; i++) {
-      if (totalXp < XP_THRESHOLDS[i]) {
-        lower = XP_THRESHOLDS[i - 1];
-        upper = XP_THRESHOLDS[i];
-        break;
-      }
-    }
-  } else {
-    // Beyond the fixed table: levels grow by ×1.5 (rounded to 100).
-    upper = lower;
-    while (totalXp >= Math.round((upper * 1.5) / 100) * 100) {
-      upper = Math.round((upper * 1.5) / 100) * 100;
-    }
-    lower = upper < XP_THRESHOLDS[XP_THRESHOLDS.length - 1] ? XP_THRESHOLDS[XP_THRESHOLDS.length - 1] : upper;
+const isValidHttpUrl = (urlString: string | null | undefined): boolean => {
+  if (!urlString) return false;
+  try {
+    const u = new URL(urlString);
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  } catch {
+    return false;
   }
-  if (upper === lower) return 100;
-  return ((totalXp - lower) / (upper - lower)) * 100;
-}
-
-// No mock data
+};
 
 export default function SubjectDetail() {
   const { subjectId } = useParams<{ subjectId: string }>();
@@ -49,6 +30,7 @@ export default function SubjectDetail() {
   const { data: sources, loading: sourcesLoading, refetch: refetchSources } = useApi<any[]>(`/sources?subjectId=${subjectId}`);
   const { data: milestones, loading: milestonesLoading, refetch: refetchMilestones } = useApi<SubjectMilestone[]>(`/milestones?subjectId=${subjectId}`);
   const { data: stats } = useApi<any>('/stats/overview');
+  const { data: skillLabels, refetch: refetchSkillLabels } = useApi<any[]>(`/skill-labels?subjectId=${subjectId}`);
   
   const [activeTab, setActiveTab] = useState<Tab>('timeline');
   const [expandedTopics, setExpandedTopics] = useState<Set<string>>(new Set());
@@ -57,12 +39,22 @@ export default function SubjectDetail() {
   const [isSourceDialogOpen, setIsSourceDialogOpen] = useState(false);
   const [isMilestonesDialogOpen, setIsMilestonesDialogOpen] = useState(false);
 
+  // Chapter creation state per topic
+  const [addingChapterTopicId, setAddingChapterTopicId] = useState<string | null>(null);
+  const [newChapterName, setNewChapterName] = useState('');
+  const [isSubmittingChapter, setIsSubmittingChapter] = useState(false);
+
+  // Skill updating state
+  const [isUpdatingSkill, setIsUpdatingSkill] = useState(false);
+
   const loading = subjectLoading || sessionsLoading || sourcesLoading || milestonesLoading;
 
   if (loading) return <div className="p-8 text-center text-gray-400">Loading...</div>;
   if (!subject) return <div className="p-8 text-center text-gray-400">Subject not found</div>;
 
   const displaySubject = subject;
+  const currentSkill = skillLabels?.[0]?.label || 'beginner';
+  const totalStudyHours = displaySubject.totalStudyHours ?? (displaySubject.totalStudyMinutes ? Number((displaySubject.totalStudyMinutes / 60).toFixed(1)) : 0);
 
   const displaySessions = (sessions && sessions.length > 0)
     ? sessions.map((s) => ({
@@ -84,6 +76,7 @@ export default function SubjectDetail() {
         id: src.id,
         type: src.type === 'videoUrl' ? ('video' as const) : (src.type as 'pdf' | 'url'),
         title: src.title,
+        url: src.url,
         subtitle: src.type === 'pdf' ? `PDF · ${src.totalPages || 0} Pages · Current: ${src.currentPage || 0}` : src.type === 'videoUrl' ? `VIDEO · ${Math.round(src.progressPercent || 0)}% watched` : `WEB · ${src.url || ''}`,
         pagesRead: src.currentPage || 0,
         totalPages: src.totalPages || 100,
@@ -124,6 +117,40 @@ export default function SubjectDetail() {
   const handleCreateSource = async (sourceData: any) => {
     await apiClient.post('/sources', { ...sourceData, subjectId });
     refetchSources();
+  };
+
+  const handleAddChapter = async (topicId: string, currentChapterCount: number) => {
+    if (!newChapterName.trim()) return;
+    try {
+      setIsSubmittingChapter(true);
+      await apiClient.post('/chapters', {
+        topicId,
+        name: newChapterName.trim(),
+        order: currentChapterCount,
+      });
+      setNewChapterName('');
+      setAddingChapterTopicId(null);
+      refetchSubject();
+    } catch (err) {
+      console.error('Failed to create chapter:', err);
+    } finally {
+      setIsSubmittingChapter(false);
+    }
+  };
+
+  const handleSkillChange = async (newLabel: string) => {
+    try {
+      setIsUpdatingSkill(true);
+      await apiClient.post('/skill-labels', {
+        subjectId,
+        label: newLabel,
+      });
+      refetchSkillLabels();
+    } catch (err) {
+      console.error('Failed to update skill label:', err);
+    } finally {
+      setIsUpdatingSkill(false);
+    }
   };
 
   const renderTabContent = () => {
@@ -230,9 +257,21 @@ export default function SubjectDetail() {
                   </span>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h4 className="text-base font-semibold text-onSurface font-heading mb-1">
-                    {source.title}
-                  </h4>
+                  {isValidHttpUrl(source.url) ? (
+                    <a
+                      href={source.url!}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-base font-semibold text-primary hover:underline font-heading mb-1 inline-flex items-center gap-1.5"
+                    >
+                      <span>{source.title}</span>
+                      <span className="material-symbols-rounded text-sm" aria-hidden="true">open_in_new</span>
+                    </a>
+                  ) : (
+                    <h4 className="text-base font-semibold text-onSurface font-heading mb-1">
+                      {source.title}
+                    </h4>
+                  )}
                   <p className="text-sm text-gray-400 font-body mb-2">
                     {source.subtitle}
                   </p>
@@ -285,31 +324,85 @@ export default function SubjectDetail() {
                   className="p-6 flex items-center justify-between cursor-pointer hover:bg-surfaceContainerHighest transition-colors"
                   onClick={() => toggleTopic(topic.id)}
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between w-full">
                     <div>
                       <h4 className="text-base font-semibold text-onSurface font-heading mb-1">
                         {topic.name}
                       </h4>
                       <p className="text-sm text-gray-400 font-body">
-                        {topic.taskCount} tasks
+                        {topic.taskCount} chapters
                       </p>
                     </div>
-                  <span className="material-symbols-rounded text-onSurfaceVariant transition-transform duration-300">
+                    <span className="material-symbols-rounded text-onSurfaceVariant transition-transform duration-300">
                       {expandedTopics.has(topic.id) ? 'expand_less' : 'expand_more'}
                     </span>
                   </div>
                 </div>
-                {expandedTopics.has(topic.id) && topic.subtopics && (
+                {expandedTopics.has(topic.id) && (
                   <div className="bg-surfaceContainer border-t border-surfaceContainerHighest">
-                    {topic.subtopics.map((sub: string, i: number) => (
+                    {topic.subtopics && topic.subtopics.map((sub: string, i: number) => (
                       <div
                         key={i}
-                        className="px-6 py-4 flex items-center gap-3 text-sm text-onSurfaceVariant font-body border-b border-surfaceContainerHighest last:border-0 hover:bg-surfaceContainerHigh transition-colors cursor-pointer"
+                        className="px-6 py-4 flex items-center gap-3 text-sm text-onSurfaceVariant font-body border-b border-surfaceContainerHighest last:border-0 hover:bg-surfaceContainerHigh transition-colors"
                       >
                         <span className="w-1.5 h-1.5 rounded-full bg-primary/50"></span>
                         {sub}
                       </div>
                     ))}
+
+                    {/* Chapter creation inline */}
+                    <div className="p-4 border-t border-surfaceContainerHighest">
+                      {addingChapterTopicId === topic.id ? (
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={newChapterName}
+                            onChange={(e) => setNewChapterName(e.target.value)}
+                            placeholder="Chapter name..."
+                            autoFocus
+                            className="flex-1 px-3 py-1.5 bg-surface border border-outlineVariant focus:border-primary rounded-lg text-sm text-onSurface font-body focus:outline-none"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                handleAddChapter(topic.id, topic.subtopics.length);
+                              } else if (e.key === 'Escape') {
+                                setAddingChapterTopicId(null);
+                                setNewChapterName('');
+                              }
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleAddChapter(topic.id, topic.subtopics.length)}
+                            disabled={isSubmittingChapter || !newChapterName.trim()}
+                            className="px-3 py-1.5 bg-primary hover:bg-primary-container text-white font-bold rounded-lg text-xs transition-colors disabled:opacity-50"
+                          >
+                            Save
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAddingChapterTopicId(null);
+                              setNewChapterName('');
+                            }}
+                            className="px-3 py-1.5 bg-surface hover:bg-surfaceContainerHighest text-gray-400 rounded-lg text-xs transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAddingChapterTopicId(topic.id);
+                            setNewChapterName('');
+                          }}
+                          className="inline-flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 font-medium font-body transition-colors"
+                        >
+                          <span className="material-symbols-rounded text-sm">add</span>
+                          Add Chapter
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -319,6 +412,10 @@ export default function SubjectDetail() {
     }
   };
 
+  const levelProgress = getLevelProgress(stats?.totalXp || 0);
+  const level = levelProgress.currentLevel;
+  const progressPercent = levelProgress.progressPercent;
+
   return (
     <div className="min-h-screen bg-background">
       <main className="p-6">
@@ -326,7 +423,7 @@ export default function SubjectDetail() {
           {/* Back Link */}
           <Link
             to="/subjects"
-            className="text-primary hover:underline mb-4 inline-block font-body flex items-center gap-2"
+            className="text-primary hover:underline mb-4 inline-flex items-center gap-2 font-body"
           >
             <span className="material-symbols-rounded text-xl">arrow_back</span>
             Back to Subjects
@@ -334,14 +431,31 @@ export default function SubjectDetail() {
 
           {/* Header Section */}
           <div className="mb-6">
-            <div className="flex items-center gap-2 mb-3">
+            <div className="flex items-center flex-wrap gap-3 mb-3">
               <span className="px-3 py-1 bg-primary/20 text-primary text-xs font-medium rounded-full flex items-center gap-1 font-body">
                 <span className="material-symbols-rounded text-sm">event</span>
                 In Progress
               </span>
               <span className="text-sm text-gray-400 font-body">
-                {displaySubject.totalStudyHours ?? 0}h total study
+                {totalStudyHours}h total study
               </span>
+
+              {/* Skill Level Selector */}
+              <div className="flex items-center gap-1.5 ml-auto">
+                <span className="text-xs text-gray-400 font-body">Skill:</span>
+                <select
+                  value={currentSkill}
+                  disabled={isUpdatingSkill}
+                  onChange={(e) => handleSkillChange(e.target.value)}
+                  className="bg-surfaceContainerHighest text-onSurface border border-outlineVariant rounded-lg px-2.5 py-1 text-xs font-semibold focus:outline-none focus:border-primary cursor-pointer capitalize"
+                >
+                  {SKILL_LEVELS.map((lvl) => (
+                    <option key={lvl} value={lvl}>
+                      {lvl.charAt(0).toUpperCase() + lvl.slice(1)}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
             <h1 className="text-3xl font-bold text-onSurface font-heading mb-2">
               {displaySubject.name}
@@ -387,14 +501,14 @@ export default function SubjectDetail() {
                 <div className="flex items-center gap-4 mb-4">
                   <div className="flex-1">
                     <div className="text-sm text-gray-400 font-body mb-1">XP Level</div>
-                    <div className="text-2xl font-bold text-onSurface font-data">{stats?.currentLevel || 1}</div>
+                    <div className="text-2xl font-bold text-onSurface font-data">{level}</div>
                   </div>
                   <div className="w-12 h-12 rounded-full border-4 border-primary flex items-center justify-center">
                     <span className="material-symbols-rounded text-primary">emoji_events</span>
                   </div>
                 </div>
                 <div className="w-full bg-surfaceContainerHighest rounded-full h-2">
-                  <div className="bg-primary h-2 rounded-full" style={{ width: `${Math.min(xpLevelProgress(stats?.totalXp ?? 0), 100)}%` }} />
+                  <div className="bg-primary h-2 rounded-full" style={{ width: `${Math.min(progressPercent, 100)}%` }} />
                 </div>
               </div>
 
@@ -410,33 +524,33 @@ export default function SubjectDetail() {
 
               {/* Next Milestone Card */}
               <div className="bg-surfaceContainerHigh rounded-3xl p-6 shadow-md border-l-4 border-tertiary relative overflow-hidden group">
-              <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity duration-500">
-                <span className="material-symbols-rounded text-6xl text-tertiary">local_fire_department</span>
-              </div>
-              <div className="relative z-10">
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="text-sm text-gray-400 font-body">Next Milestone</h4>
-                  <button onClick={() => setIsMilestonesDialogOpen(true)} className="text-xs text-primary hover:underline">Manage</button>
+                <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity duration-500">
+                  <span className="material-symbols-rounded text-6xl text-tertiary">local_fire_department</span>
                 </div>
-                
-                {milestones && milestones.filter(m => !m.isCompleted).length > 0 ? (
-                  <>
-                    <h3 className="text-lg font-semibold text-onSurface font-heading mb-2">
-                      {milestones.filter(m => !m.isCompleted).sort((a,b) => a.sortOrder - b.sortOrder)[0].title}
-                    </h3>
-                    <p className="text-xs text-gray-400 font-body mb-3">
-                      Keep going to unlock this!
-                    </p>
-                  </>
-                ) : (
-                  <div className="text-sm text-gray-400 my-4">No upcoming milestones</div>
-                )}
-                
-                <button onClick={() => setIsSessionDialogOpen(true)} className="w-full bg-primary/20 text-primary py-2 rounded-lg text-sm font-medium hover:bg-primary/30 transition-colors font-body">
-                  Plan Study Block
-                </button>
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-sm text-gray-400 font-body">Next Milestone</h4>
+                    <button onClick={() => setIsMilestonesDialogOpen(true)} className="text-xs text-primary hover:underline">Manage</button>
+                  </div>
+                  
+                  {milestones && milestones.filter((m) => !m.isCompleted).length > 0 ? (
+                    <>
+                      <h3 className="text-lg font-semibold text-onSurface font-heading mb-2">
+                        {milestones.filter((m) => !m.isCompleted).sort((a, b) => a.sortOrder - b.sortOrder)[0].title}
+                      </h3>
+                      <p className="text-xs text-gray-400 font-body mb-3">
+                        Keep going to unlock this!
+                      </p>
+                    </>
+                  ) : (
+                    <div className="text-sm text-gray-400 my-4">No upcoming milestones</div>
+                  )}
+                  
+                  <button onClick={() => setIsSessionDialogOpen(true)} className="w-full bg-primary/20 text-primary py-2 rounded-lg text-sm font-medium hover:bg-primary/30 transition-colors font-body">
+                    Plan Study Block
+                  </button>
+                </div>
               </div>
-            </div>
             </div>
           </div>
         </div>

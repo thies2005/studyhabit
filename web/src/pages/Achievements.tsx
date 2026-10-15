@@ -1,163 +1,463 @@
 import { useState } from 'react';
 import type { Achievement, StatsOverview } from '../types';
 import { useApi } from '../api/hooks';
+import Modal from '../components/Modal';
+import { getLevelName, getLevelProgress } from '../utils/xp';
 
-const achievementIcons: Record<string, string> = {
-  streak_3: 'local_fire_department',
-  streak_7: 'whatshot',
-  streak_30: 'bolt',
-  streak_100: 'military_tech',
-  pomodoro_10: 'timer',
-  pomodoro_100: 'alarm_on',
-  pomodoro_500: 'av_timer',
-  hours_10: 'schedule',
-  hours_100: 'history_edu',
-  subject_5h: 'auto_stories',
-  subject_10h: 'menu_book',
-  first_pdf: 'picture_as_pdf',
-  confidence_5: 'star',
-  skill_advanced: 'trending_up',
-  all_badges: 'emoji_events',
-};
+interface AchievementInfo {
+  name: string;
+  description: string;
+  icon: string;
+  category: string;
+  color: string;
+}
 
-const achievementColors: Record<string, string> = {
-  streak_3: '#FDB87C',
-  streak_7: '#FDB87C',
-  streak_30: '#FDB87C',
-  streak_100: '#FFD700',
-  pomodoro_10: '#85D2E0',
-  pomodoro_100: '#85D2E0',
-  pomodoro_500: '#85D2E0',
-  hours_10: '#006874',
-  hours_100: '#006874',
-  subject_5h: '#85D2E0',
-  subject_10h: '#85D2E0',
-  first_pdf: '#EF4444',
-  confidence_5: '#FDB87C',
-  skill_advanced: '#006874',
-  all_badges: '#FFD700',
-};
-
-const achievementDescriptions: Record<string, { title: string; description: string }> = {
+const ACHIEVEMENTS_METADATA: Record<string, AchievementInfo> = {
+  // Streaks
   streak_3: {
-    title: 'Consistent Learner',
-    description: 'Study for 3 consecutive days. Consistency is the key to mastery.',
+    name: 'Getting Warm',
+    description: 'Maintain a 3-day study streak.',
+    icon: 'local_fire_department',
+    category: 'Streaks',
+    color: '#FDB87C',
   },
   streak_7: {
-    title: 'Week Warrior',
-    description: 'Maintain a 7-day study streak. You\'re building great habits!',
+    name: 'Weekly Warrior',
+    description: 'Maintain a 7-day study streak.',
+    icon: 'local_fire_department',
+    category: 'Streaks',
+    color: '#FDB87C',
+  },
+  streak_14: {
+    name: 'Two Week Triumph',
+    description: 'Maintain a 14-day study streak.',
+    icon: 'local_fire_department',
+    category: 'Streaks',
+    color: '#FDB87C',
   },
   streak_30: {
-    title: 'Monthly Master',
-    description: 'Study for 30 consecutive days. Your dedication is inspiring!',
+    name: 'Monthly Master',
+    description: 'Maintain a 30-day study streak.',
+    icon: 'calendar_month',
+    category: 'Streaks',
+    color: '#FDB87C',
+  },
+  streak_50: {
+    name: 'Half Century',
+    description: 'Maintain a 50-day study streak.',
+    icon: 'workspace_premium',
+    category: 'Streaks',
+    color: '#FFD700',
   },
   streak_100: {
-    title: 'Centurion',
-    description: 'Achieve a 100-day study streak. You are unstoppable!',
+    name: 'Century Club',
+    description: 'Maintain a 100-day study streak.',
+    icon: 'workspace_premium',
+    category: 'Streaks',
+    color: '#FFD700',
   },
+  streak_200: {
+    name: 'Bicentennial',
+    description: 'Maintain a 200-day study streak.',
+    icon: 'military_tech',
+    category: 'Streaks',
+    color: '#FFD700',
+  },
+  streak_365: {
+    name: 'Orbital Period',
+    description: 'Maintain a 365-day study streak.',
+    icon: 'public',
+    category: 'Streaks',
+    color: '#FFD700',
+  },
+
+  // Pomodoros
   pomodoro_10: {
-    title: 'Pomodoro Pioneer',
-    description: 'Complete 10 pomodoro sessions using the timer.',
+    name: 'Focus Novice',
+    description: 'Complete 10 Pomodoro sessions.',
+    icon: 'timer',
+    category: 'Pomodoros',
+    color: '#85D2E0',
+  },
+  pomodoro_25: {
+    name: 'Focus Apprentice',
+    description: 'Complete 25 Pomodoro sessions.',
+    icon: 'timer',
+    category: 'Pomodoros',
+    color: '#85D2E0',
+  },
+  pomodoro_50: {
+    name: 'Focus Adept',
+    description: 'Complete 50 Pomodoro sessions.',
+    icon: 'timer',
+    category: 'Pomodoros',
+    color: '#85D2E0',
   },
   pomodoro_100: {
-    title: 'Pomodoro Pro',
-    description: 'Complete 100 pomodoro sessions. You\'re a time management expert!',
+    name: 'Focus Master',
+    description: 'Complete 100 Pomodoro sessions.',
+    icon: 'timer',
+    category: 'Pomodoros',
+    color: '#85D2E0',
+  },
+  pomodoro_250: {
+    name: 'Focus Elite',
+    description: 'Complete 250 Pomodoro sessions.',
+    icon: 'timer',
+    category: 'Pomodoros',
+    color: '#85D2E0',
   },
   pomodoro_500: {
-    title: 'Pomodoro Legend',
-    description: 'Complete 500 pomodoro sessions. Legendary focus!',
+    name: 'Focus Legend',
+    description: 'Complete 500 Pomodoro sessions.',
+    icon: 'timer',
+    category: 'Pomodoros',
+    color: '#85D2E0',
   },
+  pomodoro_1000: {
+    name: 'Titan of Time',
+    description: 'Complete 1000 Pomodoro sessions.',
+    icon: 'timer',
+    category: 'Pomodoros',
+    color: '#85D2E0',
+  },
+  pomodoro_2500: {
+    name: 'Time Lord',
+    description: 'Complete 2500 Pomodoro sessions.',
+    icon: 'timer',
+    category: 'Pomodoros',
+    color: '#85D2E0',
+  },
+  pomodoro_5000: {
+    name: 'Eternal Focus',
+    description: 'Complete 5000 Pomodoro sessions.',
+    icon: 'all_inclusive',
+    category: 'Pomodoros',
+    color: '#85D2E0',
+  },
+
+  // Study Hours
   hours_10: {
-    title: 'Dedicated Student',
-    description: 'Study for a total of 10 hours across all subjects.',
+    name: '10-Hour Club',
+    description: 'Total study time reaches 10 hours.',
+    icon: 'hourglass_top',
+    category: 'Study Hours',
+    color: '#006874',
+  },
+  hours_25: {
+    name: '25-Hour Club',
+    description: 'Total study time reaches 25 hours.',
+    icon: 'hourglass_bottom',
+    category: 'Study Hours',
+    color: '#006874',
+  },
+  hours_50: {
+    name: '50-Hour Club',
+    description: 'Total study time reaches 50 hours.',
+    icon: 'hourglass_full',
+    category: 'Study Hours',
+    color: '#006874',
   },
   hours_100: {
-    title: 'Century Scholar',
-    description: 'Accumulate 100 hours of total study time.',
+    name: '100-Hour Club',
+    description: 'Total study time reaches 100 hours.',
+    icon: 'watch_later',
+    category: 'Study Hours',
+    color: '#006874',
   },
+  hours_200: {
+    name: 'Double Century',
+    description: 'Total study time reaches 200 hours.',
+    icon: 'watch_later',
+    category: 'Study Hours',
+    color: '#006874',
+  },
+  hours_500: {
+    name: 'Grind Master',
+    description: 'Total study time reaches 500 hours.',
+    icon: 'history_edu',
+    category: 'Study Hours',
+    color: '#006874',
+  },
+  hours_1000: {
+    name: 'The Millenary',
+    description: 'Total study time reaches 1000 hours.',
+    icon: 'auto_awesome',
+    category: 'Study Hours',
+    color: '#FFD700',
+  },
+
+  // Sessions
+  sessions_5: {
+    name: 'Starter',
+    description: 'Complete 5 study sessions.',
+    icon: 'play_circle',
+    category: 'Consistency',
+    color: '#9ECAFF',
+  },
+  sessions_20: {
+    name: 'Consistent',
+    description: 'Complete 20 study sessions.',
+    icon: 'play_circle',
+    category: 'Consistency',
+    color: '#9ECAFF',
+  },
+  sessions_50: {
+    name: 'Regular',
+    description: 'Complete 50 study sessions.',
+    icon: 'play_circle',
+    category: 'Consistency',
+    color: '#9ECAFF',
+  },
+  sessions_100: {
+    name: 'Dedicated',
+    description: 'Complete 100 study sessions.',
+    icon: 'play_circle',
+    category: 'Consistency',
+    color: '#9ECAFF',
+  },
+  sessions_250: {
+    name: 'Reliable',
+    description: 'Complete 250 study sessions.',
+    icon: 'play_circle',
+    category: 'Consistency',
+    color: '#9ECAFF',
+  },
+  sessions_500: {
+    name: 'Indomitable',
+    description: 'Complete 500 study sessions.',
+    icon: 'play_circle',
+    category: 'Consistency',
+    color: '#9ECAFF',
+  },
+
+  // Subject milestones
   subject_5h: {
-    title: 'Subject Specialist',
-    description: 'Study 5 hours in a single subject.',
+    name: 'Specialist',
+    description: 'Study one subject for at least 5 hours.',
+    icon: 'school',
+    category: 'Subject Mastery',
+    color: '#80DC89',
+  },
+  subjects_2_5h: {
+    name: 'Multitasker',
+    description: 'Study two subjects for at least 5 hours each.',
+    icon: 'school',
+    category: 'Subject Mastery',
+    color: '#80DC89',
+  },
+  subjects_5_5h: {
+    name: 'Polymath',
+    description: 'Study five subjects for at least 5 hours each.',
+    icon: 'school',
+    category: 'Subject Mastery',
+    color: '#80DC89',
   },
   subject_10h: {
-    title: 'Subject Master',
-    description: 'Study 10 hours in a single subject.',
+    name: 'Deep Diver',
+    description: 'Study one subject for at least 10 hours.',
+    icon: 'bolt',
+    category: 'Subject Mastery',
+    color: '#80DC89',
   },
-  first_pdf: {
-    title: 'Resource Gatherer',
-    description: 'Add your first PDF study resource to a subject.',
+  subjects_3_10h: {
+    name: 'Broad Horizon',
+    description: 'Study three subjects for at least 10 hours each.',
+    icon: 'bolt',
+    category: 'Subject Mastery',
+    color: '#80DC89',
   },
+  subjects_5_10h: {
+    name: 'Master Scholar',
+    description: 'Study five subjects for at least 10 hours each.',
+    icon: 'bolt',
+    category: 'Subject Mastery',
+    color: '#80DC89',
+  },
+
+  // Free timer
+  free_timer_first: {
+    name: 'Freedom',
+    description: 'Start your first non-Pomodoro session.',
+    icon: 'speed',
+    category: 'Flexibility',
+    color: '#E8C16C',
+  },
+  free_timer_10: {
+    name: 'Flow State',
+    description: 'Complete 10 free timer sessions.',
+    icon: 'speed',
+    category: 'Flexibility',
+    color: '#E8C16C',
+  },
+  free_timer_30m: {
+    name: 'Quality Time',
+    description: 'Complete a free timer session of 30 mins or more.',
+    icon: 'speed',
+    category: 'Flexibility',
+    color: '#E8C16C',
+  },
+  free_timer_2h: {
+    name: 'Marathoner',
+    description: 'Complete a free timer session of 2 hours or more.',
+    icon: 'speed',
+    category: 'Flexibility',
+    color: '#E8C16C',
+  },
+
+  // Long sessions
+  long_session_2h: {
+    name: 'The Grind',
+    description: 'Log a session of at least 2 hours.',
+    icon: 'fitness_center',
+    category: 'Intensity',
+    color: '#FFB4AB',
+  },
+  long_session_3h: {
+    name: 'Endurance',
+    description: 'Log a session of at least 3 hours.',
+    icon: 'fitness_center',
+    category: 'Intensity',
+    color: '#FFB4AB',
+  },
+  long_session_5h: {
+    name: 'Iron Mind',
+    description: 'Log a session of at least 5 hours.',
+    icon: 'fitness_center',
+    category: 'Intensity',
+    color: '#FFB4AB',
+  },
+
+  // Confidence
   confidence_5: {
-    title: 'Confidence Boost',
-    description: 'Rate a study session with 5 stars for confidence.',
+    name: 'Honest Review',
+    description: 'Rate your first session.',
+    icon: 'star',
+    category: 'Smart Study',
+    color: '#D0BCFF',
   },
+  confidence_10: {
+    name: 'Self-Aware',
+    description: 'Rate 10 sessions.',
+    icon: 'star',
+    category: 'Smart Study',
+    color: '#D0BCFF',
+  },
+  confidence_50: {
+    name: 'Reflective',
+    description: 'Rate 50 sessions.',
+    icon: 'star',
+    category: 'Smart Study',
+    color: '#D0BCFF',
+  },
+  all_5stars_3: {
+    name: 'Peak Performance',
+    description: 'Achieve 3 high-confidence ratings in any subjects.',
+    icon: 'auto_awesome',
+    category: 'Smart Study',
+    color: '#D0BCFF',
+  },
+
+  // Sources
+  first_pdf: {
+    name: 'Digital Library',
+    description: 'Add your first PDF source.',
+    icon: 'picture_as_pdf',
+    category: 'Sources',
+    color: '#FFB1C8',
+  },
+  sources_5: {
+    name: 'Collector',
+    description: 'Add 5 PDF sources.',
+    icon: 'picture_as_pdf',
+    category: 'Sources',
+    color: '#FFB1C8',
+  },
+  sources_10: {
+    name: 'Archivist',
+    description: 'Add 10 PDF sources.',
+    icon: 'picture_as_pdf',
+    category: 'Sources',
+    color: '#FFB1C8',
+  },
+
+  // Skill
   skill_advanced: {
-    title: 'Skill Advancer',
-    description: 'Reach the Advanced skill level in any subject.',
+    name: 'Moving Up',
+    description: 'Reach Advanced skill level in any subject.',
+    icon: 'trending_up',
+    category: 'Skill',
+    color: '#89D6A1',
   },
+  skill_expert: {
+    name: 'Expert Opinion',
+    description: 'Reach Expert skill level in any subject.',
+    icon: 'workspace_premium',
+    category: 'Skill',
+    color: '#89D6A1',
+  },
+
+  // Night/Day
+  night_owl: {
+    name: 'Night Owl',
+    description: 'Study after 10 PM.',
+    icon: 'nightlight_round',
+    category: 'Dedication',
+    color: '#BFC2FF',
+  },
+  early_bird: {
+    name: 'Early Bird',
+    description: 'Study before 7 AM.',
+    icon: 'wb_sunny',
+    category: 'Dedication',
+    color: '#BFC2FF',
+  },
+
+  // All Badges
   all_badges: {
-    title: 'Badge Collector',
-    description: 'Unlock all achievement badges. You are a true StudyHabit master!',
+    name: 'Completionist',
+    description: 'Unlock all achievements.',
+    icon: 'emoji_events',
+    category: 'Mastery',
+    color: '#FFD700',
   },
 };
-
-const levelNames: Record<number, string> = {
-  1: 'Novice',
-  2: 'Apprentice',
-  3: 'Scholar',
-  4: 'Adept',
-  5: 'Expert',
-  6: 'Master',
-  7: 'Grandmaster',
-};
-
-function getXpForLevel(level: number): number {
-  if (level === 1) return 0;
-  if (level === 2) return 500;
-  if (level === 3) return 1500;
-  if (level === 4) return 3500;
-  if (level === 5) return 7000;
-  let xp = 7000;
-  for (let i = 6; i <= level; i++) {
-    xp = Math.round(xp * 1.5 / 100) * 100;
-  }
-  return xp;
-}
 
 export default function Achievements() {
   const [selectedAchievement, setSelectedAchievement] = useState<Achievement | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const { data: stats, loading: statsLoading } = useApi<StatsOverview>('/stats/overview');
   const { data: serverAchievements, loading: achievementsLoading } = useApi<Achievement[]>('/achievements');
 
-  const currentLevel = stats?.currentLevel || 1;
   const totalXp = stats?.totalXp || 0;
   const loading = statsLoading || achievementsLoading;
 
   const achievements = serverAchievements || [];
 
-  const getXpInCurrentLevel = () => {
-    const levelXp = getXpForLevel(currentLevel);
-    return totalXp - levelXp;
+  const getInfo = (key: string): AchievementInfo => {
+    return ACHIEVEMENTS_METADATA[key] || {
+      name: key
+        .split('_')
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' '),
+      description: 'Achievement reward.',
+      icon: 'emoji_events',
+      category: 'General',
+      color: '#85D2E0',
+    };
   };
 
-  const getXpToNextLevel = () => {
-    const levelXp = getXpForLevel(currentLevel);
-    const nextLevelXp = getXpForLevel(currentLevel + 1);
-    return nextLevelXp - levelXp;
-  };
+  const categories = ['All', ...Array.from(new Set(Object.values(ACHIEVEMENTS_METADATA).map((a) => a.category)))];
 
-  const getProgressPercentage = () => {
-    const xpInLevel = getXpInCurrentLevel();
-    const xpNeeded = getXpToNextLevel();
-    return (xpInLevel / xpNeeded) * 100;
-  };
+  const filteredAchievements = selectedCategory === 'All'
+    ? achievements
+    : achievements.filter((a) => getInfo(a.key).category === selectedCategory);
 
-  const getAchievementName = (key: string) => {
-    return achievementDescriptions[key]?.title || key
-      .split('_')
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-  };
+  const progressInfo = getLevelProgress(totalXp);
+  const currentLevel = progressInfo.currentLevel;
+  const xpInCurrentLevel = progressInfo.xpInLevel;
+  const xpNeeded = progressInfo.xpNeededForBand;
+  const progressPercent = progressInfo.progressPercent;
 
   return (
     <div className="min-h-screen bg-background">
@@ -186,7 +486,7 @@ export default function Achievements() {
                         Level {currentLevel}
                       </h2>
                       <span className="px-3 py-1 bg-primary/20 text-primary text-sm font-medium rounded-full font-body">
-                        {levelNames[currentLevel] || 'Unknown'}
+                        {getLevelName(currentLevel)}
                       </span>
                     </div>
                     <p className="text-sm text-gray-400 font-body">
@@ -196,14 +496,14 @@ export default function Achievements() {
                   <div className="text-right">
                     <p className="text-sm text-gray-400 font-body mb-1">XP Progress</p>
                     <p className="text-sm font-medium text-onSurface font-data">
-                      {getXpInCurrentLevel().toLocaleString()} / {getXpToNextLevel().toLocaleString()} XP
+                      {Math.max(0, xpInCurrentLevel).toLocaleString()} / {Math.max(1, xpNeeded).toLocaleString()} XP
                     </p>
                   </div>
                 </div>
                 <div className="w-full bg-gray-700 rounded-full h-3">
                   <div
-                    className="bg-tertiary h-3 rounded-full transition-all"
-                    style={{ width: `${getProgressPercentage()}%` }}
+                    className="bg-primary h-3 rounded-full transition-all"
+                    style={{ width: `${Math.max(3, progressPercent)}%` }}
                   />
                 </div>
               </div>
@@ -216,7 +516,7 @@ export default function Achievements() {
                   </div>
                   <div>
                     <p className="text-2xl font-bold text-onSurface font-data">
-                      {achievements.filter(a => a.unlockedAt).length}
+                      {achievements.filter((a) => a.unlockedAt).length}
                     </p>
                     <p className="text-sm text-gray-400 font-body">Unlocked</p>
                   </div>
@@ -228,7 +528,7 @@ export default function Achievements() {
                   </div>
                   <div>
                     <p className="text-2xl font-bold text-onSurface font-data">
-                      {achievements.filter(a => !a.unlockedAt).length}
+                      {achievements.filter((a) => !a.unlockedAt).length}
                     </p>
                     <p className="text-sm text-gray-400 font-body">Locked</p>
                   </div>
@@ -240,93 +540,114 @@ export default function Achievements() {
                   </div>
                   <div>
                     <p className="text-2xl font-bold text-onSurface font-data">
-                      {Math.round(achievements.reduce((sum, a) => sum + a.progress, 0) / achievements.length * 100)}%
+                      {achievements.length > 0
+                        ? `${Math.round((achievements.reduce((sum, a) => sum + a.progress, 0) / achievements.length) * 100)}%`
+                        : '0%'}
                     </p>
                     <p className="text-sm text-gray-400 font-body">Complete</p>
                   </div>
                 </div>
               </div>
 
+              {/* Category Filter */}
+              <div className="flex gap-2 overflow-x-auto pb-4 mb-6 scrollbar-none">
+                {categories.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`px-4 py-2 rounded-full text-xs font-medium font-body transition-colors shrink-0 ${
+                      selectedCategory === cat
+                        ? 'bg-primary text-background font-bold'
+                        : 'bg-surfaceContainerHigh text-gray-300 hover:bg-surfaceContainerHighest'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+
               {/* Achievements Grid */}
-              {achievements.length === 0 ? (
+              {filteredAchievements.length === 0 ? (
                 <div className="bg-surfaceContainerHigh rounded-3xl p-12 text-center shadow-md">
                   <div className="w-16 h-16 bg-surface/50 rounded-full flex items-center justify-center mx-auto mb-4">
                     <span className="material-symbols-rounded text-gray-500 text-3xl">emoji_events</span>
                   </div>
-                  <h3 className="text-xl font-bold text-onSurface font-heading mb-2">No achievements yet</h3>
+                  <h3 className="text-xl font-bold text-onSurface font-heading mb-2">No achievements found</h3>
                   <p className="text-gray-400 font-body">
                     Start studying and tracking your sessions to earn achievements!
                   </p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {achievements.map((achievement) => {
-                  const isUnlocked = !!achievement.unlockedAt;
-                  const icon = achievementIcons[achievement.key] || 'emoji_events';
-                  const color = achievementColors[achievement.key] || '#85D2E0';
-                  const name = getAchievementName(achievement.key);
-                  const description = achievementDescriptions[achievement.key]?.description || '';
+                  {filteredAchievements.map((achievement) => {
+                    const isUnlocked = !!achievement.unlockedAt;
+                    const info = getInfo(achievement.key);
 
-                  return (
-                    <div
-                      key={achievement.id}
-                      className={`bg-surfaceContainerHigh rounded-3xl p-6 transition-all hover:-translate-y-1 hover:shadow-xl cursor-pointer border border-transparent hover:border-outlineVariant ${
-                        isUnlocked ? 'shadow-md' : 'grayscale opacity-70 shadow-sm'
-                      }`}
-                      onClick={() => setSelectedAchievement(achievement)}
-                    >
-                      <div className="flex items-center justify-between mb-4">
-                        <div
-                          className="w-16 h-16 rounded-2xl flex items-center justify-center"
-                          style={{
-                            backgroundColor: isUnlocked ? `${color}20` : 'rgba(46, 53, 57, 0.5)',
-                          }}
-                        >
-                          <span
-                            className="material-symbols-rounded text-4xl"
+                    return (
+                      <div
+                        key={achievement.id}
+                        className={`bg-surfaceContainerHigh rounded-3xl p-6 transition-all hover:-translate-y-1 hover:shadow-xl cursor-pointer border border-transparent hover:border-outlineVariant ${
+                          isUnlocked ? 'shadow-md' : 'grayscale opacity-70 shadow-sm'
+                        }`}
+                        onClick={() => setSelectedAchievement(achievement)}
+                      >
+                        <div className="flex items-center justify-between mb-4">
+                          <div
+                            className="w-16 h-16 rounded-2xl flex items-center justify-center"
                             style={{
-                              color: isUnlocked ? color : '#6B7280',
+                              backgroundColor: isUnlocked ? `${info.color}20` : 'rgba(46, 53, 57, 0.5)',
                             }}
                           >
-                            {icon}
-                          </span>
+                            <span
+                              className="material-symbols-rounded text-4xl"
+                              style={{
+                                color: isUnlocked ? info.color : '#6B7280',
+                              }}
+                            >
+                              {info.icon}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-surface text-gray-400">
+                              {info.category}
+                            </span>
+                            {isUnlocked && (
+                              <span className="px-2 py-1 text-xs font-medium bg-green-500/20 text-green-400 rounded-full font-body">
+                                ✓
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        {isUnlocked && (
-                          <span className="px-2 py-1 text-xs font-medium bg-green-500/20 text-green-400 rounded-full font-body">
-                            ✓
-                          </span>
+
+                        <h3 className="text-base font-bold text-onSurface font-heading mb-1">
+                          {info.name}
+                        </h3>
+
+                        <p className="text-sm text-gray-400 font-body mb-4 line-clamp-2">
+                          {info.description}
+                        </p>
+
+                        {isUnlocked ? (
+                          <p className="text-xs text-gray-500 font-body flex items-center gap-1">
+                            <span className="material-symbols-rounded text-sm">event</span>
+                            {new Date(achievement.unlockedAt!).toLocaleDateString()}
+                          </p>
+                        ) : (
+                          <div>
+                            <div className="w-full bg-gray-700 rounded-full h-2 mb-2">
+                              <div
+                                className="bg-primary h-2 rounded-full transition-all"
+                                style={{ width: `${Math.round(achievement.progress * 100)}%` }}
+                              />
+                            </div>
+                            <p className="text-xs text-gray-400 font-body">
+                              {Math.round(achievement.progress * 100)}% complete
+                            </p>
+                          </div>
                         )}
                       </div>
-
-                      <h3 className="text-base font-bold text-onSurface font-heading mb-1">
-                        {name}
-                      </h3>
-
-                      <p className="text-sm text-gray-400 font-body mb-4 line-clamp-2">
-                        {description}
-                      </p>
-
-                      {isUnlocked ? (
-                        <p className="text-xs text-gray-500 font-body flex items-center gap-1">
-                          <span className="material-symbols-rounded text-sm">event</span>
-                          {new Date(achievement.unlockedAt!).toLocaleDateString()}
-                        </p>
-                      ) : (
-                        <div>
-                          <div className="w-full bg-gray-700 rounded-full h-2 mb-2">
-                            <div
-                              className="bg-primary h-2 rounded-full transition-all"
-                              style={{ width: `${achievement.progress * 100}%` }}
-                            />
-                          </div>
-                          <p className="text-xs text-gray-400 font-body">
-                            {Math.round(achievement.progress * 100)}% complete
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                    );
+                  })}
                 </div>
               )}
             </>
@@ -336,21 +657,19 @@ export default function Achievements() {
 
       {/* Achievement Detail Modal */}
       {selectedAchievement && (
-        <div
-          className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
-          onClick={() => setSelectedAchievement(null)}
+        <Modal
+          isOpen={!!selectedAchievement}
+          onClose={() => setSelectedAchievement(null)}
+          title={getInfo(selectedAchievement.key).name}
         >
-          <div
-            className="bg-surfaceContainerHighest rounded-3xl p-8 max-w-md w-full shadow-2xl glass"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="p-8">
             <div className="flex items-start justify-between mb-6">
               <div className="flex items-center gap-4">
                 <div
                   className="w-20 h-20 rounded-2xl flex items-center justify-center"
                   style={{
                     backgroundColor: selectedAchievement.unlockedAt
-                      ? `${achievementColors[selectedAchievement.key] || '#85D2E0'}20`
+                      ? `${getInfo(selectedAchievement.key).color}20`
                       : 'rgba(46, 53, 57, 0.5)',
                   }}
                 >
@@ -358,34 +677,40 @@ export default function Achievements() {
                     className="material-symbols-rounded text-5xl"
                     style={{
                       color: selectedAchievement.unlockedAt
-                        ? achievementColors[selectedAchievement.key] || '#85D2E0'
+                        ? getInfo(selectedAchievement.key).color
                         : '#6B7280',
                     }}
                   >
-                    {achievementIcons[selectedAchievement.key] || 'emoji_events'}
+                    {getInfo(selectedAchievement.key).icon}
                   </span>
                 </div>
                 <div>
                   <h3 className="text-xl font-bold text-onSurface font-heading mb-1">
-                    {getAchievementName(selectedAchievement.key)}
+                    {getInfo(selectedAchievement.key).name}
                   </h3>
-                  {selectedAchievement.unlockedAt && (
-                    <span className="px-2 py-1 text-xs font-medium bg-green-500/20 text-green-400 rounded-full font-body">
-                      Unlocked
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-surface text-gray-400">
+                      {getInfo(selectedAchievement.key).category}
                     </span>
-                  )}
+                    {selectedAchievement.unlockedAt && (
+                      <span className="px-2 py-1 text-xs font-medium bg-green-500/20 text-green-400 rounded-full font-body">
+                        Unlocked
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
               <button
                 onClick={() => setSelectedAchievement(null)}
-                className="text-gray-400 hover:text-gray-200"
+                aria-label="Close dialog"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-surface hover:text-white transition-colors"
               >
-                <span className="material-symbols-rounded">close</span>
+                <span className="material-symbols-rounded text-lg">close</span>
               </button>
             </div>
 
             <p className="text-base text-gray-300 font-body mb-6">
-              {achievementDescriptions[selectedAchievement.key]?.description || ''}
+              {getInfo(selectedAchievement.key).description}
             </p>
 
             <div className="mb-6">
@@ -400,7 +725,7 @@ export default function Achievements() {
                       ? 'bg-green-500'
                       : 'bg-primary'
                   }`}
-                  style={{ width: `${selectedAchievement.progress * 100}%` }}
+                  style={{ width: `${Math.round(selectedAchievement.progress * 100)}%` }}
                 />
               </div>
             </div>
@@ -413,13 +738,14 @@ export default function Achievements() {
             )}
 
             <button
+              type="button"
               onClick={() => setSelectedAchievement(null)}
-              className="w-full mt-6 bg-primary/20 text-primary py-3 rounded-xl text-sm font-medium hover:bg-primary/30 transition-colors font-body"
+              className="w-full mt-6 bg-primary hover:bg-primary-container text-white py-3 rounded-xl text-sm font-bold transition-colors font-body"
             >
               Close
             </button>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

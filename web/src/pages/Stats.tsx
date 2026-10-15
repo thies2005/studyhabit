@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
+  AreaChart,
+  Area,
   BarChart,
   Bar,
   XAxis,
@@ -12,6 +14,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import apiClient from '../api/client';
+import { useProject } from '../contexts/ProjectContext';
 
 type TooltipRendererProps = any;
 
@@ -45,7 +48,27 @@ const WeeklyChartTooltip = ({ active, payload, label }: TooltipRendererProps) =>
   return null;
 };
 
+const XpChartTooltip = ({ active, payload, label }: TooltipRendererProps) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-surfaceContainerHigh border border-outlineVariant rounded-xl p-3 shadow-lg">
+        <p className="text-sm font-medium text-onSurface font-heading mb-1">{label}</p>
+        <p className="text-sm text-primary font-body">
+          {payload[0]?.value?.toLocaleString()} XP total
+        </p>
+        {payload[0]?.payload?.dailyXp > 0 && (
+          <p className="text-xs text-tertiary font-body mt-0.5">
+            +{payload[0]?.payload?.dailyXp} XP earned
+          </p>
+        )}
+      </div>
+    );
+  }
+  return null;
+};
+
 export default function Stats() {
+  const { currentProjectId } = useProject();
   const [overview, setOverview] = useState({
     totalHours: 0,
     weekHours: 0,
@@ -58,107 +81,108 @@ export default function Stats() {
   const [subjectDistribution, setSubjectDistribution] = useState<any[]>([]);
   const [heatmap, setHeatmap] = useState<any[]>([]);
   const [subjectBreakdown, setSubjectBreakdown] = useState<any[]>([]);
+  const [xpHistory, setXpHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        setLoading(true);
-        setError(false);
-        const [overviewRes, heatmapRes, subjectsRes] = await Promise.all([
-          apiClient.get('/stats/overview'),
-          apiClient.get('/stats/heatmap'),
-          apiClient.get('/stats/subjects'),
-        ]);
+  const fetchStats = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(false);
+      const queryParam = currentProjectId ? `?projectId=${currentProjectId}` : '';
+      const [overviewRes, heatmapRes, subjectsRes, xpRes] = await Promise.all([
+        apiClient.get(`/stats/overview${queryParam}`),
+        apiClient.get(`/stats/heatmap${queryParam}`),
+        apiClient.get(`/stats/subjects${queryParam}`),
+        apiClient.get(`/stats/xp-history${queryParam ? queryParam + '&days=30' : '?days=30'}`),
+      ]);
 
-        const overviewData = overviewRes.data.data;
-        const heatmapData = heatmapRes.data.data as { date: string; minutes: number }[];
-        const subjectsData = subjectsRes.data.data;
+      const overviewData = overviewRes.data.data;
+      const heatmapData = heatmapRes.data.data as { date: string; minutes: number }[];
+      const subjectsData = subjectsRes.data.data;
+      const xpData = xpRes.data.data;
 
-        setOverview(overviewData);
+      setOverview(overviewData);
+      setXpHistory(xpData || []);
 
-        // Map heatmap
-        const now = new Date();
-        const cells = [];
-        for (let i = 83; i >= 0; i--) {
-          const d = new Date(now);
-          d.setDate(now.getDate() - i);
-          const dateStr = d.toISOString().split('T')[0];
-          const match = heatmapData.find(h => h.date === dateStr);
-          const minutes = match ? match.minutes : 0;
-          const intensity = minutes === 0 ? 0 : Math.min(4, Math.ceil(minutes / 30));
+      // Map heatmap: 12 weeks Monday through Sunday
+      const today = new Date();
+      const todayDayOfWeek = (today.getDay() + 6) % 7; // 0 = Mon, 6 = Sun
+      const startMonday = new Date(today);
+      startMonday.setDate(today.getDate() - todayDayOfWeek - (11 * 7));
+      startMonday.setHours(0, 0, 0, 0);
+
+      const cells = [];
+      for (let w = 0; w < 12; w++) {
+        for (let d = 0; d < 7; d++) {
+          const cellDate = new Date(startMonday);
+          cellDate.setDate(startMonday.getDate() + (w * 7 + d));
+          const dateStr = cellDate.toISOString().split('T')[0];
+          const isFuture = cellDate > today;
+          const match = heatmapData.find((h) => h.date === dateStr);
+          const minutes = (!isFuture && match) ? match.minutes : 0;
+          const intensity = isFuture ? -1 : (minutes === 0 ? 0 : Math.min(4, Math.ceil(minutes / 30)));
           cells.push({
-            id: 83 - i,
-            dayOfWeek: d.getDay(),
-            weekNum: Math.floor((83 - i) / 7),
+            id: `${w}-${d}`,
+            dateStr,
+            dayOfWeek: d,
+            weekNum: w,
             intensity,
             minutes,
-            date: `${dateStr} - ${minutes}m studied`,
+            isFuture,
+            tooltip: isFuture ? '' : `${dateStr} - ${minutes}m studied`,
           });
         }
-        setHeatmap(cells);
-
-        // Map weekly activity
-        const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-        const last7Days = [];
-        for (let i = 6; i >= 0; i--) {
-          const d = new Date();
-          d.setDate(d.getDate() - i);
-          const dateStr = d.toISOString().split('T')[0];
-          const match = heatmapData.find(h => h.date === dateStr);
-          const minutes = match ? match.minutes : 0;
-          last7Days.push({
-            day: weekdays[d.getDay()],
-            hours: Number((minutes / 60).toFixed(2)),
-            minutes,
-          });
-        }
-        setWeeklyActivity(last7Days);
-
-        // Map subject distribution
-        const mappedDistribution = subjectsData.map((d: any) => ({
-          name: d.subject.name,
-          hours: Number(d.totalHours.toFixed(1)),
-          value: Number(d.totalHours.toFixed(1)),
-          color: `#${d.subject.colorValue.toString(16).padStart(6, '0')}`,
-        }));
-        setSubjectDistribution(mappedDistribution);
-
-        // Map subject breakdown
-        const mappedBreakdown = subjectsData.map((d: any) => {
-          let level = 'Beginner';
-          const xp = d.subject.xpTotal;
-          if (xp >= 7000) level = 'Expert';
-          else if (xp >= 3500) level = 'Advanced';
-          else if (xp >= 1500) level = 'Intermediate';
-          
-          return {
-            name: d.subject.name,
-            hours: d.totalHours,
-            sessions: d.sessionCount,
-            avgConfidence: Math.round(d.avgConfidence || 3),
-            skillLevel: level,
-            color: `#${d.subject.colorValue.toString(16).padStart(6, '0')}`,
-          };
-        });
-        setSubjectBreakdown(mappedBreakdown);
-
-        // XP progress chart intentionally omitted: the server does not expose a
-        // per-day XP history endpoint, so the previous implementation fabricated
-        // a curve from the current XP total (Math.round(totalXp - (29-i)*100))
-        // and presented it as real analytics. Render an honest empty state
-        // below until a real history endpoint exists.
-
-      } catch (err) {
-        console.error('Failed to fetch stats:', err);
-        setError(true);
-      } finally {
-        setLoading(false);
       }
-    };
+      setHeatmap(cells);
+
+      // Map weekly activity
+      const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const last7Days = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const dateStr = d.toISOString().split('T')[0];
+        const match = heatmapData.find((h) => h.date === dateStr);
+        const minutes = match ? match.minutes : 0;
+        last7Days.push({
+          day: weekdays[d.getDay()],
+          hours: Number((minutes / 60).toFixed(2)),
+          minutes,
+        });
+      }
+      setWeeklyActivity(last7Days);
+
+      // Map subject distribution
+      const mappedDistribution = subjectsData.map((d: any) => ({
+        name: d.subject.name,
+        hours: Number(d.totalHours.toFixed(1)),
+        value: Number(d.totalHours.toFixed(1)),
+        color: `#${d.subject.colorValue.toString(16).padStart(6, '0')}`,
+      }));
+      setSubjectDistribution(mappedDistribution);
+
+      // Map subject breakdown using skill level from server
+      const mappedBreakdown = subjectsData.map((d: any) => ({
+        name: d.subject.name,
+        hours: d.totalHours,
+        sessions: d.sessionCount,
+        avgConfidence: Math.round(d.avgConfidence || 3),
+        skillLevel: d.skillLevel ? d.skillLevel.charAt(0).toUpperCase() + d.skillLevel.slice(1) : 'Beginner',
+        color: `#${d.subject.colorValue.toString(16).padStart(6, '0')}`,
+      }));
+      setSubjectBreakdown(mappedBreakdown);
+    } catch (err) {
+      console.error('Failed to fetch stats:', err);
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [currentProjectId]);
+
+  useEffect(() => {
     fetchStats();
-  }, []);
+  }, [fetchStats]);
 
   const getHeatmapColor = (intensity: number) => {
     switch (intensity) {
@@ -331,20 +355,64 @@ export default function Stats() {
                 </div>
               )}
 
-              {/* XP Progress — empty state (per-day XP history not yet available) */}
+              {/* XP Progress Chart */}
               <div className="bg-surfaceContainerHigh rounded-3xl p-6 mb-6 shadow-md">
-                <h3 className="text-lg font-medium text-onSurface font-heading mb-4">XP Progress</h3>
-                <div className="flex flex-col items-center justify-center py-10 text-center">
-                  <span className="material-symbols-rounded text-5xl text-onSurfaceVariant mb-3" aria-hidden="true">
-                    trending_up
-                  </span>
-                  <p className="text-sm text-gray-300 font-body max-w-sm">
-                    Start logging study sessions to build your XP history and track your progress over time.
-                  </p>
-                  <p className="text-xs text-gray-500 font-body mt-2">
-                    Current total: {overview.totalXp.toLocaleString()} XP · Level {overview.currentLevel} ({overview.levelName})
-                  </p>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-medium text-onSurface font-heading">XP Progress</h3>
+                  <span className="text-xs text-gray-400 font-body">Last 30 days</span>
                 </div>
+                {xpHistory.length > 0 && xpHistory.some((p: any) => p.cumulativeXp > 0 || p.dailyXp > 0) ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <AreaChart data={xpHistory}>
+                      <defs>
+                        <linearGradient id="xpGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#85D2E0" stopOpacity={0.6}/>
+                          <stop offset="95%" stopColor="#85D2E0" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#323536" />
+                      <XAxis
+                        dataKey="date"
+                        stroke="#9CA3AF"
+                        fontSize={12}
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={(d) => {
+                          const parts = d.split('-');
+                          return `${parts[1]}/${parts[2]}`;
+                        }}
+                      />
+                      <YAxis
+                        stroke="#9CA3AF"
+                        fontSize={12}
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={(value) => `${value}`}
+                      />
+                      <Tooltip content={<XpChartTooltip />} cursor={{ stroke: '#85D2E0', strokeWidth: 1 }} />
+                      <Area
+                        type="monotone"
+                        dataKey="cumulativeXp"
+                        stroke="#85D2E0"
+                        strokeWidth={2}
+                        fillOpacity={1}
+                        fill="url(#xpGradient)"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-10 text-center">
+                    <span className="material-symbols-rounded text-5xl text-onSurfaceVariant mb-3" aria-hidden="true">
+                      trending_up
+                    </span>
+                    <p className="text-sm text-gray-300 font-body max-w-sm">
+                      Start logging study sessions to build your XP history and track your progress over time.
+                    </p>
+                    <p className="text-xs text-gray-500 font-body mt-2">
+                      Current total: {overview.totalXp.toLocaleString()} XP · Level {overview.currentLevel} ({overview.levelName})
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Activity Heatmap */}
@@ -355,25 +423,24 @@ export default function Stats() {
                     <span className="text-xs text-gray-400 font-body">Last 12 weeks</span>
                   </div>
                   <div className="overflow-x-auto">
-                    <div className="flex">
-                      {/* Day labels */}
-                      <div className="flex flex-col gap-1 mr-2 text-xs text-gray-400 font-body">
-                        <div className="h-3" />
-                        <div>M</div>
-                        <div>T</div>
-                        <div>W</div>
-                        <div>T</div>
-                        <div>F</div>
-                        <div>S</div>
-                        <div>S</div>
+                    <div className="flex items-start">
+                      {/* Day labels (M to S, 7 days) */}
+                      <div className="flex flex-col gap-1 mr-2 text-[10px] text-gray-400 font-body select-none">
+                        <div className="h-3 flex items-center">M</div>
+                        <div className="h-3 flex items-center">T</div>
+                        <div className="h-3 flex items-center">W</div>
+                        <div className="h-3 flex items-center">T</div>
+                        <div className="h-3 flex items-center">F</div>
+                        <div className="h-3 flex items-center">S</div>
+                        <div className="h-3 flex items-center">S</div>
                       </div>
-                      {/* Heatmap grid */}
-                      <div className="grid grid-cols-12 grid-rows-7 gap-1">
+                      {/* Heatmap grid (7 rows x 12 cols, column-flow) */}
+                      <div className="grid grid-rows-7 grid-flow-col gap-1">
                         {heatmap.map((cell) => (
                           <div
                             key={cell.id}
-                            className={`w-3 h-3 rounded-sm ${getHeatmapColor(cell.intensity)} hover:brightness-125 transition-colors cursor-pointer`}
-                            title={`${cell.date}`}
+                            className={`w-3 h-3 rounded-sm ${cell.isFuture ? 'opacity-0 pointer-events-none' : getHeatmapColor(cell.intensity)} hover:brightness-125 transition-colors cursor-pointer`}
+                            title={cell.tooltip}
                           />
                         ))}
                       </div>

@@ -143,6 +143,7 @@ export interface SkillLabel {
 export interface StatsOverview {
   totalHours: number;
   weekHours: number;
+  todayHours?: number;
   currentStreak: number;
   levelName: string;
   currentLevel: number;

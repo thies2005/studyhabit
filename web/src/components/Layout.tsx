@@ -61,7 +61,7 @@ export default function Layout() {
         <div className="p-8 border-b border-surfaceContainerHigh">
           <div className="flex items-center space-x-3">
             <span className="text-4xl text-primary material-symbols-rounded">school</span>
-            <h1 className="text-2xl font-bold text-onSurface font-heading tracking-tight">Studyhabit</h1>
+            <h1 className="text-2xl font-bold text-onSurface font-heading tracking-tight">StudyHabit</h1>
           </div>
         </div>
 
