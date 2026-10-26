@@ -30,6 +30,7 @@ class AppContainer(val context: Context) {
         coerceInputValues = true
         isLenient = true
         encodeDefaults = true
+        explicitNulls = false
     }
 
     private val dynamicUrlInterceptor = Interceptor { chain ->

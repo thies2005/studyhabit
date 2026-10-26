@@ -156,7 +156,7 @@ fun LoginScreen(
                                 } else {
                                     container.api.register(RegisterRequest(email.trim(), password)).data
                                 }
-                                container.tokenStorage.saveToken(authData.token)
+                                container.tokenStorage.saveToken(authData.accessToken)
                                 container.tokenStorage.saveUser(authData.user.id, authData.user.email)
 
                                 // Trigger sync

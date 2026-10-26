@@ -23,7 +23,7 @@ data class UserInfo(
 
 @Serializable
 data class AuthData(
-    val token: String,
+    val accessToken: String,
     val user: UserInfo,
 )
 
@@ -227,6 +227,7 @@ data class SyncAchievementItem(
 @Serializable
 data class SyncUserStatsItem(
     val id: String = "default_stats",
+    val userId: String? = null,
     val totalXp: Int = 0,
     val currentLevel: Int = 1,
     val currentStreak: Int = 0,

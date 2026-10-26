@@ -69,12 +69,14 @@ class SyncEngine(
         debounceJob?.cancel()
         debounceJob = scope.launch {
             delay(30_000)
-            syncNow()
+            syncNow(cancelDebounce = false)
         }
     }
 
-    suspend fun syncNow(): Boolean {
-        debounceJob?.cancel()
+    suspend fun syncNow(cancelDebounce: Boolean = true): Boolean {
+        if (cancelDebounce) {
+            debounceJob?.cancel()
+        }
         val token = tokenStorage.getToken()
         if (token.isNullOrBlank()) {
             _syncStatus.value = SyncStatus.IDLE
@@ -107,7 +109,10 @@ class SyncEngine(
                 preferences.lastSyncedAt = parseIsoString(pull.serverTime)
                 _syncStatus.value = SyncStatus.SYNCED
                 true
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
+                android.util.Log.e("SyncEngine", "syncNow failed", e)
                 _syncStatus.value = SyncStatus.ERROR
                 false
             }
@@ -131,6 +136,7 @@ class SyncEngine(
         val projects = database.projectDao().getModifiedSince(sinceMs).map {
             SyncProjectItem(
                 id = it.id,
+                userId = tokenStorage.getUserId(),
                 name = it.name,
                 icon = it.icon,
                 colorValue = normalizeColorForPush(it.colorValue),
@@ -271,6 +277,7 @@ class SyncEngine(
         val stats = database.userStatsDao().getModifiedSince(sinceMs).firstOrNull()?.let {
             SyncUserStatsItem(
                 id = it.id,
+                userId = tokenStorage.getUserId(),
                 totalXp = it.totalXp,
                 currentLevel = it.currentLevel,
                 currentStreak = it.currentStreak,
