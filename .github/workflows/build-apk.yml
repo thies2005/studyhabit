@@ -18,6 +18,7 @@ jobs:
     name: Verify Backend & Web
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -42,14 +43,82 @@ jobs:
     name: Build Native Kotlin Android APK
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      version_name: ${{ steps.version.outputs.version_name }}
+      build_number: ${{ steps.version.outputs.build_number }}
+      short_sha: ${{ steps.version.outputs.short_sha }}
+      commit_sha: ${{ steps.version.outputs.commit_sha }}
+      build_date: ${{ steps.version.outputs.build_date }}
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
         with:
           distribution: "zulu"
           java-version: "17"
-      - uses: gradle/actions/setup-gradle@v4
 
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # ── Auto-bump version name + versionCode on every push ──
+      - name: Auto-bump version name and versionCode
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        id: bump
+        run: |
+          python3 - << 'EOF'
+          import os, re
+          gradle_file = "android/app/build.gradle.kts"
+          with open(gradle_file, "r", encoding="utf-8") as f:
+              content = f.read()
+
+          code_match = re.search(r"versionCode\s*=\s*(\d+)", content)
+          name_match = re.search(r"versionName\s*=\s*\"([^\"]+)\"", content)
+          if not code_match or not name_match:
+              raise SystemExit(f"Could not find versionCode or versionName in {gradle_file}")
+
+          old_code = int(code_match.group(1))
+          old_name = name_match.group(1)
+
+          new_code = old_code + 1
+          parts = old_name.split(".")
+          if len(parts) >= 3:
+              parts[-1] = str(int(parts[-1]) + 1)
+              new_name = ".".join(parts)
+          else:
+              new_name = f"{old_name}.1"
+
+          new_content = re.sub(r"versionCode\s*=\s*\d+", f"versionCode = {new_code}", content, count=1)
+          new_content = re.sub(r"versionName\s*=\s*\"[^\"]+\"", f"versionName = \"{new_name}\"", new_content, count=1)
+
+          with open(gradle_file, "w", encoding="utf-8") as f:
+              f.write(new_content)
+
+          print(f"Bumped version: {old_name}+{old_code} → {new_name}+{new_code}")
+
+          output_file = os.environ.get("GITHUB_OUTPUT")
+          if output_file:
+              with open(output_file, "a", encoding="utf-8") as f:
+                  f.write(f"version={new_name}+{new_code}\n")
+                  f.write(f"version_name={new_name}\n")
+                  f.write(f"version_code={new_code}\n")
+          EOF
+
+      - name: Commit and push version bump
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore(ci): auto-bump versionCode to ${{ steps.bump.outputs.version }} [skip ci]"
+          file_pattern: android/app/build.gradle.kts
+          commit_user_name: github-actions[bot]
+          commit_user_email: github-actions[bot]@users.noreply.github.com
+          commit_author: github-actions[bot] <github-actions[bot]@users.noreply.github.com>
+
+      # ── Decode signing keystore ────────────
       - name: Decode keystore from secrets
         if: ${{ secrets.KEYSTORE_BASE64 != '' }}
         working-directory: android
@@ -66,13 +135,102 @@ jobs:
           echo "storeFile=release.keystore"        >> app/key.properties
           echo "storeType=pkcs12"                  >> app/key.properties
 
+      # ── Build ──────────────────────────────
       - name: Run Unit Tests, Lint & Assemble Release APK
         working-directory: android
         run: |
           ./gradlew testDebugUnitTest lintDebug assembleRelease
 
+      # ── Rename APK files with version, build number, and date ──
+      - name: Rename APK files
+        id: rename
+        run: |
+          VERSION_NAME=$(grep -E '^\s*versionName\s*=' android/app/build.gradle.kts | sed -E 's/.*versionName\s*=\s*"([^"]+)".*/\1/')
+          BUILD_NUMBER=$GITHUB_RUN_NUMBER
+          BUILD_DATE=$(date +%Y%m%d)
+          APK_DIR="android/app/build/outputs/apk/release"
+          SRC_APK=$(ls ${APK_DIR}/*.apk | head -n 1)
+          RELEASE_NAME="StudyHabit-v${VERSION_NAME}-b${BUILD_NUMBER}-${BUILD_DATE}-release.apk"
+          if [ "${SRC_APK}" != "${APK_DIR}/${RELEASE_NAME}" ]; then
+            cp "${SRC_APK}" "${APK_DIR}/${RELEASE_NAME}"
+          fi
+          echo "release_apk=${APK_DIR}/${RELEASE_NAME}" >> "$GITHUB_OUTPUT"
+          echo "Renamed APK: ${RELEASE_NAME}"
+
+      # ── Compute beta tag version ───────────
+      - name: Compute beta version tag
+        id: version
+        run: |
+          VERSION_NAME=$(grep -E '^\s*versionName\s*=' android/app/build.gradle.kts | sed -E 's/.*versionName\s*=\s*"([^"]+)".*/\1/')
+          VERSION_CODE=$(grep -E '^\s*versionCode\s*=' android/app/build.gradle.kts | sed -E 's/.*versionCode\s*=\s*([0-9]+).*/\1/')
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          FULL_SHA=$(git rev-parse HEAD)
+          BUILD_DATE=$(date +%Y%m%d)
+          PRETTY_DATE=$(date +%Y-%m-%d)
+          BUILD_NUMBER=$GITHUB_RUN_NUMBER
+
+          TAG="beta-${VERSION_NAME}-build.${BUILD_NUMBER}+${BUILD_DATE}-${SHORT_SHA}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
+          echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "short_sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+          echo "commit_sha=$FULL_SHA" >> "$GITHUB_OUTPUT"
+          echo "build_date=$PRETTY_DATE" >> "$GITHUB_OUTPUT"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "## 🏷️ Beta Tag: \`${TAG}\`" >> "$GITHUB_STEP_SUMMARY"
+
+      # ── Upload artifacts ───────────────────
+      - name: Upload Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: studyhabit-release
+          path: ${{ steps.rename.outputs.release_apk }}
+          retention-days: 14
+
+      # ── Cleanup keystore ───────────────────
       - name: Cleanup signing artifacts
         if: always()
         working-directory: android
         run: |
           rm -f app/release.keystore app/key.properties
+
+  release:
+    name: Create Beta Release
+    needs: [build-android, verify-backend-and-web]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    permissions:
+      contents: write
+    steps:
+      - name: Download Android Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: studyhabit-release
+          path: build-artifacts
+
+      - name: Create Beta Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.build-android.outputs.tag }}
+          name: "Beta ${{ needs.build-android.outputs.version_name }} (#${{ needs.build-android.outputs.build_number }})"
+          prerelease: true
+          target_commitish: ${{ needs.build-android.outputs.commit_sha }}
+          body: |
+            ## 🧪 Beta Build
+
+            | Detail | Value |
+            |--------|-------|
+            | **Version** | `${{ needs.build-android.outputs.version_name }}` |
+            | **Build** | `#${{ needs.build-android.outputs.build_number }}` |
+            | **Commit** | `${{ needs.build-android.outputs.short_sha }}` |
+            | **Branch** | `${{ github.ref_name }}` |
+            | **Date** | ${{ needs.build-android.outputs.build_date }} |
+
+            ### Downloads
+            - `StudyHabit-v${{ needs.build-android.outputs.version_name }}-b${{ needs.build-android.outputs.build_number }}-release.apk` — signed release build (Android)
+
+            > This is an automated **beta** build. Not intended for production use.
+          files: |
+            build-artifacts/**/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
