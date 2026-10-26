@@ -54,59 +54,60 @@ fun AppNavHost(
 
     // Startup check: if a timer is currently active, redirect directly to that timer
     LaunchedEffect(Unit) {
-        val activeType = container.preferences.activeTimerType
         if (timerState.isRunning && timerState.subjectId.isNotEmpty()) {
             if (timerState.timerType == TimerType.POMODORO) {
                 navController.navigate("pomodoro/${timerState.subjectId}")
             } else {
                 navController.navigate("free_timer/${timerState.subjectId}")
             }
-        } else if (activeType != null) {
-            val json = if (activeType == "pomodoro") container.preferences.pomodoroStateJson else container.preferences.freeTimerStateJson
-            // If there's an active timer state persisted
-            if (json != null && activeType == "pomodoro") {
-                // Resume pomodoro
-            }
+        } else {
+            container.preferences.clearActiveTimers()
         }
     }
 
     val isTopLevelDestination = currentRoute in listOf("home", "subjects", "stats", "achievements")
 
-    if (isTopLevelDestination) {
-        AppShellScaffold(
-            currentRoute = currentRoute,
-            onNavigateToRoute = { route ->
-                navController.navigate(route) {
-                    popUpTo("home") { saveState = true }
-                    launchSingleTop = true
-                    restoreState = true
+    AppShellScaffold(
+        currentRoute = currentRoute,
+        onNavigateToRoute = { route ->
+            navController.navigate(route) {
+                popUpTo("home") { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
+        },
+        projects = projects,
+        activeProject = activeProject,
+        syncStatus = syncStatus,
+        onSyncClick = { scope.launch { container.syncEngine.syncNow() } },
+        onSelectProject = { pId ->
+            container.preferences.setActiveProjectId(pId)
+            scope.launch { container.database.projectDao().updateLastOpened(pId, System.currentTimeMillis()) }
+        },
+        onCreateProject = { name, icon, color ->
+            scope.launch {
+                val p = ProjectEntity(
+                    id = UUID.randomUUID().toString(),
+                    name = name,
+                    icon = icon,
+                    colorValue = color
+                )
+                container.database.projectDao().upsert(p)
+                container.preferences.setActiveProjectId(p.id)
+            }
+        },
+        onRenameProject = { id, name, icon ->
+            scope.launch {
+                container.database.projectDao().renameProject(id, name, icon)
+                container.syncEngine.scheduleDebouncedSync()
+                if (container.preferences.folderSyncEnabled.value) {
+                    container.folderSyncService.syncWithFolder()
                 }
-            },
-            projects = projects,
-            activeProject = activeProject,
-            syncStatus = syncStatus,
-            onSyncClick = { scope.launch { container.syncEngine.syncNow() } },
-            onSelectProject = { pId ->
-                container.preferences.setActiveProjectId(pId)
-                scope.launch { container.database.projectDao().updateLastOpened(pId, System.currentTimeMillis()) }
-            },
-            onCreateProject = { name, icon, color ->
-                scope.launch {
-                    val p = ProjectEntity(
-                        id = UUID.randomUUID().toString(),
-                        name = name,
-                        icon = icon,
-                        colorValue = color
-                    )
-                    container.database.projectDao().upsert(p)
-                    container.preferences.setActiveProjectId(p.id)
-                }
-            },
-            onOpenSettings = { navController.navigate("settings") }
-        ) {
-            NavContent(navController, container)
-        }
-    } else {
+            }
+        },
+        onOpenSettings = { navController.navigate("settings") },
+        showNavigationBars = isTopLevelDestination
+    ) {
         NavContent(navController, container)
     }
 }

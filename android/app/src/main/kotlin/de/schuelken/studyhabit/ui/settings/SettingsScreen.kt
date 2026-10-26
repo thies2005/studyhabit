@@ -26,8 +26,11 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.BatteryChargingFull
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -63,6 +66,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import de.schuelken.studyhabit.core.di.AppContainer
 import de.schuelken.studyhabit.core.model.ImportMode
+import de.schuelken.studyhabit.core.model.SyncStatus
 import de.schuelken.studyhabit.core.model.ThemeMode
 import de.schuelken.studyhabit.core.theme.AppThemeTokens
 import kotlinx.coroutines.launch
@@ -83,6 +87,12 @@ fun SettingsScreen(
     val seedColorIndex by container.preferences.seedColorIndex.collectAsState()
     val fontScale by container.preferences.fontScale.collectAsState()
     val useDynamicColor by container.preferences.useDynamicColor.collectAsState()
+
+    val syncStatus by container.syncEngine.syncStatus.collectAsState()
+    val lastSyncedMs by container.preferences.lastSyncedAtFlow.collectAsState()
+    val lastSyncSummary by container.preferences.lastSyncSummary.collectAsState()
+    val lastSyncError by container.preferences.lastSyncError.collectAsState()
+    val isLoggedIn = !container.tokenStorage.getToken().isNullOrBlank()
 
     var workDuration by remember { mutableIntStateOf(container.preferences.workDuration) }
     var shortBreak by remember { mutableIntStateOf(container.preferences.shortBreakDuration) }
@@ -141,9 +151,38 @@ fun SettingsScreen(
                                 .padding(16.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Default.Cloud, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Icon(
+                                imageVector = when (syncStatus) {
+                                    SyncStatus.ERROR -> Icons.Default.CloudOff
+                                    SyncStatus.SYNCED -> Icons.Default.CloudDone
+                                    SyncStatus.SYNCING -> Icons.Default.Sync
+                                    else -> Icons.Default.Cloud
+                                },
+                                contentDescription = null,
+                                tint = if (syncStatus == SyncStatus.ERROR) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                            )
                             Spacer(modifier = Modifier.width(12.dp))
-                            Text(text = "Cloud Sync & Account", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(text = "Cloud Sync & Account", style = MaterialTheme.typography.titleMedium)
+                                val syncSummaryText = if (!isLoggedIn) {
+                                    "Offline local mode"
+                                } else if (syncStatus == SyncStatus.SYNCING) {
+                                    "Syncing..."
+                                } else if (syncStatus == SyncStatus.ERROR && !lastSyncError.isNullOrBlank()) {
+                                    "Error: $lastSyncError"
+                                } else if (lastSyncSummary.isNotBlank()) {
+                                    lastSyncSummary
+                                } else if (lastSyncedMs > 0L) {
+                                    "Up to date"
+                                } else {
+                                    "Not synced yet"
+                                }
+                                Text(
+                                    text = syncSummaryText,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (syncStatus == SyncStatus.ERROR) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                             Icon(Icons.Default.ChevronRight, contentDescription = null)
                         }
                         HorizontalDivider()

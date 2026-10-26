@@ -18,11 +18,18 @@ class AppPreferences(private val prefs: SharedPreferences) {
     )
 
     companion object {
-        const val DEFAULT_SERVER_URL = "https://studyhabit.schuelken.uk"
+        const val DEFAULT_SERVER_URL = ""
+        const val PREF_LEGACY_URL_CLEANED = "sync.legacyUrlCleaned_v2"
         const val PREF_SERVER_URL = "sync.serverUrl"
         const val PREF_LAST_SYNCED = "sync.lastSyncedAt"
         const val PREF_LAST_SYNCED_USER = "sync.lastSyncedUserId"
         const val PREF_HAS_MIGRATED_OFFLINE = "sync.hasMigratedOfflineSessions"
+        const val PREF_LAST_SYNC_SUMMARY = "sync.lastSyncSummary"
+        const val PREF_LAST_SYNC_ERROR = "sync.lastSyncError"
+        const val PREF_FOLDER_SYNC_URI = "sync.folderUri"
+        const val PREF_FOLDER_SYNC_ENABLED = "sync.folderEnabled"
+        const val PREF_FOLDER_LAST_SYNCED = "sync.folderLastSyncedAt"
+        const val PREF_FOLDER_LAST_SUMMARY = "sync.folderLastSummary"
 
         const val PREF_SEED_COLOR_INDEX = "theme.seedColorIndex"
         const val PREF_THEME_MODE = "theme.themeMode"
@@ -61,39 +68,136 @@ class AppPreferences(private val prefs: SharedPreferences) {
         const val PREF_DAILY_GOAL_SUNDAY = "goal.sunday"
         const val PREF_LAST_DAILY_GOAL_AWARD_DATE = "goal.lastAwardDate"
 
+        private val floatKeys = setOf(PREF_FONT_SCALE, PREF_GRACE_PERIOD)
+        private val intKeys = setOf(
+            PREF_SEED_COLOR_INDEX, PREF_THEME_MODE, PREF_THEME_STYLE,
+            PREF_WORK_DURATION, PREF_SHORT_BREAK, PREF_LONG_BREAK, PREF_LONG_BREAK_EVERY,
+            PREF_STUDY_REMINDER_MINUTES, PREF_DAILY_GOAL_MINUTES,
+            PREF_DAILY_GOAL_MONDAY, PREF_DAILY_GOAL_TUESDAY, PREF_DAILY_GOAL_WEDNESDAY,
+            PREF_DAILY_GOAL_THURSDAY, PREF_DAILY_GOAL_FRIDAY, PREF_DAILY_GOAL_SATURDAY,
+            PREF_DAILY_GOAL_SUNDAY
+        )
+        private val booleanKeys = setOf(
+            PREF_DYNAMIC_COLOR, PREF_AUTO_START_BREAKS, PREF_AUTO_START_WORK,
+            PREF_VIBRATION, PREF_CONTINUOUS_FOCUS, PREF_NOTIFICATIONS_ENABLED,
+            PREF_STUDY_REMINDER_ENABLED, PREF_HAS_MIGRATED_OFFLINE,
+            PREF_FOLDER_SYNC_ENABLED
+        )
+        private val longKeys = setOf(
+            PREF_LAST_SYNCED, PREF_SETTINGS_UPDATED_AT, PREF_FOLDER_LAST_SYNCED
+        )
+
         fun isAllowedSettingKey(k: String): Boolean =
             k.startsWith("theme.") ||
             k.startsWith("pomodoro.") ||
             k.startsWith("notifications.") ||
             k.startsWith("streak.") ||
-            k.startsWith("goal.") ||
-            k == PREF_ACTIVE_TIMER_TYPE ||
-            k == PREF_POMODORO_STATE_JSON ||
-            k == PREF_FREE_TIMER_STATE_JSON
+            k.startsWith("goal.")
     }
 
-    private val _serverUrl = MutableStateFlow(prefs.getString(PREF_SERVER_URL, DEFAULT_SERVER_URL) ?: DEFAULT_SERVER_URL)
+    private fun healAndMigratePreferences() {
+        val all = prefs.all
+        val editor = prefs.edit()
+        var changed = false
+        for ((k, v) in all) {
+            when (k) {
+                in floatKeys -> if (v !is Float) {
+                    val f = (v as? Number)?.toFloat() ?: v?.toString()?.toFloatOrNull()
+                    if (f != null) { editor.putFloat(k, f); changed = true }
+                    else { editor.remove(k); changed = true }
+                }
+                in intKeys -> if (v !is Int) {
+                    val i = (v as? Number)?.toInt() ?: v?.toString()?.toIntOrNull()
+                    if (i != null) { editor.putInt(k, i); changed = true }
+                    else { editor.remove(k); changed = true }
+                }
+                in longKeys -> if (v !is Long) {
+                    val l = (v as? Number)?.toLong() ?: v?.toString()?.toLongOrNull()
+                    if (l != null) { editor.putLong(k, l); changed = true }
+                    else { editor.remove(k); changed = true }
+                }
+                in booleanKeys -> if (v !is Boolean) {
+                    val b = v?.toString()?.toBooleanStrictOrNull()
+                    if (b != null) { editor.putBoolean(k, b); changed = true }
+                    else { editor.remove(k); changed = true }
+                }
+            }
+        }
+        if (!prefs.getBoolean(PREF_LEGACY_URL_CLEANED, false)) {
+            val currentUrl = all[PREF_SERVER_URL] as? String
+            if (currentUrl == "https://studyhabit.schuelken.uk") {
+                editor.putString(PREF_SERVER_URL, "")
+            }
+            editor.putBoolean(PREF_LEGACY_URL_CLEANED, true)
+            changed = true
+        }
+        if (changed) {
+            editor.commit()
+        }
+    }
+
+    fun getFloatSafe(key: String, default: Float): Float =
+        (prefs.all[key] as? Number)?.toFloat() ?: default
+
+    fun getIntSafe(key: String, default: Int): Int =
+        (prefs.all[key] as? Number)?.toInt() ?: default
+
+    fun getLongSafe(key: String, default: Long): Long =
+        (prefs.all[key] as? Number)?.toLong() ?: default
+
+    fun getBooleanSafe(key: String, default: Boolean): Boolean =
+        (prefs.all[key] as? Boolean) ?: default
+
+    fun getStringSafe(key: String, default: String? = null): String? =
+        (prefs.all[key] as? String) ?: default
+
+    init {
+        healAndMigratePreferences()
+    }
+
+    private val _serverUrl = MutableStateFlow(getStringSafe(PREF_SERVER_URL, DEFAULT_SERVER_URL) ?: DEFAULT_SERVER_URL)
     val serverUrl: StateFlow<String> = _serverUrl.asStateFlow()
 
     private val _themeMode = MutableStateFlow(
-        ThemeMode.entries.getOrElse(prefs.getInt(PREF_THEME_MODE, ThemeMode.SYSTEM.ordinal)) { ThemeMode.SYSTEM }
+        ThemeMode.entries.getOrElse(getIntSafe(PREF_THEME_MODE, ThemeMode.SYSTEM.ordinal)) { ThemeMode.SYSTEM }
     )
     val themeMode: StateFlow<ThemeMode> = _themeMode.asStateFlow()
 
-    private val _seedColorIndex = MutableStateFlow(prefs.getInt(PREF_SEED_COLOR_INDEX, 0).coerceIn(0, 11))
+    private val _seedColorIndex = MutableStateFlow(getIntSafe(PREF_SEED_COLOR_INDEX, 0).coerceIn(0, 11))
     val seedColorIndex: StateFlow<Int> = _seedColorIndex.asStateFlow()
 
-    private val _themeStyleIndex = MutableStateFlow(prefs.getInt(PREF_THEME_STYLE, 0).coerceIn(0, 6))
+    private val _themeStyleIndex = MutableStateFlow(getIntSafe(PREF_THEME_STYLE, 0).coerceIn(0, 6))
     val themeStyleIndex: StateFlow<Int> = _themeStyleIndex.asStateFlow()
 
-    private val _useDynamicColor = MutableStateFlow(prefs.getBoolean(PREF_DYNAMIC_COLOR, false))
+    private val _useDynamicColor = MutableStateFlow(getBooleanSafe(PREF_DYNAMIC_COLOR, false))
     val useDynamicColor: StateFlow<Boolean> = _useDynamicColor.asStateFlow()
 
-    private val _fontScale = MutableStateFlow(prefs.getFloat(PREF_FONT_SCALE, 1.0f).coerceIn(0.85f, 1.3f))
+    private val _fontScale = MutableStateFlow(getFloatSafe(PREF_FONT_SCALE, 1.0f).coerceIn(0.85f, 1.3f))
     val fontScale: StateFlow<Float> = _fontScale.asStateFlow()
 
-    private val _activeProjectId = MutableStateFlow(prefs.getString(PREF_ACTIVE_PROJECT_ID, null))
+    private val _activeProjectId = MutableStateFlow(getStringSafe(PREF_ACTIVE_PROJECT_ID, null))
     val activeProjectId: StateFlow<String?> = _activeProjectId.asStateFlow()
+
+    private val _lastSyncSummary = MutableStateFlow(getStringSafe(PREF_LAST_SYNC_SUMMARY, "") ?: "")
+    val lastSyncSummary: StateFlow<String> = _lastSyncSummary.asStateFlow()
+
+    private val _lastSyncError = MutableStateFlow(getStringSafe(PREF_LAST_SYNC_ERROR, null))
+    val lastSyncError: StateFlow<String?> = _lastSyncError.asStateFlow()
+
+    private val _lastSyncedAtFlow = MutableStateFlow(getLongSafe(PREF_LAST_SYNCED, 0L))
+    val lastSyncedAtFlow: StateFlow<Long> = _lastSyncedAtFlow.asStateFlow()
+
+    private val _folderSyncUri = MutableStateFlow(getStringSafe(PREF_FOLDER_SYNC_URI, null))
+    val folderSyncUri: StateFlow<String?> = _folderSyncUri.asStateFlow()
+
+    private val _folderSyncEnabled = MutableStateFlow(getBooleanSafe(PREF_FOLDER_SYNC_ENABLED, false))
+    val folderSyncEnabled: StateFlow<Boolean> = _folderSyncEnabled.asStateFlow()
+
+    private val _folderLastSyncedAtFlow = MutableStateFlow(getLongSafe(PREF_FOLDER_LAST_SYNCED, 0L))
+    val folderLastSyncedAtFlow: StateFlow<Long> = _folderLastSyncedAtFlow.asStateFlow()
+
+    private val _folderLastSummary = MutableStateFlow(getStringSafe(PREF_FOLDER_LAST_SUMMARY, "") ?: "")
+    val folderLastSummary: StateFlow<String> = _folderLastSummary.asStateFlow()
 
     fun setServerUrl(url: String) {
         val clean = url.trim().removeSuffix("/")
@@ -143,92 +247,130 @@ class AppPreferences(private val prefs: SharedPreferences) {
         _activeProjectId.value = id
     }
 
+    fun setLastSyncSummary(summary: String) {
+        prefs.edit().putString(PREF_LAST_SYNC_SUMMARY, summary).apply()
+        _lastSyncSummary.value = summary
+    }
+
+    fun setLastSyncError(error: String?) {
+        if (error == null) {
+            prefs.edit().remove(PREF_LAST_SYNC_ERROR).apply()
+        } else {
+            prefs.edit().putString(PREF_LAST_SYNC_ERROR, error).apply()
+        }
+        _lastSyncError.value = error
+    }
+
+    fun setFolderSyncUri(uri: String?) {
+        if (uri == null) {
+            prefs.edit().remove(PREF_FOLDER_SYNC_URI).apply()
+        } else {
+            prefs.edit().putString(PREF_FOLDER_SYNC_URI, uri).apply()
+        }
+        _folderSyncUri.value = uri
+    }
+
+    fun setFolderSyncEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(PREF_FOLDER_SYNC_ENABLED, enabled).apply()
+        _folderSyncEnabled.value = enabled
+    }
+
+    fun setFolderLastSyncedAt(timestamp: Long) {
+        prefs.edit().putLong(PREF_FOLDER_LAST_SYNCED, timestamp).apply()
+        _folderLastSyncedAtFlow.value = timestamp
+    }
+
+    fun setFolderLastSummary(summary: String) {
+        prefs.edit().putString(PREF_FOLDER_LAST_SUMMARY, summary).apply()
+        _folderLastSummary.value = summary
+    }
+
     var gracePeriodHours: Double
-        get() = prefs.getFloat(PREF_GRACE_PERIOD, 2.0f).toDouble()
+        get() = getFloatSafe(PREF_GRACE_PERIOD, 2.0f).toDouble()
         set(value) {
             prefs.edit().putFloat(PREF_GRACE_PERIOD, value.toFloat()).apply()
             markSettingsUpdated()
         }
 
     var workDuration: Int
-        get() = prefs.getInt(PREF_WORK_DURATION, 25)
+        get() = getIntSafe(PREF_WORK_DURATION, 25)
         set(value) {
             prefs.edit().putInt(PREF_WORK_DURATION, value).apply()
             markSettingsUpdated()
         }
 
     var shortBreakDuration: Int
-        get() = prefs.getInt(PREF_SHORT_BREAK, 5)
+        get() = getIntSafe(PREF_SHORT_BREAK, 5)
         set(value) {
             prefs.edit().putInt(PREF_SHORT_BREAK, value).apply()
             markSettingsUpdated()
         }
 
     var longBreakDuration: Int
-        get() = prefs.getInt(PREF_LONG_BREAK, 15)
+        get() = getIntSafe(PREF_LONG_BREAK, 15)
         set(value) {
             prefs.edit().putInt(PREF_LONG_BREAK, value).apply()
             markSettingsUpdated()
         }
 
     var longBreakEvery: Int
-        get() = prefs.getInt(PREF_LONG_BREAK_EVERY, 4)
+        get() = getIntSafe(PREF_LONG_BREAK_EVERY, 4)
         set(value) {
             prefs.edit().putInt(PREF_LONG_BREAK_EVERY, value).apply()
             markSettingsUpdated()
         }
 
     var autoStartBreaks: Boolean
-        get() = prefs.getBoolean(PREF_AUTO_START_BREAKS, false)
+        get() = getBooleanSafe(PREF_AUTO_START_BREAKS, false)
         set(value) {
             prefs.edit().putBoolean(PREF_AUTO_START_BREAKS, value).apply()
             markSettingsUpdated()
         }
 
     var autoStartWork: Boolean
-        get() = prefs.getBoolean(PREF_AUTO_START_WORK, false)
+        get() = getBooleanSafe(PREF_AUTO_START_WORK, false)
         set(value) {
             prefs.edit().putBoolean(PREF_AUTO_START_WORK, value).apply()
             markSettingsUpdated()
         }
 
     var vibrationEnabled: Boolean
-        get() = prefs.getBoolean(PREF_VIBRATION, true)
+        get() = getBooleanSafe(PREF_VIBRATION, true)
         set(value) {
             prefs.edit().putBoolean(PREF_VIBRATION, value).apply()
             markSettingsUpdated()
         }
 
     var continuousFocus: Boolean
-        get() = prefs.getBoolean(PREF_CONTINUOUS_FOCUS, true)
+        get() = getBooleanSafe(PREF_CONTINUOUS_FOCUS, true)
         set(value) {
             prefs.edit().putBoolean(PREF_CONTINUOUS_FOCUS, value).apply()
             markSettingsUpdated()
         }
 
     var notificationsEnabled: Boolean
-        get() = prefs.getBoolean(PREF_NOTIFICATIONS_ENABLED, true)
+        get() = getBooleanSafe(PREF_NOTIFICATIONS_ENABLED, true)
         set(value) {
             prefs.edit().putBoolean(PREF_NOTIFICATIONS_ENABLED, value).apply()
             markSettingsUpdated()
         }
 
     var studyReminderEnabled: Boolean
-        get() = prefs.getBoolean(PREF_STUDY_REMINDER_ENABLED, false)
+        get() = getBooleanSafe(PREF_STUDY_REMINDER_ENABLED, false)
         set(value) {
             prefs.edit().putBoolean(PREF_STUDY_REMINDER_ENABLED, value).apply()
             markSettingsUpdated()
         }
 
     var studyReminderMinutes: Int
-        get() = prefs.getInt(PREF_STUDY_REMINDER_MINUTES, 30)
+        get() = getIntSafe(PREF_STUDY_REMINDER_MINUTES, 30)
         set(value) {
             prefs.edit().putInt(PREF_STUDY_REMINDER_MINUTES, value).apply()
             markSettingsUpdated()
         }
 
     var dailyGoalMinutes: Int
-        get() = prefs.getInt(PREF_DAILY_GOAL_MINUTES, 60)
+        get() = getIntSafe(PREF_DAILY_GOAL_MINUTES, 60)
         set(value) {
             prefs.edit().putInt(PREF_DAILY_GOAL_MINUTES, value).apply()
             markSettingsUpdated()
@@ -245,7 +387,7 @@ class AppPreferences(private val prefs: SharedPreferences) {
             7 -> PREF_DAILY_GOAL_SUNDAY
             else -> PREF_DAILY_GOAL_MINUTES
         }
-        return prefs.getInt(key, dailyGoalMinutes)
+        return getIntSafe(key, dailyGoalMinutes)
     }
 
     fun setWeekdayGoalMinutes(weekday: Int, minutes: Int) {
@@ -264,27 +406,30 @@ class AppPreferences(private val prefs: SharedPreferences) {
     }
 
     var lastDailyGoalAwardDate: String?
-        get() = prefs.getString(PREF_LAST_DAILY_GOAL_AWARD_DATE, null)
+        get() = getStringSafe(PREF_LAST_DAILY_GOAL_AWARD_DATE, null)
         set(value) = prefs.edit().putString(PREF_LAST_DAILY_GOAL_AWARD_DATE, value).apply()
 
     var lastFreezeUseDate: String?
-        get() = prefs.getString(PREF_LAST_FREEZE_USE, null)
+        get() = getStringSafe(PREF_LAST_FREEZE_USE, null)
         set(value) = prefs.edit().putString(PREF_LAST_FREEZE_USE, value).apply()
 
     var lastSyncedAt: Long
-        get() = prefs.getLong(PREF_LAST_SYNCED, 0L)
-        set(value) = prefs.edit().putLong(PREF_LAST_SYNCED, value).apply()
+        get() = getLongSafe(PREF_LAST_SYNCED, 0L)
+        set(value) {
+            prefs.edit().putLong(PREF_LAST_SYNCED, value).apply()
+            _lastSyncedAtFlow.value = value
+        }
 
     var lastSyncedUserId: String?
-        get() = prefs.getString(PREF_LAST_SYNCED_USER, null)
+        get() = getStringSafe(PREF_LAST_SYNCED_USER, null)
         set(value) = prefs.edit().putString(PREF_LAST_SYNCED_USER, value).apply()
 
     var hasMigratedOfflineSessions: Boolean
-        get() = prefs.getBoolean(PREF_HAS_MIGRATED_OFFLINE, false)
+        get() = getBooleanSafe(PREF_HAS_MIGRATED_OFFLINE, false)
         set(value) = prefs.edit().putBoolean(PREF_HAS_MIGRATED_OFFLINE, value).apply()
 
     var settingsUpdatedAt: Long
-        get() = prefs.getLong(PREF_SETTINGS_UPDATED_AT, 0L)
+        get() = getLongSafe(PREF_SETTINGS_UPDATED_AT, 0L)
         set(value) = prefs.edit().putLong(PREF_SETTINGS_UPDATED_AT, value).apply()
 
     fun markSettingsUpdated() {
@@ -293,27 +438,24 @@ class AppPreferences(private val prefs: SharedPreferences) {
     }
 
     var activeTimerType: String?
-        get() = prefs.getString(PREF_ACTIVE_TIMER_TYPE, null)
+        get() = getStringSafe(PREF_ACTIVE_TIMER_TYPE, null)
         set(value) {
             if (value == null) prefs.edit().remove(PREF_ACTIVE_TIMER_TYPE).apply()
             else prefs.edit().putString(PREF_ACTIVE_TIMER_TYPE, value).apply()
-            markSettingsUpdated()
         }
 
     var pomodoroStateJson: String?
-        get() = prefs.getString(PREF_POMODORO_STATE_JSON, null)
+        get() = getStringSafe(PREF_POMODORO_STATE_JSON, null)
         set(value) {
             if (value == null) prefs.edit().remove(PREF_POMODORO_STATE_JSON).apply()
             else prefs.edit().putString(PREF_POMODORO_STATE_JSON, value).apply()
-            markSettingsUpdated()
         }
 
     var freeTimerStateJson: String?
-        get() = prefs.getString(PREF_FREE_TIMER_STATE_JSON, null)
+        get() = getStringSafe(PREF_FREE_TIMER_STATE_JSON, null)
         set(value) {
             if (value == null) prefs.edit().remove(PREF_FREE_TIMER_STATE_JSON).apply()
             else prefs.edit().putString(PREF_FREE_TIMER_STATE_JSON, value).apply()
-            markSettingsUpdated()
         }
 
     fun clearActiveTimers() {
@@ -322,8 +464,10 @@ class AppPreferences(private val prefs: SharedPreferences) {
             .remove(PREF_POMODORO_STATE_JSON)
             .remove(PREF_FREE_TIMER_STATE_JSON)
             .apply()
-        markSettingsUpdated()
     }
+
+    val folderLastSyncedAt: Long
+        get() = getLongSafe(PREF_FOLDER_LAST_SYNCED, 0L)
 
     fun getAllowedSettingsMap(): Map<String, Any> {
         val result = mutableMapOf<String, Any>()
@@ -340,30 +484,34 @@ class AppPreferences(private val prefs: SharedPreferences) {
         for ((key, element) in settings) {
             if (!isAllowedSettingKey(key)) continue
             if (element is JsonPrimitive) {
-                val boolVal = element.booleanOrNull
-                if (boolVal != null) {
-                    editor.putBoolean(key, boolVal)
-                    continue
+                when (key) {
+                    in floatKeys -> {
+                        val v = element.doubleOrNull?.toFloat() ?: element.content.toFloatOrNull()
+                        if (v != null) editor.putFloat(key, v)
+                    }
+                    in intKeys -> {
+                        val v = element.intOrNull ?: element.doubleOrNull?.toInt() ?: element.content.toIntOrNull()
+                        if (v != null) editor.putInt(key, v)
+                    }
+                    in booleanKeys -> {
+                        val v = element.booleanOrNull ?: element.content.toBooleanStrictOrNull()
+                        if (v != null) editor.putBoolean(key, v)
+                    }
+                    in longKeys -> {
+                        val v = element.doubleOrNull?.toLong() ?: element.content.toLongOrNull()
+                        if (v != null) editor.putLong(key, v)
+                    }
+                    else -> {
+                        editor.putString(key, element.content)
+                    }
                 }
-                val intVal = element.intOrNull
-                if (intVal != null) {
-                    editor.putInt(key, intVal)
-                    continue
-                }
-                val doubleVal = element.doubleOrNull
-                if (doubleVal != null) {
-                    editor.putFloat(key, doubleVal.toFloat())
-                    continue
-                }
-                editor.putString(key, element.content)
             }
         }
         editor.apply()
-        // Refresh StateFlows
-        _themeMode.value = ThemeMode.entries.getOrElse(prefs.getInt(PREF_THEME_MODE, ThemeMode.SYSTEM.ordinal)) { ThemeMode.SYSTEM }
-        _seedColorIndex.value = prefs.getInt(PREF_SEED_COLOR_INDEX, 0).coerceIn(0, 11)
-        _themeStyleIndex.value = prefs.getInt(PREF_THEME_STYLE, 0).coerceIn(0, 6)
-        _useDynamicColor.value = prefs.getBoolean(PREF_DYNAMIC_COLOR, false)
-        _fontScale.value = prefs.getFloat(PREF_FONT_SCALE, 1.0f).coerceIn(0.85f, 1.3f)
+        _themeMode.value = ThemeMode.entries.getOrElse(getIntSafe(PREF_THEME_MODE, ThemeMode.SYSTEM.ordinal)) { ThemeMode.SYSTEM }
+        _seedColorIndex.value = getIntSafe(PREF_SEED_COLOR_INDEX, 0).coerceIn(0, 11)
+        _themeStyleIndex.value = getIntSafe(PREF_THEME_STYLE, 0).coerceIn(0, 6)
+        _useDynamicColor.value = getBooleanSafe(PREF_DYNAMIC_COLOR, false)
+        _fontScale.value = getFloatSafe(PREF_FONT_SCALE, 1.0f).coerceIn(0.85f, 1.3f)
     }
 }

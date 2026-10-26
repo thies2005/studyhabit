@@ -14,10 +14,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -32,7 +34,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import de.schuelken.studyhabit.core.database.ProjectEntity
-import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,10 +42,12 @@ fun ProjectSwitcherSheet(
     activeProjectId: String?,
     onSelectProject: (String) -> Unit,
     onCreateProject: (String, String, Int) -> Unit,
+    onRenameProject: (projectId: String, newName: String, newIcon: String) -> Unit,
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var showCreateDialog by remember { mutableStateOf(false) }
+    var editingProject by remember { mutableStateOf<ProjectEntity?>(null) }
     var newProjectName by remember { mutableStateOf("") }
     var newProjectIcon by remember { mutableStateOf("📚") }
 
@@ -57,13 +60,63 @@ fun ProjectSwitcherSheet(
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp, vertical = 16.dp)
         ) {
-            Text(
-                text = "Projects",
-                style = MaterialTheme.typography.titleLarge
-            )
-            Spacer(modifier = Modifier.height(16.dp))
+            if (editingProject != null) {
+                Text(
+                    text = "Rename Project",
+                    style = MaterialTheme.typography.titleLarge
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = newProjectName,
+                    onValueChange = { newProjectName = it },
+                    label = { Text("Project Name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = newProjectIcon,
+                    onValueChange = { newProjectIcon = it },
+                    label = { Text("Icon (Emoji)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    Button(
+                        onClick = { editingProject = null },
+                        modifier = Modifier.padding(end = 8.dp)
+                    ) {
+                        Text("Cancel")
+                    }
+                    Button(
+                        onClick = {
+                            val proj = editingProject
+                            if (proj != null && newProjectName.isNotBlank()) {
+                                onRenameProject(
+                                    proj.id,
+                                    newProjectName.trim(),
+                                    newProjectIcon.trim().ifEmpty { "📚" }
+                                )
+                                editingProject = null
+                                onDismiss()
+                            }
+                        },
+                        enabled = newProjectName.isNotBlank()
+                    ) {
+                        Text("Save")
+                    }
+                }
+            } else if (!showCreateDialog) {
+                Text(
+                    text = "Projects",
+                    style = MaterialTheme.typography.titleLarge
+                )
+                Spacer(modifier = Modifier.height(16.dp))
 
-            if (!showCreateDialog) {
                 LazyColumn(modifier = Modifier.fillMaxWidth()) {
                     items(projects) { project ->
                         val isSelected = project.id == activeProjectId
@@ -90,6 +143,20 @@ fun ProjectSwitcherSheet(
                                     contentDescription = "Active",
                                     tint = MaterialTheme.colorScheme.primary
                                 )
+                                Spacer(modifier = Modifier.width(8.dp))
+                            }
+                            IconButton(
+                                onClick = {
+                                    editingProject = project
+                                    newProjectName = project.name
+                                    newProjectIcon = project.icon
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Edit,
+                                    contentDescription = "Rename ${project.name}",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
                         }
                         HorizontalDivider()
@@ -98,7 +165,11 @@ fun ProjectSwitcherSheet(
 
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(
-                    onClick = { showCreateDialog = true },
+                    onClick = {
+                        newProjectName = ""
+                        newProjectIcon = "📚"
+                        showCreateDialog = true
+                    },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(imageVector = Icons.Default.Add, contentDescription = null)
@@ -106,6 +177,11 @@ fun ProjectSwitcherSheet(
                     Text("New Project")
                 }
             } else {
+                Text(
+                    text = "New Project",
+                    style = MaterialTheme.typography.titleLarge
+                )
+                Spacer(modifier = Modifier.height(16.dp))
                 OutlinedTextField(
                     value = newProjectName,
                     onValueChange = { newProjectName = it },

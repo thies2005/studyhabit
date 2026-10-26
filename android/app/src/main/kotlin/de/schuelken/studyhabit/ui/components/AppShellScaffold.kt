@@ -52,59 +52,65 @@ fun AppShellScaffold(
     onSyncClick: () -> Unit,
     onSelectProject: (String) -> Unit,
     onCreateProject: (String, String, Int) -> Unit,
+    onRenameProject: (projectId: String, newName: String, newIcon: String) -> Unit,
     onOpenSettings: () -> Unit,
+    showNavigationBars: Boolean = true,
     content: @Composable () -> Unit
 ) {
     var showProjectSwitcher by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
-            CenterAlignedTopAppBar(
-                title = {
-                    OutlinedButton(
-                        onClick = { showProjectSwitcher = true }
-                    ) {
-                        Text(text = activeProject?.icon ?: "📚")
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = activeProject?.name ?: "All Projects",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Icon(
-                            imageVector = Icons.Default.UnfoldMore,
-                            contentDescription = "Switch Project"
-                        )
-                    }
-                },
-                actions = {
-                    SyncStatusIcon(status = syncStatus, onClick = onSyncClick)
-                    IconButton(onClick = onOpenSettings) {
-                        Icon(imageVector = Icons.Default.Settings, contentDescription = "Settings")
-                    }
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+            if (showNavigationBars) {
+                CenterAlignedTopAppBar(
+                    title = {
+                        OutlinedButton(
+                            onClick = { showProjectSwitcher = true }
+                        ) {
+                            Text(text = activeProject?.icon ?: "📚")
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = activeProject?.name ?: "All Projects",
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                imageVector = Icons.Default.UnfoldMore,
+                                contentDescription = "Switch Project"
+                            )
+                        }
+                    },
+                    actions = {
+                        SyncStatusIcon(status = syncStatus, onClick = onSyncClick)
+                        IconButton(onClick = onOpenSettings) {
+                            Icon(imageVector = Icons.Default.Settings, contentDescription = "Settings")
+                        }
+                    },
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
                 )
-            )
+            }
         },
         bottomBar = {
-            NavigationBar {
-                BottomNavDestination.entries.forEach { dest ->
-                    val selected = currentRoute == dest.route
-                    NavigationBarItem(
-                        selected = selected,
-                        onClick = { onNavigateToRoute(dest.route) },
-                        icon = {
-                            when (dest) {
-                                BottomNavDestination.HOME -> Icon(Icons.Default.Home, contentDescription = dest.title)
-                                BottomNavDestination.SUBJECTS -> Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = dest.title)
-                                BottomNavDestination.STATS -> Icon(Icons.Default.BarChart, contentDescription = dest.title)
-                                BottomNavDestination.ACHIEVEMENTS -> Icon(Icons.Default.EmojiEvents, contentDescription = dest.title)
-                            }
-                        },
-                        label = { Text(dest.title) }
-                    )
+            if (showNavigationBars) {
+                NavigationBar {
+                    BottomNavDestination.entries.forEach { dest ->
+                        val selected = currentRoute == dest.route
+                        NavigationBarItem(
+                            selected = selected,
+                            onClick = { onNavigateToRoute(dest.route) },
+                            icon = {
+                                when (dest) {
+                                    BottomNavDestination.HOME -> Icon(Icons.Default.Home, contentDescription = dest.title)
+                                    BottomNavDestination.SUBJECTS -> Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = dest.title)
+                                    BottomNavDestination.STATS -> Icon(Icons.Default.BarChart, contentDescription = dest.title)
+                                    BottomNavDestination.ACHIEVEMENTS -> Icon(Icons.Default.EmojiEvents, contentDescription = dest.title)
+                                }
+                            },
+                            label = { Text(dest.title) }
+                        )
+                    }
                 }
             }
         }
@@ -122,6 +128,7 @@ fun AppShellScaffold(
                     activeProjectId = activeProject?.id,
                     onSelectProject = onSelectProject,
                     onCreateProject = onCreateProject,
+                    onRenameProject = onRenameProject,
                     onDismiss = { showProjectSwitcher = false }
                 )
             }

@@ -12,6 +12,7 @@ import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 import de.schuelken.studyhabit.MainActivity
 import de.schuelken.studyhabit.R
+import de.schuelken.studyhabit.StudyHabitApplication
 import de.schuelken.studyhabit.core.model.TimerPhase
 import de.schuelken.studyhabit.core.model.TimerType
 import de.schuelken.studyhabit.core.preferences.AppPreferences
@@ -163,7 +164,7 @@ class TimerForegroundService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        preferences = AppPreferences(applicationContext)
+        preferences = (application as StudyHabitApplication).container.preferences
         NotificationHelper.createNotificationChannels(this)
     }
 
@@ -416,21 +417,30 @@ class TimerForegroundService : Service() {
 
     private fun startForegroundWithNotification(state: TimerState) {
         val notification = buildNotification(state)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(
-                NotificationHelper.TIMER_NOTIFICATION_ID,
-                notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
-            )
-        } else {
-            startForeground(NotificationHelper.TIMER_NOTIFICATION_ID, notification)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NotificationHelper.TIMER_NOTIFICATION_ID,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+                )
+            } else {
+                startForeground(NotificationHelper.TIMER_NOTIFICATION_ID, notification)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("TimerService", "Failed to promote to foreground, running with standard notification", e)
+            updateNotification(state)
         }
     }
 
     private fun updateNotification(state: TimerState) {
-        val notification = buildNotification(state)
-        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
-        manager.notify(NotificationHelper.TIMER_NOTIFICATION_ID, notification)
+        runCatching {
+            val notification = buildNotification(state)
+            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+            manager.notify(NotificationHelper.TIMER_NOTIFICATION_ID, notification)
+        }.onFailure {
+            android.util.Log.w("TimerService", "Failed to update notification", it)
+        }
     }
 
     private fun buildNotification(state: TimerState): Notification {

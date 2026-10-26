@@ -81,6 +81,8 @@ data class SyncPullData(
 
 @Serializable
 data class SyncPushResult(
+    val applied: Map<String, Int> = emptyMap(),
+    val conflicts: Map<String, Int> = emptyMap(),
     val errors: List<SyncErrorItem> = emptyList(),
 )
 
@@ -121,8 +123,8 @@ data class SyncSubjectItem(
     val defaultDurationMinutes: Int = 25,
     val defaultBreakMinutes: Int = 5,
     val completenessMode: String = "none",
-    val targetHours: Int? = null,
-    val targetWeeklyHours: Int? = null,
+    val targetHours: Double? = null,
+    val targetWeeklyHours: Double? = null,
     val xpTotal: Int = 0,
     val createdAt: String,
     val updatedAt: String,

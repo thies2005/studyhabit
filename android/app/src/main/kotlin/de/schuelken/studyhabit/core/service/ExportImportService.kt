@@ -62,21 +62,21 @@ class ExportImportService(
     private val database: AppDatabase,
     private val preferences: AppPreferences,
 ) {
-    private val json = Json {
+    val json = Json {
         ignoreUnknownKeys = true
         prettyPrint = true
         encodeDefaults = true
     }
 
-    suspend fun exportToJson(): File {
-        val projects = database.projectDao().getAllProjects()
-        val subjects = database.subjectDao().getAllSubjects()
-        val topics = database.topicDao().getAllTopics()
-        val chapters = database.chapterDao().getAllChapters()
-        val sessions = database.sessionDao().getAllSessions()
-        val sources = database.sourceDao().getAllSources()
-        val skillLabels = database.skillLabelDao().getAllSkillLabels()
-        val milestones = database.milestoneDao().getAllMilestones()
+    suspend fun buildExportDocument(includeDeleted: Boolean = false): ExportDocument {
+        val projects = if (includeDeleted) database.projectDao().getModifiedSince(-1L) else database.projectDao().getAllProjects()
+        val subjects = if (includeDeleted) database.subjectDao().getModifiedSince(-1L) else database.subjectDao().getAllSubjects()
+        val topics = if (includeDeleted) database.topicDao().getModifiedSince(-1L) else database.topicDao().getAllTopics()
+        val chapters = if (includeDeleted) database.chapterDao().getModifiedSince(-1L) else database.chapterDao().getAllChapters()
+        val sessions = if (includeDeleted) database.sessionDao().getModifiedSince(-1L) else database.sessionDao().getAllSessions()
+        val sources = if (includeDeleted) database.sourceDao().getModifiedSince(-1L) else database.sourceDao().getAllSources()
+        val skillLabels = if (includeDeleted) database.skillLabelDao().getModifiedSince(-1L) else database.skillLabelDao().getAllSkillLabels()
+        val milestones = if (includeDeleted) database.milestoneDao().getModifiedSince(-1L) else database.milestoneDao().getAllMilestones()
         val achievements = database.achievementDao().getAllAchievements()
         val stats = database.userStatsDao().getUserStats() ?: UserStatsEntity()
 
@@ -113,7 +113,7 @@ class ExportImportService(
             }
         }
 
-        val document = ExportDocument(
+        return ExportDocument(
             exportVersion = 2,
             exportedAt = Instant.now().toString(),
             userStats = stats,
@@ -121,7 +121,10 @@ class ExportImportService(
             achievements = achievements,
             settings = settingsMap.ifEmpty { null },
         )
+    }
 
+    suspend fun exportToJson(): File {
+        val document = buildExportDocument()
         val jsonString = json.encodeToString(document)
         val tempDir = context.cacheDir
         val timestamp = System.currentTimeMillis()

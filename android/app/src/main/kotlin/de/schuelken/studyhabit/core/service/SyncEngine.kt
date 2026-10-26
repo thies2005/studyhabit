@@ -77,14 +77,17 @@ class SyncEngine(
         if (cancelDebounce) {
             debounceJob?.cancel()
         }
-        val token = tokenStorage.getToken()
-        if (token.isNullOrBlank()) {
+        if (preferences.serverUrl.value.isBlank() || tokenStorage.getToken().isNullOrBlank()) {
             _syncStatus.value = SyncStatus.IDLE
             return false
         }
 
         val currentUserId = tokenStorage.getUserId() ?: ""
         return syncMutex.withLock {
+            if (preferences.serverUrl.value.isBlank() || tokenStorage.getToken().isNullOrBlank()) {
+                _syncStatus.value = SyncStatus.IDLE
+                return@withLock false
+            }
             _syncStatus.value = SyncStatus.SYNCING
             try {
                 // Check user switch
@@ -103,16 +106,54 @@ class SyncEngine(
                 val pushPayload = collectPushPayload(sinceMs)
                 val response = api.fullSync(sinceIso, pushPayload)
                 val pull = response.data.pull
+                val serverTimeMs = parseIsoString(pull.serverTime)
 
-                applyRemoteChanges(pull)
+                // Handle push errors (soft-delete orphaned forbidden rows)
+                response.data.push?.errors?.forEach { err ->
+                    if (err.error == "forbidden" && err.id != null) {
+                        when (err.entity) {
+                            "session", "sessions" -> database.sessionDao().softDelete(err.id, serverTimeMs)
+                            "source", "sources" -> database.sourceDao().softDelete(err.id, serverTimeMs)
+                            "subject", "subjects" -> database.subjectDao().softDelete(err.id, serverTimeMs)
+                            "topic", "topics" -> database.topicDao().softDelete(err.id, serverTimeMs)
+                            "chapter", "chapters" -> database.chapterDao().softDelete(err.id, serverTimeMs)
+                            "project", "projects" -> database.projectDao().softDelete(err.id, serverTimeMs)
+                            "skillLabel", "skillLabels" -> database.skillLabelDao().softDelete(err.id, serverTimeMs)
+                            "subjectMilestone", "milestone", "milestones" -> database.milestoneDao().softDelete(err.id, serverTimeMs)
+                        }
+                    }
+                }
 
-                preferences.lastSyncedAt = parseIsoString(pull.serverTime)
+                val pulledCounts = applyRemoteChanges(pull)
+
+                val pushedMap = response.data.push?.applied?.filterValues { it > 0 } ?: emptyMap()
+                val pulledMap = pulledCounts.filterValues { it > 0 }
+                val summary = if (pushedMap.isEmpty() && pulledMap.isEmpty()) {
+                    "✓ Already up to date — no new changes"
+                } else {
+                    val parts = mutableListOf<String>()
+                    if (pushedMap.isNotEmpty()) {
+                        val pushStr = pushedMap.entries.joinToString(", ") { "${it.value} ${it.key}" }
+                        parts.add("↑ Pushed: $pushStr")
+                    }
+                    if (pulledMap.isNotEmpty()) {
+                        val pullStr = pulledMap.entries.joinToString(", ") { "${it.value} ${it.key}" }
+                        parts.add("↓ Pulled: $pullStr")
+                    }
+                    parts.joinToString(" • ")
+                }
+                preferences.lastSyncedAt = serverTimeMs
+                preferences.setLastSyncSummary(summary)
+                preferences.setLastSyncError(null)
                 _syncStatus.value = SyncStatus.SYNCED
                 true
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
                 android.util.Log.e("SyncEngine", "syncNow failed", e)
+                val msg = e.localizedMessage ?: "Unknown sync error"
+                preferences.setLastSyncError(msg)
+                preferences.setLastSyncSummary("Sync failed: $msg")
                 _syncStatus.value = SyncStatus.ERROR
                 false
             }
@@ -164,8 +205,8 @@ class SyncEngine(
                 defaultDurationMinutes = it.defaultDurationMinutes,
                 defaultBreakMinutes = it.defaultBreakMinutes,
                 completenessMode = it.completenessMode,
-                targetHours = it.targetHours,
-                targetWeeklyHours = it.targetWeeklyHours,
+                targetHours = it.targetHours?.toDouble(),
+                targetWeeklyHours = it.targetWeeklyHours?.toDouble(),
                 xpTotal = it.xpTotal,
                 createdAt = toIsoString(it.createdAt),
                 updatedAt = toIsoString(it.updatedAt),
@@ -319,8 +360,11 @@ class SyncEngine(
         )
     }
 
-    private suspend fun applyRemoteChanges(pull: SyncPullData) {
+    private suspend fun applyRemoteChanges(pull: SyncPullData): Map<String, Int> {
+        val pulled = mutableMapOf<String, Int>()
+
         // Projects
+        var projectsCount = 0
         for (item in pull.projects) {
             val serverUpdated = parseIsoString(item.updatedAt)
             val local = database.projectDao().getProjectById(item.id)
@@ -343,10 +387,13 @@ class SyncEngine(
                         isDeleted = item.isDeleted,
                     )
                 )
+                projectsCount++
             }
         }
+        if (projectsCount > 0) pulled["projects"] = projectsCount
 
         // Subjects
+        var subjectsCount = 0
         for (item in pull.subjects) {
             val serverUpdated = parseIsoString(item.updatedAt)
             val local = database.subjectDao().getSubjectById(item.id)
@@ -362,18 +409,21 @@ class SyncEngine(
                         defaultDurationMinutes = item.defaultDurationMinutes,
                         defaultBreakMinutes = item.defaultBreakMinutes,
                         completenessMode = item.completenessMode,
-                        targetHours = item.targetHours,
-                        targetWeeklyHours = item.targetWeeklyHours,
+                        targetHours = item.targetHours?.toInt(),
+                        targetWeeklyHours = item.targetWeeklyHours?.toInt(),
                         xpTotal = item.xpTotal,
                         createdAt = parseIsoString(item.createdAt),
                         updatedAt = serverUpdated,
                         isDeleted = item.isDeleted,
                     )
                 )
+                subjectsCount++
             }
         }
+        if (subjectsCount > 0) pulled["subjects"] = subjectsCount
 
         // Topics
+        var topicsCount = 0
         for (item in pull.topics) {
             val serverUpdated = parseIsoString(item.updatedAt)
             val local = database.topicDao().getTopicById(item.id)
@@ -389,10 +439,13 @@ class SyncEngine(
                         isDeleted = item.isDeleted,
                     )
                 )
+                topicsCount++
             }
         }
+        if (topicsCount > 0) pulled["topics"] = topicsCount
 
         // Chapters
+        var chaptersCount = 0
         for (item in pull.chapters) {
             val serverUpdated = parseIsoString(item.updatedAt)
             val local = database.chapterDao().getChapterById(item.id)
@@ -408,10 +461,13 @@ class SyncEngine(
                         isDeleted = item.isDeleted,
                     )
                 )
+                chaptersCount++
             }
         }
+        if (chaptersCount > 0) pulled["chapters"] = chaptersCount
 
         // Sessions
+        var sessionsCount = 0
         for (item in pull.sessions) {
             val serverUpdated = parseIsoString(item.updatedAt)
             val local = database.sessionDao().getSessionById(item.id)
@@ -438,10 +494,13 @@ class SyncEngine(
                         isDeleted = item.isDeleted,
                     )
                 )
+                sessionsCount++
             }
         }
+        if (sessionsCount > 0) pulled["sessions"] = sessionsCount
 
         // Sources
+        var sourcesCount = 0
         for (item in pull.sources) {
             val serverUpdated = parseIsoString(item.updatedAt)
             val local = database.sourceDao().getSourceById(item.id)
@@ -465,10 +524,13 @@ class SyncEngine(
                         isDeleted = item.isDeleted,
                     )
                 )
+                sourcesCount++
             }
         }
+        if (sourcesCount > 0) pulled["sources"] = sourcesCount
 
         // Skill Labels
+        var skillLabelsCount = 0
         for (item in pull.skillLabels) {
             database.skillLabelDao().upsert(
                 SkillLabelEntity(
@@ -481,9 +543,12 @@ class SyncEngine(
                     isDeleted = item.isDeleted,
                 )
             )
+            skillLabelsCount++
         }
+        if (skillLabelsCount > 0) pulled["skillLabels"] = skillLabelsCount
 
         // Milestones
+        var milestonesCount = 0
         for (item in pull.subjectMilestones) {
             database.milestoneDao().upsert(
                 SubjectMilestoneEntity(
@@ -497,9 +562,12 @@ class SyncEngine(
                     isDeleted = item.isDeleted,
                 )
             )
+            milestonesCount++
         }
+        if (milestonesCount > 0) pulled["subjectMilestones"] = milestonesCount
 
         // Achievements
+        var achievementsCount = 0
         for (item in pull.achievements) {
             val serverUpdated = parseIsoString(item.updatedAt)
             val local = database.achievementDao().getAchievementByKey(item.key)
@@ -512,8 +580,10 @@ class SyncEngine(
                         updatedAt = serverUpdated,
                     )
                 )
+                achievementsCount++
             }
         }
+        if (achievementsCount > 0) pulled["achievements"] = achievementsCount
 
         // User Stats
         pull.userStats?.let { stats ->
@@ -533,6 +603,7 @@ class SyncEngine(
                         updatedAt = serverUpdated,
                     )
                 )
+                pulled["userStats"] = 1
             }
         }
 
@@ -542,7 +613,10 @@ class SyncEngine(
             if (serverUpdated > preferences.settingsUpdatedAt) {
                 preferences.applySettingsMap(settingsItem.settings)
                 preferences.settingsUpdatedAt = serverUpdated
+                pulled["userSettings"] = 1
             }
         }
+
+        return pulled
     }
 }

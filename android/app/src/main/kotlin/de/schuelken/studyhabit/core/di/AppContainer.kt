@@ -9,6 +9,7 @@ import de.schuelken.studyhabit.core.network.TokenStorage
 import de.schuelken.studyhabit.core.preferences.AppPreferences
 import de.schuelken.studyhabit.core.service.AchievementEvaluator
 import de.schuelken.studyhabit.core.service.ExportImportService
+import de.schuelken.studyhabit.core.service.FolderSyncService
 import de.schuelken.studyhabit.core.service.ReminderScheduler
 import de.schuelken.studyhabit.core.service.StreakManager
 import de.schuelken.studyhabit.core.service.SyncEngine
@@ -35,16 +36,19 @@ class AppContainer(val context: Context) {
 
     private val dynamicUrlInterceptor = Interceptor { chain ->
         var request = chain.request()
-        val currentServerUrl = preferences.serverUrl.value.trim().removeSuffix("/")
-        val currentHttpUrl = currentServerUrl.toHttpUrlOrNull()
-        if (currentHttpUrl != null) {
-            val newUrl = request.url.newBuilder()
-                .scheme(currentHttpUrl.scheme)
-                .host(currentHttpUrl.host)
-                .port(currentHttpUrl.port)
-                .build()
-            request = request.newBuilder().url(newUrl).build()
+        val rawUrl = preferences.serverUrl.value.trim().removeSuffix("/")
+        if (rawUrl.isEmpty()) {
+            throw java.io.IOException("Server URL is not configured. Please set your Server URL in Sync Settings.")
         }
+        val baseWithApi = if (rawUrl.endsWith("/api/v1")) "$rawUrl/" else "$rawUrl/api/v1/"
+        val targetBase = baseWithApi.toHttpUrlOrNull()
+            ?: throw java.io.IOException("Invalid Server URL: $rawUrl")
+        val relativePath = request.url.encodedPath.removePrefix("/api/v1/")
+        val newUrl = targetBase.newBuilder()
+            .addEncodedPathSegments(relativePath.trimStart('/'))
+            .encodedQuery(request.url.encodedQuery)
+            .build()
+        request = request.newBuilder().url(newUrl).build()
         chain.proceed(request)
     }
 
@@ -57,7 +61,7 @@ class AppContainer(val context: Context) {
         .build()
 
     val api: StudyHabitApi = Retrofit.Builder()
-        .baseUrl("https://studyhabit.schuelken.uk/api/v1/")
+        .baseUrl("http://localhost/api/v1/")
         .client(okHttpClient)
         .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
         .build()
@@ -67,5 +71,8 @@ class AppContainer(val context: Context) {
     val achievementEvaluator = AchievementEvaluator(database)
     val syncEngine = SyncEngine(api, database, preferences, tokenStorage)
     val exportImportService = ExportImportService(context, database, preferences)
+    val folderSyncService: FolderSyncService by lazy {
+        FolderSyncService(context, database, preferences, exportImportService)
+    }
     val reminderScheduler = ReminderScheduler(context, preferences)
 }

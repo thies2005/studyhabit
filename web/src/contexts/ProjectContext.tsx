@@ -9,6 +9,7 @@ interface ProjectContextType {
   loading: boolean;
   refreshProjects: () => Promise<void>;
   createProject: (name: string, colorValue: number) => Promise<Project>;
+  updateProject: (id: string, updates: { name?: string; icon?: string; colorValue?: number }) => Promise<Project>;
 }
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
@@ -54,6 +55,13 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     return newProject;
   };
 
+  const updateProject = async (id: string, updates: { name?: string; icon?: string; colorValue?: number }) => {
+    const response = await apiClient.patch(`/projects/${id}`, updates);
+    const updated = response.data.data;
+    setProjects(prev => prev.map(p => p.id === id ? { ...p, ...updated } : p));
+    return updated;
+  };
+
   return (
     <ProjectContext.Provider value={{
       projects,
@@ -61,7 +69,8 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       setCurrentProjectId,
       loading,
       refreshProjects: fetchProjects,
-      createProject
+      createProject,
+      updateProject
     }}>
       {children}
     </ProjectContext.Provider>

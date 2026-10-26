@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="108" height="108">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="108" y2="108" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#00363D" />
+      <stop offset="50%" stop-color="#006874" />
+      <stop offset="100%" stop-color="#004F58" />
+    </linearGradient>
+  </defs>
+  <rect width="108" height="108" rx="22" fill="url(#bg)" />
+  <!-- Outer Focus Timer Ring -->
+  <path
+    d="M54,24 A30,30 0 1,1 26.5,66"
+    fill="none"
+    stroke="#85D2E0"
+    stroke-width="4.5"
+    stroke-linecap="round" />
+  <!-- Open Book Left Page -->
+  <path
+    d="M35,46 C42,44 49,46 53,50 L53,70 C49,66 42,64 35,66 Z"
+    fill="#FFFFFF" />
+  <!-- Open Book Right Page -->
+  <path
+    d="M73,46 C66,44 59,46 55,50 L55,70 C59,66 66,64 73,66 Z"
+    fill="#E0F7FA" />
+  <!-- Habit Streak Flame / Check Spark Above Book -->
+  <path
+    d="M54,29 C58,35 61,39 58,44 C56,47 52,47 50,44 C47,39 50,35 54,29 Z"
+    fill="#FFB599" />
+</svg>
