@@ -156,6 +156,11 @@ fun LoginScreen(
                                 } else {
                                     container.api.register(RegisterRequest(email.trim(), password)).data
                                 }
+                                if (authData.accessToken.isBlank()) {
+                                    isLoading = false
+                                    errorMessage = "An account with this email may already exist. Please sign in."
+                                    return@launch
+                                }
                                 container.tokenStorage.saveToken(authData.accessToken)
                                 container.tokenStorage.saveUser(authData.user.id, authData.user.email)
 

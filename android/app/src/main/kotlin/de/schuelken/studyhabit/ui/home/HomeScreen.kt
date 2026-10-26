@@ -40,6 +40,7 @@ import de.schuelken.studyhabit.core.database.StudySessionEntity
 import de.schuelken.studyhabit.core.database.SubjectEntity
 import de.schuelken.studyhabit.core.database.UserStatsEntity
 import de.schuelken.studyhabit.core.di.AppContainer
+import de.schuelken.studyhabit.core.model.TimerType
 import de.schuelken.studyhabit.core.service.TimerForegroundService
 import de.schuelken.studyhabit.core.service.XpCalculator
 import de.schuelken.studyhabit.ui.timer.StartSessionSheet
@@ -57,22 +58,48 @@ fun HomeScreen(
 ) {
     val context = LocalContext.current
     val stats by container.database.userStatsDao().getUserStatsFlow().collectAsState(initial = UserStatsEntity())
-    val activeProjectId by container.preferences.activeProjectId.collectAsState()
-    val subjects by if (activeProjectId != null) {
-        container.database.subjectDao().getSubjectsForProjectFlow(activeProjectId!!).collectAsState(initial = emptyList())
-    } else {
-        container.database.subjectDao().getAllSubjectsFlow().collectAsState(initial = emptyList())
-    }
-    val recentSessions by container.database.sessionDao().getRecentSessionsFlow(10).collectAsState(initial = emptyList())
+    val timerState by TimerForegroundService.timerState.collectAsState()
 
-    var showStartSheet by remember { mutableStateOf(false) }
+    val projects by container.database.projectDao().getAllProjectsFlow().collectAsState(initial = emptyList())
+    val activeProjectId by container.preferences.activeProjectId.collectAsState()
+    val activeProject = projects.firstOrNull { it.id == activeProjectId } ?: projects.firstOrNull()
+    val effectiveProjectId = activeProject?.id
+
+    val subjects by remember(effectiveProjectId) {
+        if (effectiveProjectId != null) {
+            container.database.subjectDao().getSubjectsForProjectFlow(effectiveProjectId)
+        } else {
+            container.database.subjectDao().getAllSubjectsFlow()
+        }
+    }.collectAsState(initial = emptyList())
+
+    // Global map of all subjects so cross-project sessions NEVER fall back to "Subject"
+    val allSubjects by container.database.subjectDao().getAllSubjectsFlow().collectAsState(initial = emptyList())
+    val subjectMap = remember(allSubjects) { allSubjects.associateBy { it.id } }
 
     val zone = ZoneId.systemDefault()
     val today = LocalDate.now(zone)
     val todayStartMs = today.atStartOfDay(zone).toInstant().toEpochMilli()
 
+    val recentSessions by remember(effectiveProjectId) {
+        if (effectiveProjectId != null) {
+            container.database.sessionDao().getRecentSessionsForProjectFlow(effectiveProjectId, 10)
+        } else {
+            container.database.sessionDao().getRecentSessionsFlow(10)
+        }
+    }.collectAsState(initial = emptyList())
+
+    val todaySessions by remember(effectiveProjectId, todayStartMs) {
+        if (effectiveProjectId != null) {
+            container.database.sessionDao().getSessionsForProjectSinceFlow(effectiveProjectId, todayStartMs)
+        } else {
+            container.database.sessionDao().getSessionsSinceFlow(todayStartMs)
+        }
+    }.collectAsState(initial = emptyList())
+
+    var showStartSheet by remember { mutableStateOf(false) }
+
     // Calculate today's studied minutes
-    val todaySessions = recentSessions.filter { it.startedAt >= todayStartMs }
     val todayMinutes = todaySessions.sumOf { it.actualDurationMinutes }
 
     val weekday = today.dayOfWeek.value // 1 = Monday .. 7 = Sunday
@@ -83,7 +110,6 @@ fun HomeScreen(
 
     val totalXp = stats?.totalXp ?: 0
     val levelProgress = XpCalculator.getLevelProgress(totalXp)
-    val subjectMap = subjects.associateBy { it.id }
 
     Scaffold(
         floatingActionButton = {
@@ -101,6 +127,50 @@ fun HomeScreen(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            if (timerState.isRunning && timerState.subjectId.isNotEmpty()) {
+                item {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                if (timerState.timerType == TimerType.POMODORO) {
+                                    onNavigateToPomodoro(timerState.subjectId)
+                                } else {
+                                    onNavigateToFreeTimer(timerState.subjectId)
+                                }
+                            },
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PlayArrow,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Active Focus: ${timerState.subjectName}",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "Tap to return to timer",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
             item {
                 Spacer(modifier = Modifier.height(8.dp))
                 // Streak & Level Overview Row

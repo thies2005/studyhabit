@@ -23,6 +23,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,17 +42,22 @@ import java.time.ZoneId
 @Composable
 fun StatsScreen(container: AppContainer) {
     val stats by container.database.userStatsDao().getUserStatsFlow().collectAsState(initial = UserStatsEntity())
+    val projects by container.database.projectDao().getAllProjectsFlow().collectAsState(initial = emptyList())
     val activeProjectId by container.preferences.activeProjectId.collectAsState()
+    val activeProject = projects.firstOrNull { it.id == activeProjectId } ?: projects.firstOrNull()
+    val effectiveProjectId = activeProject?.id
 
-    val subjects by if (activeProjectId != null) {
-        container.database.subjectDao().getSubjectsForProjectFlow(activeProjectId!!).collectAsState(initial = emptyList())
-    } else {
-        container.database.subjectDao().getAllSubjectsFlow().collectAsState(initial = emptyList())
-    }
+    val subjects by remember(effectiveProjectId) {
+        if (effectiveProjectId != null) {
+            container.database.subjectDao().getSubjectsForProjectFlow(effectiveProjectId)
+        } else {
+            container.database.subjectDao().getAllSubjectsFlow()
+        }
+    }.collectAsState(initial = emptyList())
 
     val allSessions by container.database.sessionDao().getAllSessionsFlow().collectAsState(initial = emptyList())
     val subjectIds = subjects.map { it.id }.toSet()
-    val filteredSessions = if (activeProjectId != null) {
+    val filteredSessions = if (effectiveProjectId != null) {
         allSessions.filter { subjectIds.contains(it.subjectId) }
     } else {
         allSessions

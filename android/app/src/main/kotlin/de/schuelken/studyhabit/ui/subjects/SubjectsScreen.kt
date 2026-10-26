@@ -77,6 +77,7 @@ fun SubjectsScreen(
                             )
                             container.database.projectDao().upsert(defaultProj)
                             container.preferences.setActiveProjectId(defaultProj.id)
+                            container.triggerDataChangedSync()
                             showCreateSheet = true
                         }
                     } else {
@@ -175,9 +176,7 @@ fun SubjectsScreen(
                     onSave = { newSubj ->
                         scope.launch {
                             container.database.subjectDao().upsert(newSubj)
-                            if (!container.tokenStorage.getToken().isNullOrBlank()) {
-                                container.syncEngine.scheduleDebouncedSync()
-                            }
+                            container.triggerDataChangedSync()
                         }
                     },
                     onDismiss = { showCreateSheet = false }

@@ -168,7 +168,6 @@ fun SyncSettingsScreen(
                         OutlinedButton(
                             onClick = {
                                 container.tokenStorage.clear()
-                                container.preferences.lastSyncedUserId = null
                                 onNavigateBack()
                             },
                             modifier = Modifier.fillMaxWidth()

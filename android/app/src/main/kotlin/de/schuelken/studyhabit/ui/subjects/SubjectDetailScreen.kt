@@ -2,6 +2,8 @@ package de.schuelken.studyhabit.ui.subjects
 
 import android.content.Intent
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -194,6 +196,20 @@ fun SubjectDetailScreen(
                         scope.launch {
                             container.database.sessionDao().softDelete(session.id)
                             container.database.subjectDao().updateXp(currentSubj.id, -session.xpEarned)
+                            val stats = container.database.userStatsDao().getUserStats()
+                            if (stats != null) {
+                                val newXp = (stats.totalXp - session.xpEarned).coerceAtLeast(0)
+                                val newMins = (stats.totalStudyMinutes - session.actualDurationMinutes).coerceAtLeast(0)
+                                container.database.userStatsDao().upsert(
+                                    stats.copy(
+                                        totalXp = newXp,
+                                        currentLevel = XpCalculator.calculateLevel(newXp),
+                                        totalStudyMinutes = newMins,
+                                        updatedAt = System.currentTimeMillis()
+                                    )
+                                )
+                            }
+                            container.triggerDataChangedSync()
                         }
                     }
                 )
@@ -204,8 +220,16 @@ fun SubjectDetailScreen(
                         if (src.type.equals("pdf", ignoreCase = true)) {
                             onNavigateToPdf(src.id)
                         } else if (!src.url.isNullOrBlank()) {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(src.url))
-                            context.startActivity(intent)
+                            val raw = src.url.trim()
+                            val normalized = if (!raw.contains("://")) "https://$raw" else raw
+                            val uri = runCatching { Uri.parse(normalized) }.getOrNull()
+                            val scheme = uri?.scheme?.lowercase()
+                            if (uri != null && (scheme == "https" || scheme == "http")) {
+                                val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+                                    addCategory(Intent.CATEGORY_BROWSABLE)
+                                }
+                                runCatching { context.startActivity(intent) }
+                            }
                         }
                     }
                 )
@@ -271,6 +295,7 @@ fun SubjectDetailScreen(
             onSave = { src ->
                 scope.launch {
                     container.database.sourceDao().upsert(src)
+                    container.triggerDataChangedSync()
                     showAddSourceDialog = false
                 }
             },
@@ -285,6 +310,7 @@ fun SubjectDetailScreen(
             onSave = { t ->
                 scope.launch {
                     container.database.topicDao().upsert(t)
+                    container.triggerDataChangedSync()
                     showAddTopicDialog = false
                 }
             },
@@ -296,8 +322,11 @@ fun SubjectDetailScreen(
         SkillLabelSheet(
             onSelectLevel = { level ->
                 scope.launch {
+                    val existingLabel = skillLabels.firstOrNull {
+                        it.topicId == skillSelectorTopicId && it.chapterId == skillSelectorChapterId
+                    }
                     val labelEntity = SkillLabelEntity(
-                        id = UUID.randomUUID().toString(),
+                        id = existingLabel?.id ?: UUID.randomUUID().toString(),
                         subjectId = currentSubj.id,
                         topicId = skillSelectorTopicId,
                         chapterId = skillSelectorChapterId,
@@ -305,6 +334,7 @@ fun SubjectDetailScreen(
                         updatedAt = System.currentTimeMillis()
                     )
                     container.database.skillLabelDao().upsert(labelEntity)
+                    container.triggerDataChangedSync()
                     showSkillSheet = false
                 }
             },
@@ -510,6 +540,7 @@ fun TopicsTab(
             onSave = { c ->
                 scope.launch {
                     container.database.chapterDao().upsert(c)
+                    container.triggerDataChangedSync()
                     showAddChapterTopicId = null
                 }
             },
@@ -525,9 +556,21 @@ fun AddSourceDialog(
     onSave: (SourceEntity) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
     var title by remember { mutableStateOf("") }
     var type by remember { mutableStateOf("pdf") }
     var pathOrUrl by remember { mutableStateOf("") }
+
+    val pdfPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            pathOrUrl = uri.toString()
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -546,11 +589,20 @@ fun AddSourceDialog(
                     FilterChip(selected = type == "url", onClick = { type = "url" }, label = { Text("URL") })
                     FilterChip(selected = type == "videoUrl", onClick = { type = "videoUrl" }, label = { Text("Video") })
                 }
+                if (type == "pdf") {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = { pdfPickerLauncher.launch(arrayOf("application/pdf")) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Select PDF Document")
+                    }
+                }
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
                     value = pathOrUrl,
                     onValueChange = { pathOrUrl = it },
-                    label = { Text(if (type == "pdf") "File Path" else "URL") },
+                    label = { Text(if (type == "pdf") "File Path or URI" else "URL") },
                     modifier = Modifier.fillMaxWidth()
                 )
             }

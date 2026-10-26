@@ -75,4 +75,13 @@ class AppContainer(val context: Context) {
         FolderSyncService(context, database, preferences, exportImportService)
     }
     val reminderScheduler = ReminderScheduler(context, preferences)
+
+    fun triggerDataChangedSync() {
+        if (!tokenStorage.getToken().isNullOrBlank() && preferences.serverUrl.value.isNotBlank()) {
+            syncEngine.scheduleDebouncedSync()
+        }
+        if (preferences.folderSyncEnabled.value && !preferences.folderSyncUri.value.isNullOrBlank()) {
+            folderSyncService.scheduleDebouncedSync()
+        }
+    }
 }

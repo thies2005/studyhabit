@@ -69,7 +69,11 @@ fun AppTheme(
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
         else -> {
-            val seed = AppThemeTokens.presetSeeds.getOrElse(seedColorIndex) { AppThemeTokens.presetSeeds[0] }
+            val seed = if (themeStyleIndex in 1..AppThemeTokens.curatedPalettes.size) {
+                AppThemeTokens.curatedPalettes[themeStyleIndex - 1].seedColor
+            } else {
+                AppThemeTokens.presetSeeds.getOrElse(seedColorIndex) { AppThemeTokens.presetSeeds[0] }
+            }
             if (darkTheme) {
                 darkColorScheme(
                     primary = seed,

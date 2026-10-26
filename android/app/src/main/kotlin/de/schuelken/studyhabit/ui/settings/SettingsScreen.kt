@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -47,6 +48,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -227,7 +229,10 @@ fun SettingsScreen(
                             ThemeMode.entries.forEach { mode ->
                                 FilterChip(
                                     selected = currentMode == mode,
-                                    onClick = { container.preferences.setThemeMode(mode) },
+                                    onClick = {
+                                        container.preferences.setThemeMode(mode)
+                                        container.triggerDataChangedSync()
+                                    },
                                     label = { Text(mode.name.lowercase().replaceFirstChar { it.uppercase() }) }
                                 )
                             }
@@ -245,7 +250,10 @@ fun SettingsScreen(
                                         .size(36.dp)
                                         .clip(CircleShape)
                                         .background(color)
-                                        .clickable { container.preferences.setSeedColorIndex(index) }
+                                        .clickable {
+                                            container.preferences.setSeedColorIndex(index)
+                                            container.triggerDataChangedSync()
+                                        }
                                         .then(
                                             if (isSelected) Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
                                             else Modifier
@@ -259,6 +267,7 @@ fun SettingsScreen(
                         Slider(
                             value = fontScale,
                             onValueChange = { container.preferences.setFontScale(it) },
+                            onValueChangeFinished = { container.triggerDataChangedSync() },
                             valueRange = 0.85f..1.30f,
                             steps = 3
                         )
@@ -279,6 +288,7 @@ fun SettingsScreen(
                                 dailyGoalMinutes = it.toInt()
                                 container.preferences.dailyGoalMinutes = dailyGoalMinutes
                             },
+                            onValueChangeFinished = { container.triggerDataChangedSync() },
                             valueRange = 10f..240f,
                             steps = 22
                         )
@@ -299,6 +309,7 @@ fun SettingsScreen(
                                 workDuration = it.toInt()
                                 container.preferences.workDuration = workDuration
                             },
+                            onValueChangeFinished = { container.triggerDataChangedSync() },
                             valueRange = 5f..120f,
                             steps = 22
                         )
@@ -311,6 +322,7 @@ fun SettingsScreen(
                                 shortBreak = it.toInt()
                                 container.preferences.shortBreakDuration = shortBreak
                             },
+                            onValueChangeFinished = { container.triggerDataChangedSync() },
                             valueRange = 1f..30f,
                             steps = 28
                         )
@@ -327,6 +339,7 @@ fun SettingsScreen(
                                 onCheckedChange = {
                                     continuousFocus = it
                                     container.preferences.continuousFocus = it
+                                    container.triggerDataChangedSync()
                                 }
                             )
                         }
@@ -342,6 +355,7 @@ fun SettingsScreen(
                                 onCheckedChange = {
                                     vibration = it
                                     container.preferences.vibrationEnabled = it
+                                    container.triggerDataChangedSync()
                                 }
                             )
                         }
@@ -413,31 +427,44 @@ fun SettingsScreen(
             title = { Text("Import Data Mode") },
             text = { Text("Would you like to Merge with existing data, or Replace all current data on this device?") },
             confirmButton = {
-                Button(
-                    onClick = {
-                        val json = importPendingJson!!
-                        importPendingJson = null
-                        scope.launch {
-                            val res = container.exportImportService.importFromJson(json, ImportMode.MERGE)
-                            importStatusMessage = "Imported ${res.subjectCount} subjects and ${res.sessionCount} sessions."
-                        }
-                    }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Merge")
+                    OutlinedButton(
+                        onClick = {
+                            val json = importPendingJson!!
+                            importPendingJson = null
+                            scope.launch {
+                                val res = container.exportImportService.importFromJson(json, ImportMode.REPLACE)
+                                importStatusMessage = "Replaced data: ${res.subjectCount} subjects, ${res.sessionCount} sessions."
+                                container.triggerDataChangedSync()
+                            }
+                        },
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Text("Replace All")
+                    }
+                    Button(
+                        onClick = {
+                            val json = importPendingJson!!
+                            importPendingJson = null
+                            scope.launch {
+                                val res = container.exportImportService.importFromJson(json, ImportMode.MERGE)
+                                importStatusMessage = "Imported ${res.subjectCount} subjects and ${res.sessionCount} sessions."
+                                container.triggerDataChangedSync()
+                            }
+                        }
+                    ) {
+                        Text("Merge")
+                    }
                 }
             },
             dismissButton = {
-                Button(
-                    onClick = {
-                        val json = importPendingJson!!
-                        importPendingJson = null
-                        scope.launch {
-                            val res = container.exportImportService.importFromJson(json, ImportMode.REPLACE)
-                            importStatusMessage = "Replaced data: ${res.subjectCount} subjects, ${res.sessionCount} sessions."
-                        }
-                    }
-                ) {
-                    Text("Replace All")
+                TextButton(onClick = { importPendingJson = null }) {
+                    Text("Cancel")
                 }
             }
         )

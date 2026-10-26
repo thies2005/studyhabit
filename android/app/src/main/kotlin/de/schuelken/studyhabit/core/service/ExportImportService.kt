@@ -1,6 +1,7 @@
 package de.schuelken.studyhabit.core.service
 
 import android.content.Context
+import androidx.room.withTransaction
 import de.schuelken.studyhabit.core.database.AchievementEntity
 import de.schuelken.studyhabit.core.database.AppDatabase
 import de.schuelken.studyhabit.core.database.ChapterEntity
@@ -30,6 +31,7 @@ data class ExportDocument(
     val projects: List<ExportProject>,
     val achievements: List<AchievementEntity>,
     val settings: Map<String, JsonElement>? = null,
+    val settingsUpdatedAt: Long = 0L,
 )
 
 @Serializable
@@ -120,15 +122,21 @@ class ExportImportService(
             projects = exportProjects,
             achievements = achievements,
             settings = settingsMap.ifEmpty { null },
+            settingsUpdatedAt = preferences.settingsUpdatedAt,
         )
     }
 
     suspend fun exportToJson(): File {
         val document = buildExportDocument()
         val jsonString = json.encodeToString(document)
-        val tempDir = context.cacheDir
+        val exportsDir = File(context.cacheDir, "exports").apply { mkdirs() }
+        exportsDir.listFiles()?.forEach { oldFile ->
+            if (oldFile.name.startsWith("studyhabit_export_")) {
+                runCatching { oldFile.delete() }
+            }
+        }
         val timestamp = System.currentTimeMillis()
-        val file = File(tempDir, "studyhabit_export_$timestamp.json")
+        val file = File(exportsDir, "studyhabit_export_$timestamp.json")
         file.writeText(jsonString)
         return file
     }
@@ -143,58 +151,66 @@ class ExportImportService(
         try {
             val doc = json.decodeFromString<ExportDocument>(jsonString)
 
-            if (mode == ImportMode.REPLACE) {
-                database.skillLabelDao().deleteAll()
-                database.milestoneDao().deleteAll()
-                database.sourceDao().deleteAll()
-                database.sessionDao().deleteAll()
-                database.chapterDao().deleteAll()
-                database.topicDao().deleteAll()
-                database.subjectDao().deleteAll()
-                database.projectDao().deleteAll()
-                database.achievementDao().deleteAll()
-                database.userStatsDao().deleteAll()
-            }
+            database.withTransaction {
+                if (mode == ImportMode.REPLACE) {
+                    database.skillLabelDao().deleteAll()
+                    database.milestoneDao().deleteAll()
+                    database.sourceDao().deleteAll()
+                    database.sessionDao().deleteAll()
+                    database.chapterDao().deleteAll()
+                    database.topicDao().deleteAll()
+                    database.subjectDao().deleteAll()
+                    database.projectDao().deleteAll()
+                    database.achievementDao().deleteAll()
+                    database.userStatsDao().deleteAll()
+                }
 
-            for (exportProj in doc.projects) {
-                database.projectDao().upsert(exportProj.project)
-                projectCount++
+                for (exportProj in doc.projects) {
+                    database.projectDao().upsert(exportProj.project)
+                    projectCount++
 
-                for (exportSubj in exportProj.subjects) {
-                    database.subjectDao().upsert(exportSubj.subject)
-                    subjectCount++
+                    for (exportSubj in exportProj.subjects) {
+                        database.subjectDao().upsert(exportSubj.subject)
+                        subjectCount++
 
-                    if (exportSubj.topics.isNotEmpty()) {
-                        database.topicDao().upsertAll(exportSubj.topics)
-                    }
-                    if (exportSubj.chapters.isNotEmpty()) {
-                        database.chapterDao().upsertAll(exportSubj.chapters)
-                    }
-                    if (exportSubj.sessions.isNotEmpty()) {
-                        database.sessionDao().upsertAll(exportSubj.sessions)
-                        sessionCount += exportSubj.sessions.size
-                    }
-                    if (exportSubj.sources.isNotEmpty()) {
-                        database.sourceDao().upsertAll(exportSubj.sources)
-                        sourceCount += exportSubj.sources.size
-                    }
-                    if (exportSubj.skillLabels.isNotEmpty()) {
-                        database.skillLabelDao().upsertAll(exportSubj.skillLabels)
-                    }
-                    if (exportSubj.milestones.isNotEmpty()) {
-                        database.milestoneDao().upsertAll(exportSubj.milestones)
+                        if (exportSubj.topics.isNotEmpty()) {
+                            database.topicDao().upsertAll(exportSubj.topics)
+                        }
+                        if (exportSubj.chapters.isNotEmpty()) {
+                            database.chapterDao().upsertAll(exportSubj.chapters)
+                        }
+                        if (exportSubj.sessions.isNotEmpty()) {
+                            database.sessionDao().upsertAll(exportSubj.sessions)
+                            sessionCount += exportSubj.sessions.size
+                        }
+                        if (exportSubj.sources.isNotEmpty()) {
+                            database.sourceDao().upsertAll(exportSubj.sources)
+                            sourceCount += exportSubj.sources.size
+                        }
+                        if (exportSubj.skillLabels.isNotEmpty()) {
+                            database.skillLabelDao().upsertAll(exportSubj.skillLabels)
+                        }
+                        if (exportSubj.milestones.isNotEmpty()) {
+                            database.milestoneDao().upsertAll(exportSubj.milestones)
+                        }
                     }
                 }
-            }
 
-            if (doc.achievements.isNotEmpty()) {
-                database.achievementDao().upsertAll(doc.achievements)
-            }
+                if (doc.achievements.isNotEmpty()) {
+                    database.achievementDao().upsertAll(doc.achievements)
+                }
 
-            database.userStatsDao().upsert(doc.userStats)
+                database.userStatsDao().upsert(doc.userStats)
 
-            doc.settings?.let { settings ->
-                preferences.applySettingsMap(settings)
+                doc.settings?.let { settings ->
+                    preferences.applySettingsMap(settings)
+                }
+
+                val allProjects = database.projectDao().getAllProjects()
+                val currentActive = preferences.activeProjectId.value
+                if (currentActive == null || allProjects.none { it.id == currentActive }) {
+                    preferences.setActiveProjectId(allProjects.firstOrNull()?.id)
+                }
             }
         } catch (e: Exception) {
             errors.add(e.message ?: "Unknown import error")

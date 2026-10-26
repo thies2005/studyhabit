@@ -8,12 +8,17 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -23,6 +28,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -34,13 +40,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import de.schuelken.studyhabit.core.database.AchievementEntity
 import de.schuelken.studyhabit.core.database.StudySessionEntity
 import de.schuelken.studyhabit.core.di.AppContainer
+import de.schuelken.studyhabit.core.model.TimerType
 import de.schuelken.studyhabit.core.service.LevelProgress
 import de.schuelken.studyhabit.core.service.TimerState
 import de.schuelken.studyhabit.core.service.XpCalculator
+import de.schuelken.studyhabit.ui.achievements.AchievementsMetadata
+import de.schuelken.studyhabit.ui.components.AchievementUnlockBanner
 import de.schuelken.studyhabit.ui.components.LevelUpDialog
 import kotlinx.coroutines.launch
+import java.time.LocalDate
+import java.time.ZoneId
+import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,16 +69,28 @@ fun SessionReviewSheet(
     var notes by remember { mutableStateOf("") }
     var showLevelUp by remember { mutableStateOf(false) }
     var newLevelAwarded by remember { mutableIntStateOf(1) }
+    var unlockedAchievements by remember { mutableStateOf<List<AchievementEntity>>(emptyList()) }
 
-    val actualMinutes = (timerState.elapsedSeconds / 60).coerceAtLeast(1)
-    val plannedMinutes = (timerState.totalSeconds / 60).coerceAtLeast(1)
+    val studiedSeconds = if (timerState.timerType == TimerType.POMODORO) {
+        timerState.totalWorkSeconds.coerceAtLeast(timerState.elapsedSeconds)
+    } else {
+        timerState.elapsedSeconds
+    }
+    val actualMinutes = (studiedSeconds / 60).coerceAtLeast(1)
+    val plannedMinutes = (timerState.totalSeconds / 60).coerceAtLeast(actualMinutes)
 
     // XP calculation
     var xpEarned = 0
-    if (timerState.pomodorosCompleted > 0) {
-        xpEarned += timerState.pomodorosCompleted * XpCalculator.XP_COMPLETE_POMODORO
-    } else if (timerState.elapsedSeconds >= (timerState.totalSeconds * 0.8)) {
-        xpEarned += XpCalculator.XP_COMPLETE_POMODORO
+    if (timerState.timerType == TimerType.POMODORO) {
+        if (timerState.pomodorosCompleted > 0) {
+            xpEarned += timerState.pomodorosCompleted * XpCalculator.XP_COMPLETE_POMODORO
+        } else if (timerState.totalSeconds > 0 && studiedSeconds >= (timerState.totalSeconds * 0.8)) {
+            xpEarned += XpCalculator.XP_COMPLETE_POMODORO
+        }
+    } else {
+        if (actualMinutes >= 20) {
+            xpEarned += (actualMinutes / 25).coerceAtLeast(1) * XpCalculator.XP_COMPLETE_POMODORO
+        }
     }
     if (actualMinutes >= 120) {
         xpEarned += XpCalculator.XP_LONG_SESSION
@@ -81,6 +106,9 @@ fun SessionReviewSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .navigationBarsPadding()
+                .imePadding()
                 .padding(horizontal = 24.dp, vertical = 16.dp)
         ) {
             Text(text = "Session Complete!", style = MaterialTheme.typography.headlineMedium)
@@ -153,7 +181,7 @@ fun SessionReviewSheet(
                 onClick = {
                     scope.launch {
                         val sessionEntity = StudySessionEntity(
-                            id = timerState.sessionId.ifEmpty { java.util.UUID.randomUUID().toString() },
+                            id = timerState.sessionId.ifEmpty { UUID.randomUUID().toString() },
                             subjectId = timerState.subjectId,
                             topicId = timerState.topicId,
                             chapterId = timerState.chapterId,
@@ -166,7 +194,7 @@ fun SessionReviewSheet(
                             notes = notes.trim().ifEmpty { null },
                             xpEarned = xpEarned,
                             sourceId = timerState.sourceId,
-                            isFreeTimer = timerState.timerType == de.schuelken.studyhabit.core.model.TimerType.FREE_TIMER,
+                            isFreeTimer = timerState.timerType == TimerType.FREE_TIMER,
                             updatedAt = System.currentTimeMillis()
                         )
                         container.database.sessionDao().upsert(sessionEntity)
@@ -174,11 +202,35 @@ fun SessionReviewSheet(
                         // Update Subject XP
                         container.database.subjectDao().updateXp(timerState.subjectId, xpEarned)
 
+                        // Record study day and calculate streak bonus XP
+                        var bonusXp = 0
+                        container.streakManager.recordStudyDay { reason ->
+                            bonusXp += XpCalculator.xpForReason(reason)
+                        }
+
+                        // Daily goal check
+                        val zone = ZoneId.systemDefault()
+                        val today = LocalDate.now(zone)
+                        val todayStr = today.toString()
+                        val todayStartMs = today.atStartOfDay(zone).toInstant().toEpochMilli()
+
+                        val allSessions = container.database.sessionDao().getAllSessions()
+                        val todayMinutes = allSessions
+                            .filter { it.startedAt >= todayStartMs && !it.isDeleted }
+                            .sumOf { it.actualDurationMinutes }
+
+                        val goalMinutes = container.preferences.getWeekdayGoalMinutes(today.dayOfWeek.value)
+                        if (todayMinutes >= goalMinutes && container.preferences.lastDailyGoalAwardDate != todayStr) {
+                            bonusXp += XpCalculator.XP_DAILY_GOAL
+                            container.preferences.lastDailyGoalAwardDate = todayStr
+                        }
+
                         // Update User Stats
                         val currentStats = container.database.userStatsDao().getUserStats()
                             ?: de.schuelken.studyhabit.core.database.UserStatsEntity()
                         val oldLevel = currentStats.currentLevel
-                        val newTotalXp = currentStats.totalXp + xpEarned
+                        val totalAwardedXp = xpEarned + bonusXp
+                        val newTotalXp = currentStats.totalXp + totalAwardedXp
                         val newLevel = XpCalculator.calculateLevel(newTotalXp)
                         val newTotalMinutes = currentStats.totalStudyMinutes + actualMinutes
 
@@ -190,21 +242,20 @@ fun SessionReviewSheet(
                         )
                         container.database.userStatsDao().upsert(updatedStats)
 
-                        // Record study day and update streaks
-                        container.streakManager.recordStudyDay()
-
                         // Check achievements
-                        container.achievementEvaluator.checkAndUnlock()
+                        val newlyUnlocked = container.achievementEvaluator.checkAndUnlock()
 
-                        // Trigger sync in background if logged in
-                        if (!container.tokenStorage.getToken().isNullOrBlank()) {
-                            container.syncEngine.scheduleDebouncedSync()
+                        // Trigger sync in background (Cloud Folder Sync & Server Sync)
+                        container.triggerDataChangedSync()
+
+                        if (newlyUnlocked.isNotEmpty()) {
+                            unlockedAchievements = newlyUnlocked
                         }
 
                         if (newLevel > oldLevel) {
                             newLevelAwarded = newLevel
                             showLevelUp = true
-                        } else {
+                        } else if (newlyUnlocked.isEmpty()) {
                             onFinished()
                         }
                     }
@@ -220,7 +271,42 @@ fun SessionReviewSheet(
     if (showLevelUp) {
         LevelUpDialog(newLevel = newLevelAwarded) {
             showLevelUp = false
-            onFinished()
+            if (unlockedAchievements.isEmpty()) {
+                onFinished()
+            }
         }
+    }
+
+    if (unlockedAchievements.isNotEmpty() && !showLevelUp) {
+        val achievement = unlockedAchievements.first()
+        val meta = AchievementsMetadata.ALL.firstOrNull { it.key == achievement.key }
+        AlertDialog(
+            onDismissRequest = {
+                unlockedAchievements = unlockedAchievements.drop(1)
+                if (unlockedAchievements.isEmpty()) {
+                    onFinished()
+                }
+            },
+            title = { Text("Achievement Unlocked!") },
+            text = {
+                AchievementUnlockBanner(
+                    title = meta?.title ?: achievement.key,
+                    description = meta?.description ?: "Congratulations!",
+                    icon = meta?.icon ?: "🏆"
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        unlockedAchievements = unlockedAchievements.drop(1)
+                        if (unlockedAchievements.isEmpty()) {
+                            onFinished()
+                        }
+                    }
+                ) {
+                    Text("Awesome!")
+                }
+            }
+        )
     }
 }

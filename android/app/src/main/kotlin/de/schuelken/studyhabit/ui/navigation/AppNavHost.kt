@@ -16,6 +16,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.navArgument
 import de.schuelken.studyhabit.core.database.ProjectEntity
 import de.schuelken.studyhabit.core.di.AppContainer
+import de.schuelken.studyhabit.core.model.SyncStatus
 import de.schuelken.studyhabit.core.model.TimerType
 import de.schuelken.studyhabit.core.service.TimerForegroundService
 import de.schuelken.studyhabit.ui.achievements.AchievementsScreen
@@ -49,19 +50,30 @@ fun AppNavHost(
     val activeProjectId by container.preferences.activeProjectId.collectAsState()
     val activeProject = projects.firstOrNull { it.id == activeProjectId } ?: projects.firstOrNull()
 
-    val syncStatus by container.syncEngine.syncStatus.collectAsState()
+    val serverSyncStatus by container.syncEngine.syncStatus.collectAsState()
+    val folderSyncStatus by container.folderSyncService.syncStatus.collectAsState()
+    val syncStatus = when {
+        serverSyncStatus == SyncStatus.SYNCING || folderSyncStatus == SyncStatus.SYNCING ->
+            SyncStatus.SYNCING
+        serverSyncStatus == SyncStatus.ERROR || folderSyncStatus == SyncStatus.ERROR ->
+            SyncStatus.ERROR
+        serverSyncStatus == SyncStatus.SYNCED || folderSyncStatus == SyncStatus.SYNCED ->
+            SyncStatus.SYNCED
+        else -> SyncStatus.IDLE
+    }
+
     val timerState by TimerForegroundService.timerState.collectAsState()
 
     // Startup check: if a timer is currently active, redirect directly to that timer
     LaunchedEffect(Unit) {
-        if (timerState.isRunning && timerState.subjectId.isNotEmpty()) {
-            if (timerState.timerType == TimerType.POMODORO) {
-                navController.navigate("pomodoro/${timerState.subjectId}")
+        TimerForegroundService.restoreIfNeeded(navController.context)
+        val active = TimerForegroundService.timerState.value
+        if (active.isRunning && active.subjectId.isNotEmpty()) {
+            if (active.timerType == TimerType.POMODORO) {
+                navController.navigate("pomodoro/${active.subjectId}")
             } else {
-                navController.navigate("free_timer/${timerState.subjectId}")
+                navController.navigate("free_timer/${active.subjectId}")
             }
-        } else {
-            container.preferences.clearActiveTimers()
         }
     }
 
@@ -79,7 +91,18 @@ fun AppNavHost(
         projects = projects,
         activeProject = activeProject,
         syncStatus = syncStatus,
-        onSyncClick = { scope.launch { container.syncEngine.syncNow() } },
+        onSyncClick = {
+            scope.launch {
+                val hasServer = !container.tokenStorage.getToken().isNullOrBlank() && container.preferences.serverUrl.value.isNotBlank()
+                val hasFolder = container.preferences.folderSyncEnabled.value && !container.preferences.folderSyncUri.value.isNullOrBlank()
+                if (!hasServer && !hasFolder) {
+                    navController.navigate("sync_settings")
+                } else {
+                    if (hasFolder) container.folderSyncService.syncWithFolder()
+                    if (hasServer) container.syncEngine.syncNow()
+                }
+            }
+        },
         onSelectProject = { pId ->
             container.preferences.setActiveProjectId(pId)
             scope.launch { container.database.projectDao().updateLastOpened(pId, System.currentTimeMillis()) }
@@ -94,15 +117,13 @@ fun AppNavHost(
                 )
                 container.database.projectDao().upsert(p)
                 container.preferences.setActiveProjectId(p.id)
+                container.triggerDataChangedSync()
             }
         },
         onRenameProject = { id, name, icon ->
             scope.launch {
                 container.database.projectDao().renameProject(id, name, icon)
-                container.syncEngine.scheduleDebouncedSync()
-                if (container.preferences.folderSyncEnabled.value) {
-                    container.folderSyncService.syncWithFolder()
-                }
+                container.triggerDataChangedSync()
             }
         },
         onOpenSettings = { navController.navigate("settings") },

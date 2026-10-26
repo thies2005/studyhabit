@@ -27,6 +27,26 @@ interface SessionDao {
     @Query("SELECT * FROM study_sessions WHERE is_deleted = 0 ORDER BY started_at DESC LIMIT :limit")
     fun getRecentSessionsFlow(limit: Int = 10): Flow<List<StudySessionEntity>>
 
+    @Query("""
+        SELECT s.* FROM study_sessions s
+        INNER JOIN subjects subj ON s.subject_id = subj.id
+        WHERE subj.project_id = :projectId AND s.is_deleted = 0 AND subj.is_deleted = 0
+        ORDER BY s.started_at DESC
+        LIMIT :limit
+    """)
+    fun getRecentSessionsForProjectFlow(projectId: String, limit: Int = 10): Flow<List<StudySessionEntity>>
+
+    @Query("""
+        SELECT s.* FROM study_sessions s
+        INNER JOIN subjects subj ON s.subject_id = subj.id
+        WHERE subj.project_id = :projectId AND s.is_deleted = 0 AND subj.is_deleted = 0 AND s.started_at >= :sinceMs
+        ORDER BY s.started_at DESC
+    """)
+    fun getSessionsForProjectSinceFlow(projectId: String, sinceMs: Long): Flow<List<StudySessionEntity>>
+
+    @Query("SELECT * FROM study_sessions WHERE is_deleted = 0 AND started_at >= :sinceMs ORDER BY started_at DESC")
+    fun getSessionsSinceFlow(sinceMs: Long): Flow<List<StudySessionEntity>>
+
     @Query("SELECT * FROM study_sessions WHERE updated_at > :since")
     suspend fun getModifiedSince(since: Long): List<StudySessionEntity>
 

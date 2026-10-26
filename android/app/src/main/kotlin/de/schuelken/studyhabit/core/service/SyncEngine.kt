@@ -1,5 +1,6 @@
 package de.schuelken.studyhabit.core.service
 
+import androidx.room.withTransaction
 import de.schuelken.studyhabit.core.database.AchievementEntity
 import de.schuelken.studyhabit.core.database.AppDatabase
 import de.schuelken.studyhabit.core.database.ChapterEntity
@@ -360,7 +361,7 @@ class SyncEngine(
         )
     }
 
-    private suspend fun applyRemoteChanges(pull: SyncPullData): Map<String, Int> {
+    private suspend fun applyRemoteChanges(pull: SyncPullData): Map<String, Int> = database.withTransaction {
         val pulled = mutableMapOf<String, Int>()
 
         // Projects
@@ -617,6 +618,12 @@ class SyncEngine(
             }
         }
 
-        return pulled
+        val allProjects = database.projectDao().getAllProjects()
+        val currentActive = preferences.activeProjectId.value
+        if (currentActive == null || allProjects.none { it.id == currentActive }) {
+            preferences.setActiveProjectId(allProjects.firstOrNull()?.id)
+        }
+
+        pulled
     }
 }

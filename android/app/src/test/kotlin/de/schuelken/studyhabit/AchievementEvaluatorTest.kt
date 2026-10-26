@@ -37,6 +37,15 @@ class FakeSessionDao : SessionDao {
     override fun getRecentSessionsFlow(limit: Int): Flow<List<StudySessionEntity>> =
         flowOf(sessions.take(limit))
 
+    override fun getRecentSessionsForProjectFlow(projectId: String, limit: Int): Flow<List<StudySessionEntity>> =
+        flowOf(sessions.take(limit))
+
+    override fun getSessionsForProjectSinceFlow(projectId: String, sinceMs: Long): Flow<List<StudySessionEntity>> =
+        flowOf(sessions.filter { it.startedAt >= sinceMs })
+
+    override fun getSessionsSinceFlow(sinceMs: Long): Flow<List<StudySessionEntity>> =
+        flowOf(sessions.filter { it.startedAt >= sinceMs })
+
     override suspend fun getModifiedSince(since: Long): List<StudySessionEntity> =
         sessions.filter { it.updatedAt > since }
 

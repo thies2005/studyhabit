@@ -9,6 +9,9 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.os.SystemClock
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import androidx.core.app.NotificationCompat
 import de.schuelken.studyhabit.MainActivity
 import de.schuelken.studyhabit.R
@@ -49,6 +52,7 @@ data class TimerPersistedState(
     val pomodorosCompleted: Int,
     val startedAt: Long,
     val sessionId: String,
+    val totalWorkSeconds: Int = 0,
 )
 
 data class TimerState(
@@ -69,6 +73,7 @@ data class TimerState(
     val pomodorosCompleted: Int = 0,
     val startedAt: Long = 0L,
     val sessionId: String = "",
+    val totalWorkSeconds: Int = 0,
 )
 
 class TimerForegroundService : Service() {
@@ -90,6 +95,46 @@ class TimerForegroundService : Service() {
 
         private val _timerState = MutableStateFlow(TimerState())
         val timerState: StateFlow<TimerState> = _timerState.asStateFlow()
+
+        fun restoreIfNeeded(context: Context) {
+            if (_timerState.value.isRunning) return
+            val app = context.applicationContext as? StudyHabitApplication ?: return
+            val preferences = app.container.preferences
+            val activeType = preferences.activeTimerType ?: return
+            val jsonString = if (activeType == TimerType.POMODORO.value) {
+                preferences.pomodoroStateJson
+            } else {
+                preferences.freeTimerStateJson
+            } ?: return
+
+            val persisted = runCatching {
+                Json.decodeFromString<TimerPersistedState>(jsonString)
+            }.getOrNull() ?: return
+
+            if (persisted.isRunning && !_timerState.value.isRunning) {
+                val restoredState = TimerState(
+                    timerType = TimerType.fromValue(persisted.timerType),
+                    phase = TimerPhase.fromValue(persisted.phase),
+                    isRunning = true,
+                    isPaused = true,
+                    subjectId = persisted.subjectId,
+                    subjectName = persisted.subjectName,
+                    topicId = persisted.topicId,
+                    chapterId = persisted.chapterId,
+                    sourceId = persisted.sourceId,
+                    totalSeconds = persisted.totalSeconds,
+                    remainingSeconds = persisted.remainingSeconds,
+                    elapsedSeconds = persisted.elapsedSeconds,
+                    overtimeSeconds = persisted.overtimeSeconds,
+                    isOvertime = persisted.isOvertime,
+                    pomodorosCompleted = persisted.pomodorosCompleted,
+                    startedAt = persisted.startedAt,
+                    sessionId = persisted.sessionId,
+                    totalWorkSeconds = persisted.totalWorkSeconds,
+                )
+                _timerState.value = restoredState
+            }
+        }
 
         fun startPomodoro(
             context: Context,
@@ -160,6 +205,7 @@ class TimerForegroundService : Service() {
     private var tickerJob: Job? = null
     private var baseElapsedRealtime: Long = 0L
     private var accumulatedElapsedSeconds: Int = 0
+    private var accumulatedWorkSeconds: Int = 0
     private lateinit var preferences: AppPreferences
 
     override fun onCreate() {
@@ -207,6 +253,7 @@ class TimerForegroundService : Service() {
     ) {
         val totalSec = durationMinutes * 60
         accumulatedElapsedSeconds = 0
+        accumulatedWorkSeconds = 0
         baseElapsedRealtime = SystemClock.elapsedRealtime()
 
         val state = TimerState(
@@ -227,6 +274,7 @@ class TimerForegroundService : Service() {
             pomodorosCompleted = 0,
             startedAt = System.currentTimeMillis(),
             sessionId = UUID.randomUUID().toString(),
+            totalWorkSeconds = 0,
         )
         _timerState.value = state
         persistState(state)
@@ -242,6 +290,7 @@ class TimerForegroundService : Service() {
         sourceId: String?
     ) {
         accumulatedElapsedSeconds = 0
+        accumulatedWorkSeconds = 0
         baseElapsedRealtime = SystemClock.elapsedRealtime()
 
         val state = TimerState(
@@ -262,6 +311,7 @@ class TimerForegroundService : Service() {
             pomodorosCompleted = 0,
             startedAt = System.currentTimeMillis(),
             sessionId = UUID.randomUUID().toString(),
+            totalWorkSeconds = 0,
         )
         _timerState.value = state
         persistState(state)
@@ -282,10 +332,21 @@ class TimerForegroundService : Service() {
 
     private fun resumeTimer() {
         if (!_timerState.value.isRunning || !_timerState.value.isPaused) return
+        if (accumulatedElapsedSeconds == 0 && _timerState.value.elapsedSeconds > 0) {
+            accumulatedElapsedSeconds = _timerState.value.elapsedSeconds
+        }
+        if (accumulatedWorkSeconds == 0 && _timerState.value.totalWorkSeconds > 0) {
+            accumulatedWorkSeconds = if (_timerState.value.phase == TimerPhase.WORK) {
+                (_timerState.value.totalWorkSeconds - _timerState.value.elapsedSeconds).coerceAtLeast(0)
+            } else {
+                _timerState.value.totalWorkSeconds
+            }
+        }
         baseElapsedRealtime = SystemClock.elapsedRealtime()
         val updated = _timerState.value.copy(isPaused = false)
         _timerState.value = updated
         persistState(updated)
+        startForegroundWithNotification(updated)
         startTicker()
         updateNotification(updated)
     }
@@ -293,6 +354,14 @@ class TimerForegroundService : Service() {
     private fun skipToNextPhase() {
         val curr = _timerState.value
         if (curr.timerType != TimerType.POMODORO) return
+
+        val runningSec = if (curr.isPaused) 0 else ((SystemClock.elapsedRealtime() - baseElapsedRealtime) / 1000).toInt()
+        val totalElapsed = accumulatedElapsedSeconds + runningSec
+
+        if (curr.phase == TimerPhase.WORK) {
+            val completedWork = totalElapsed.coerceAtLeast(curr.totalSeconds)
+            accumulatedWorkSeconds += completedWork
+        }
 
         accumulatedElapsedSeconds = 0
         baseElapsedRealtime = SystemClock.elapsedRealtime()
@@ -312,6 +381,12 @@ class TimerForegroundService : Service() {
             TimerPhase.IDLE -> TimerPhase.WORK to (preferences.workDuration * 60)
         }
 
+        val shouldPause = if (curr.phase == TimerPhase.WORK) {
+            !preferences.autoStartBreaks
+        } else {
+            !preferences.autoStartWork
+        }
+
         val updated = curr.copy(
             phase = nextPhase,
             totalSeconds = nextDuration,
@@ -320,15 +395,47 @@ class TimerForegroundService : Service() {
             overtimeSeconds = 0,
             isOvertime = false,
             pomodorosCompleted = if (curr.phase == TimerPhase.WORK) curr.pomodorosCompleted + 1 else curr.pomodorosCompleted,
-            isPaused = false,
+            totalWorkSeconds = accumulatedWorkSeconds,
+            isPaused = shouldPause,
         )
         _timerState.value = updated
         persistState(updated)
         updateNotification(updated)
+
+        if (shouldPause) {
+            tickerJob?.cancel()
+        } else if (tickerJob?.isActive != true) {
+            startTicker()
+        }
+    }
+
+    private fun triggerVibration() {
+        if (!preferences.vibrationEnabled) return
+        runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vibratorManager = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+                vibratorManager?.defaultVibrator?.vibrate(
+                    VibrationEffect.createOneShot(400, VibrationEffect.DEFAULT_AMPLITUDE)
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    vibrator?.vibrate(
+                        VibrationEffect.createOneShot(400, VibrationEffect.DEFAULT_AMPLITUDE)
+                    )
+                } else {
+                    @Suppress("DEPRECATION")
+                    vibrator?.vibrate(400)
+                }
+            }
+        }
     }
 
     private fun stopTimer() {
         tickerJob?.cancel()
+        accumulatedElapsedSeconds = 0
+        accumulatedWorkSeconds = 0
         val stopped = _timerState.value.copy(isRunning = false, isPaused = false)
         _timerState.value = stopped
         preferences.clearActiveTimers()
@@ -348,18 +455,28 @@ class TimerForegroundService : Service() {
                 val totalElapsed = accumulatedElapsedSeconds + runningSec
 
                 if (curr.timerType == TimerType.FREE_TIMER) {
-                    val updated = curr.copy(elapsedSeconds = totalElapsed)
+                    val currentWorkTotal = accumulatedWorkSeconds + totalElapsed
+                    val updated = curr.copy(
+                        elapsedSeconds = totalElapsed,
+                        totalWorkSeconds = currentWorkTotal
+                    )
                     _timerState.value = updated
                     updateNotification(updated)
                 } else {
                     // Pomodoro mode
                     if (totalElapsed < curr.totalSeconds) {
                         val remaining = curr.totalSeconds - totalElapsed
+                        val currentWorkTotal = if (curr.phase == TimerPhase.WORK) {
+                            accumulatedWorkSeconds + totalElapsed
+                        } else {
+                            accumulatedWorkSeconds
+                        }
                         val updated = curr.copy(
                             elapsedSeconds = totalElapsed,
                             remainingSeconds = remaining,
                             isOvertime = false,
                             overtimeSeconds = 0,
+                            totalWorkSeconds = currentWorkTotal,
                         )
                         _timerState.value = updated
                         updateNotification(updated)
@@ -367,16 +484,19 @@ class TimerForegroundService : Service() {
                         // Work phase completed or in overtime
                         if (preferences.continuousFocus && curr.phase == TimerPhase.WORK) {
                             val overtime = totalElapsed - curr.totalSeconds
+                            val currentWorkTotal = accumulatedWorkSeconds + totalElapsed
                             val updated = curr.copy(
                                 elapsedSeconds = totalElapsed,
                                 remainingSeconds = 0,
                                 isOvertime = true,
                                 overtimeSeconds = overtime,
+                                totalWorkSeconds = currentWorkTotal,
                             )
                             _timerState.value = updated
                             updateNotification(updated)
                         } else {
-                            // Automatically transition or wait
+                            // Automatically transition
+                            triggerVibration()
                             skipToNextPhase()
                         }
                     }
@@ -405,6 +525,7 @@ class TimerForegroundService : Service() {
                 pomodorosCompleted = state.pomodorosCompleted,
                 startedAt = state.startedAt,
                 sessionId = state.sessionId,
+                totalWorkSeconds = state.totalWorkSeconds,
             )
         )
         preferences.activeTimerType = state.timerType.value

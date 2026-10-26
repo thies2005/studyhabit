@@ -7,8 +7,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -61,6 +67,14 @@ fun StartSessionSheet(
 
     val selectedSubject = subjects.firstOrNull { it.id == selectedSubjectId }
 
+    val filteredChapters = remember(chapters, selectedTopicId) {
+        if (selectedTopicId != null) {
+            chapters.filter { it.topicId == selectedTopicId }
+        } else {
+            chapters
+        }
+    }
+
     LaunchedEffect(selectedSubjectId) {
         if (selectedSubjectId.isNotEmpty()) {
             val (t, c, s) = onFetchHierarchy(selectedSubjectId)
@@ -81,6 +95,9 @@ fun StartSessionSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .navigationBarsPadding()
+                .imePadding()
                 .padding(horizontal = 24.dp, vertical = 16.dp)
         ) {
             Text(text = "Start Study Session", style = MaterialTheme.typography.titleLarge)
@@ -103,8 +120,9 @@ fun StartSessionSheet(
 
             // Subject Selector
             Text(text = "Subject", style = MaterialTheme.typography.titleMedium)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                subjects.forEach { subj ->
+            Spacer(modifier = Modifier.height(8.dp))
+            LazyRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(subjects, key = { it.id }) { subj ->
                     FilterChip(
                         selected = subj.id == selectedSubjectId,
                         onClick = { selectedSubjectId = subj.id },
@@ -117,8 +135,9 @@ fun StartSessionSheet(
             // Topic Selector (if available)
             if (topics.isNotEmpty()) {
                 Text(text = "Topic (Optional)", style = MaterialTheme.typography.titleMedium)
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    topics.forEach { topic ->
+                Spacer(modifier = Modifier.height(8.dp))
+                LazyRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(topics, key = { it.id }) { topic ->
                         FilterChip(
                             selected = topic.id == selectedTopicId,
                             onClick = {
@@ -126,6 +145,42 @@ fun StartSessionSheet(
                                 selectedChapterId = null
                             },
                             label = { Text(topic.name) }
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
+            // Chapter Selector (if available, filtered by topic)
+            if (filteredChapters.isNotEmpty()) {
+                Text(text = "Chapter (Optional)", style = MaterialTheme.typography.titleMedium)
+                Spacer(modifier = Modifier.height(8.dp))
+                LazyRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(filteredChapters, key = { it.id }) { chapter ->
+                        FilterChip(
+                            selected = chapter.id == selectedChapterId,
+                            onClick = {
+                                selectedChapterId = if (selectedChapterId == chapter.id) null else chapter.id
+                            },
+                            label = { Text(chapter.name) }
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
+            // Source Selector (if available)
+            if (sources.isNotEmpty()) {
+                Text(text = "Study Source (Optional)", style = MaterialTheme.typography.titleMedium)
+                Spacer(modifier = Modifier.height(8.dp))
+                LazyRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(sources, key = { it.id }) { source ->
+                        FilterChip(
+                            selected = source.id == selectedSourceId,
+                            onClick = {
+                                selectedSourceId = if (selectedSourceId == source.id) null else source.id
+                            },
+                            label = { Text(source.title) }
                         )
                     }
                 }
