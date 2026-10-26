@@ -109,6 +109,9 @@ backend/dist/
 
 # Database
 
+# Deployment logs
+deployment-*.txt
+
 # APK build output
 **/*.apk
 **/app-release.apk
