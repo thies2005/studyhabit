@@ -120,7 +120,6 @@ jobs:
 
       # ── Decode signing keystore ────────────
       - name: Decode keystore from secrets
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
         working-directory: android
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
@@ -128,12 +127,16 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
-          echo "$KEYSTORE_BASE64" | base64 --decode > app/release.keystore
-          echo "storePassword=$KEYSTORE_PASSWORD" >> app/key.properties
-          echo "keyPassword=$KEY_PASSWORD"         >> app/key.properties
-          echo "keyAlias=$KEY_ALIAS"               >> app/key.properties
-          echo "storeFile=release.keystore"        >> app/key.properties
-          echo "storeType=pkcs12"                  >> app/key.properties
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > app/release.keystore
+            echo "storePassword=$KEYSTORE_PASSWORD" >> app/key.properties
+            echo "keyPassword=$KEY_PASSWORD"         >> app/key.properties
+            echo "keyAlias=$KEY_ALIAS"               >> app/key.properties
+            echo "storeFile=release.keystore"        >> app/key.properties
+            echo "storeType=pkcs12"                  >> app/key.properties
+          else
+            echo "KEYSTORE_BASE64 not configured; release build will use fallback signing"
+          fi
 
       # ── Build ──────────────────────────────
       - name: Run Unit Tests, Lint & Assemble Release APK
