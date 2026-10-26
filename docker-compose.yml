@@ -20,7 +20,12 @@ services:
     ports:
       - "3001:3001"
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql://${DB_USER:-studyhabit}:${DB_PASSWORD}@db:5432/${DB_NAME:-studyhabit}}
+      DB_HOST: ${DB_HOST:-db}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:-studyhabit}
+      DB_USER: ${DB_USER:-studyhabit}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      DATABASE_URL: postgresql://${DB_USER:-studyhabit}:${DB_PASSWORD}@db:5432/${DB_NAME:-studyhabit}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
       # JWT_REFRESH_SECRET is no longer used (refresh tokens are opaque), but
       # kept here for backward-compat with existing .env files.
@@ -43,8 +48,6 @@ services:
       retries: 5
       timeout: 5s
       start_period: 30s
-    command: >
-      sh -c "npx prisma migrate deploy || (npx prisma migrate resolve --rolled-back 20260708000000_init && npx prisma migrate deploy) && node dist/index.js"
 
   web:
     build:
