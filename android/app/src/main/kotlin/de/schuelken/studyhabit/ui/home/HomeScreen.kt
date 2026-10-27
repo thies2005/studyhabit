@@ -35,6 +35,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import de.schuelken.studyhabit.core.database.StudySessionEntity
 import de.schuelken.studyhabit.core.database.SubjectEntity
@@ -340,7 +342,12 @@ fun HomeScreen(
                                     color = MaterialTheme.colorScheme.primary
                                 )
                                 if (session.confidenceRating != null) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.semantics(mergeDescendants = true) {
+                                            contentDescription = "Confidence rating: ${session.confidenceRating} out of 5 stars"
+                                        }
+                                    ) {
                                         Text(text = "${session.confidenceRating}", style = MaterialTheme.typography.labelSmall)
                                         Icon(
                                             imageVector = Icons.Default.Star,

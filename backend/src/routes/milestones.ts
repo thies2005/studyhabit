@@ -26,7 +26,7 @@ async function verifySubjectOwnership(subjectId: string, userId: string): Promis
     where: { id: subjectId },
     include: { project: true },
   });
-  return !!subject && subject.project.userId === userId;
+  return !!subject && !subject.isDeleted && !subject.project.isDeleted && subject.project.userId === userId;
 }
 
 router.get('/', async (req, res, next) => {
@@ -86,11 +86,14 @@ router.patch('/:id', async (req, res, next) => {
     const data = updateMilestoneSchema.parse(req.body);
 
     const existing = await prisma.subjectMilestone.findFirst({
-      where: { id, isDeleted: false },
-      include: { subject: { include: { project: true } } },
+      where: {
+        id,
+        isDeleted: false,
+        subject: { isDeleted: false, project: { userId: req.user.userId, isDeleted: false } },
+      },
     });
 
-    if (!existing || existing.subject.project.userId !== req.user.userId) {
+    if (!existing) {
       return res.status(404).json({ error: 'Milestone not found' });
     }
 
@@ -119,11 +122,14 @@ router.delete('/:id', async (req, res, next) => {
     const id = String(req.params.id);
 
     const existing = await prisma.subjectMilestone.findFirst({
-      where: { id, isDeleted: false },
-      include: { subject: { include: { project: true } } },
+      where: {
+        id,
+        isDeleted: false,
+        subject: { isDeleted: false, project: { userId: req.user.userId, isDeleted: false } },
+      },
     });
 
-    if (!existing || existing.subject.project.userId !== req.user.userId) {
+    if (!existing) {
       return res.status(404).json({ error: 'Milestone not found' });
     }
 

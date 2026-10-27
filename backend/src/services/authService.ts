@@ -87,7 +87,11 @@ export class AuthService {
     });
 
     if (!record) return null;
-    if (record.revokedAt) return null;
+    if (record.revokedAt) {
+      console.warn(`[SECURITY] Refresh token reuse detected for user ${record.userId}. Revoking all sessions.`);
+      await this.revokeAllUserTokens(record.userId);
+      return null;
+    }
     if (record.expiresAt < new Date()) {
       await prisma.refreshToken.update({
         where: { id: record.id },

@@ -137,9 +137,9 @@ export default function CreateSessionDialog({ isOpen, onClose, subjects, onSubmi
         <button
           onClick={onClose}
           aria-label="Close dialog"
-          className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-surface hover:text-white transition-colors"
+          className="w-11 h-11 rounded-full flex items-center justify-center text-onSurfaceVariant hover:bg-surface hover:text-onSurface transition-colors"
         >
-          <span className="material-symbols-rounded text-lg" aria-hidden="true">close</span>
+          <span className="material-symbols-rounded text-xl" aria-hidden="true">close</span>
         </button>
       </div>
 
@@ -153,7 +153,7 @@ export default function CreateSessionDialog({ isOpen, onClose, subjects, onSubmi
 
           {/* Subject Picker */}
           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-2 font-body">
+            <label className="block text-sm font-medium text-onSurfaceVariant mb-2 font-body">
               Select Subject <span className="text-red-500">*</span>
             </label>
             <select
@@ -176,7 +176,7 @@ export default function CreateSessionDialog({ isOpen, onClose, subjects, onSubmi
             <div className="grid grid-cols-2 gap-4">
               {/* Topic Select */}
               <div>
-                <label className="block text-sm font-medium text-gray-400 mb-2 font-body">
+                <label className="block text-sm font-medium text-onSurfaceVariant mb-2 font-body">
                   Select Topic
                 </label>
                 <select
@@ -196,7 +196,7 @@ export default function CreateSessionDialog({ isOpen, onClose, subjects, onSubmi
               {/* Chapter Select */}
               {hasChapters && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2 font-body">
+                  <label className="block text-sm font-medium text-onSurfaceVariant mb-2 font-body">
                     Select Chapter
                   </label>
                   <select
@@ -220,7 +220,7 @@ export default function CreateSessionDialog({ isOpen, onClose, subjects, onSubmi
           {/* Date and Time Pickers */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2 font-body">
+              <label className="block text-sm font-medium text-onSurfaceVariant mb-2 font-body">
                 Date
               </label>
               <input
@@ -232,7 +232,7 @@ export default function CreateSessionDialog({ isOpen, onClose, subjects, onSubmi
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2 font-body">
+              <label className="block text-sm font-medium text-onSurfaceVariant mb-2 font-body">
                 Start Time
               </label>
               <input
@@ -248,7 +248,7 @@ export default function CreateSessionDialog({ isOpen, onClose, subjects, onSubmi
           {/* Durations */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2 font-body">
+              <label className="block text-sm font-medium text-onSurfaceVariant mb-2 font-body">
                 Planned Duration (min)
               </label>
               <input
@@ -261,7 +261,7 @@ export default function CreateSessionDialog({ isOpen, onClose, subjects, onSubmi
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2 font-body">
+              <label className="block text-sm font-medium text-onSurfaceVariant mb-2 font-body">
                 Actual Study Duration (min)
               </label>
               <input
@@ -277,7 +277,7 @@ export default function CreateSessionDialog({ isOpen, onClose, subjects, onSubmi
 
           {/* Confidence Rating (1-5 Stars) */}
           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-2 font-body">
+            <label className="block text-sm font-medium text-onSurfaceVariant mb-2 font-body">
               How confident do you feel about this material?
             </label>
             <div className="flex items-center space-x-2">
@@ -286,16 +286,18 @@ export default function CreateSessionDialog({ isOpen, onClose, subjects, onSubmi
                   key={star}
                   type="button"
                   onClick={() => setConfidence(star === confidence ? null : star)}
-                  className="focus:outline-none transition-transform hover:scale-125"
+                  aria-label={`Rate confidence ${star} out of 5 stars`}
+                  aria-pressed={confidence === star}
+                  className="focus:outline-none transition-transform hover:scale-125 p-1 rounded-md"
                 >
                   <span className={`material-symbols-rounded text-2xl ${
-                    confidence && star <= confidence ? 'text-yellow-500' : 'text-gray-600'
+                    confidence && star <= confidence ? 'text-yellow-500' : 'text-outlineVariant'
                   }`}>
                     star
                   </span>
                 </button>
               ))}
-              <span className="text-xs text-gray-500 ml-2 font-body">
+              <span className="text-xs text-onSurfaceVariant ml-2 font-body">
                 {confidence ? `${confidence} / 5` : 'Not rated'}
               </span>
             </div>
@@ -303,7 +305,7 @@ export default function CreateSessionDialog({ isOpen, onClose, subjects, onSubmi
 
           {/* Session Notes */}
           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-2 font-body">
+            <label className="block text-sm font-medium text-onSurfaceVariant mb-2 font-body">
               Study Notes (Optional)
             </label>
             <textarea
@@ -311,7 +313,7 @@ export default function CreateSessionDialog({ isOpen, onClose, subjects, onSubmi
               onChange={(e) => setNotes(e.target.value)}
               placeholder="What did you study? Write any takeaways, concepts, or reminders..."
               rows={3}
-              className="w-full px-4 py-3 bg-surface border border-outlineVariant focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors placeholder:text-gray-600 resize-none"
+              className="w-full px-4 py-3 bg-surface border border-outlineVariant focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors placeholder:text-outline resize-none"
             />
           </div>
 
@@ -321,7 +323,7 @@ export default function CreateSessionDialog({ isOpen, onClose, subjects, onSubmi
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="flex-1 py-3 bg-surface hover:bg-gray-800 text-gray-300 font-bold rounded-xl transition-colors font-body text-sm"
+              className="flex-1 py-3 bg-surface hover:bg-surfaceContainerHighest text-onSurfaceVariant hover:text-onSurface font-bold rounded-xl transition-colors font-body text-sm"
             >
               Cancel
             </button>

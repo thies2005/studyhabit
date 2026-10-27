@@ -102,10 +102,10 @@ fun AppShellScaffold(
                             onClick = { onNavigateToRoute(dest.route) },
                             icon = {
                                 when (dest) {
-                                    BottomNavDestination.HOME -> Icon(Icons.Default.Home, contentDescription = dest.title)
-                                    BottomNavDestination.SUBJECTS -> Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = dest.title)
-                                    BottomNavDestination.STATS -> Icon(Icons.Default.BarChart, contentDescription = dest.title)
-                                    BottomNavDestination.ACHIEVEMENTS -> Icon(Icons.Default.EmojiEvents, contentDescription = dest.title)
+                                    BottomNavDestination.HOME -> Icon(Icons.Default.Home, contentDescription = null)
+                                    BottomNavDestination.SUBJECTS -> Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null)
+                                    BottomNavDestination.STATS -> Icon(Icons.Default.BarChart, contentDescription = null)
+                                    BottomNavDestination.ACHIEVEMENTS -> Icon(Icons.Default.EmojiEvents, contentDescription = null)
                                 }
                             },
                             label = { Text(dest.title) }

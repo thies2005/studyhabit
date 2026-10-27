@@ -90,6 +90,7 @@ fun SyncSettingsScreen(
 
     var customUrl by remember(serverUrl) { mutableStateOf(serverUrl) }
     var showEraseDialog by remember { mutableStateOf(false) }
+    var showLogoutDialog by remember { mutableStateOf(false) }
     var isErasing by remember { mutableStateOf(false) }
     var isFolderSyncing by remember { mutableStateOf(false) }
 
@@ -166,10 +167,7 @@ fun SyncSettingsScreen(
                         Text(text = userEmail ?: "User", style = MaterialTheme.typography.titleMedium)
                         Spacer(modifier = Modifier.height(12.dp))
                         OutlinedButton(
-                            onClick = {
-                                container.tokenStorage.clear()
-                                onNavigateBack()
-                            },
+                            onClick = { showLogoutDialog = true },
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null)
@@ -525,6 +523,42 @@ fun SyncSettingsScreen(
             dismissButton = {
                 Button(onClick = { showEraseDialog = false }) {
                     Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (showLogoutDialog) {
+        AlertDialog(
+            onDismissRequest = { showLogoutDialog = false },
+            title = { Text("Log Out") },
+            text = {
+                Text("Would you like to keep an offline copy of your study data on this device, or log out and clear all local data?")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        scope.launch {
+                            container.syncEngine.clearLocalData()
+                            container.tokenStorage.clear()
+                            showLogoutDialog = false
+                            onNavigateBack()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Log Out & Clear Local Data")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = {
+                        container.tokenStorage.clear()
+                        showLogoutDialog = false
+                        onNavigateBack()
+                    }
+                ) {
+                    Text("Log Out & Keep Offline Copy")
                 }
             }
         )

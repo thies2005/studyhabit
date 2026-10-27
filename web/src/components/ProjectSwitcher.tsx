@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useProject } from '../contexts/ProjectContext';
 
 export default function ProjectSwitcher() {
-  const { projects, currentProjectId, setCurrentProjectId, loading, createProject, updateProject } = useProject();
+  const { projects, currentProjectId, setCurrentProjectId, loading, createProject, updateProject, deleteProject } = useProject();
   const [isOpen, setIsOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
@@ -58,12 +58,15 @@ export default function ProjectSwitcher() {
     <div className="relative z-50" ref={containerRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
+        aria-expanded={isOpen}
+        aria-haspopup="listbox"
+        aria-label="Select study project"
         className="flex items-center gap-3 px-4 py-2.5 bg-surfaceContainer hover:bg-surfaceContainerHigh rounded-full transition-all duration-300 border border-outlineVariant shadow-sm"
       >
         <span className="material-symbols-rounded text-primary text-xl">
           {currentProject ? 'work' : 'error_outline'}
         </span>
-        <span className="font-heading font-medium text-sm truncate max-w-[120px]">
+        <span className="font-heading font-medium text-sm truncate max-w-[180px] sm:max-w-[240px]">
           {currentProject ? currentProject.name : 'No Project'}
         </span>
         <span className="material-symbols-rounded text-onSurfaceVariant text-xl">
@@ -72,8 +75,8 @@ export default function ProjectSwitcher() {
       </button>
 
       {isOpen && (
-        <div className="absolute top-full left-0 mt-3 w-72 bg-surfaceContainerHigh border border-outlineVariant rounded-3xl shadow-xl overflow-hidden glass">
-          <div className="p-2 max-h-60 overflow-y-auto space-y-1">
+        <div className="absolute top-full left-0 mt-3 w-80 bg-surfaceContainerHigh border border-outlineVariant rounded-3xl shadow-xl overflow-hidden glass">
+          <div className="p-2 max-h-60 overflow-y-auto space-y-1" role="listbox" aria-label="Projects">
             {projects.map(project => (
               <div key={project.id} className="relative">
                 {editingProjectId === project.id ? (
@@ -93,6 +96,7 @@ export default function ProjectSwitcher() {
                       type="submit"
                       disabled={!editName.trim()}
                       className="text-primary disabled:opacity-50 hover:bg-primary/10 p-1 rounded-lg"
+                      aria-label="Save project name"
                       title="Save"
                     >
                       <span className="material-symbols-rounded text-lg">check</span>
@@ -100,7 +104,8 @@ export default function ProjectSwitcher() {
                     <button
                       type="button"
                       onClick={() => setEditingProjectId(null)}
-                      className="text-gray-400 hover:text-gray-200 hover:bg-surfaceContainer p-1 rounded-lg"
+                      className="text-onSurfaceVariant hover:text-onSurface hover:bg-surfaceContainer p-1 rounded-lg"
+                      aria-label="Cancel editing project name"
                       title="Cancel"
                     >
                       <span className="material-symbols-rounded text-lg">close</span>
@@ -113,10 +118,12 @@ export default function ProjectSwitcher() {
                         setCurrentProjectId(project.id);
                         setIsOpen(false);
                       }}
+                      role="option"
+                      aria-selected={project.id === currentProjectId}
                       className={`flex-1 flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-left ${
                         project.id === currentProjectId
                           ? 'bg-primary/10 text-primary'
-                          : 'text-gray-300'
+                          : 'text-onSurface'
                       }`}
                     >
                       <div
@@ -137,11 +144,28 @@ export default function ProjectSwitcher() {
                         setEditingProjectId(project.id);
                         setEditName(project.name);
                       }}
-                      className="opacity-0 group-hover:opacity-100 p-2 text-gray-400 hover:text-primary transition-all rounded-lg mr-1"
+                      className="opacity-0 group-hover:opacity-100 p-2 text-onSurfaceVariant hover:text-primary transition-all rounded-lg mr-1"
+                      aria-label={`Rename ${project.name}`}
                       title={`Rename ${project.name}`}
                     >
                       <span className="material-symbols-rounded text-lg">edit</span>
                     </button>
+                    {projects.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          if (window.confirm(`Delete project "${project.name}"? This will delete all its subjects and study data.`)) {
+                            await deleteProject(project.id);
+                          }
+                        }}
+                        className="opacity-0 group-hover:opacity-100 p-2 text-onSurfaceVariant hover:text-red-400 transition-all rounded-lg mr-1"
+                        aria-label={`Delete ${project.name}`}
+                        title={`Delete ${project.name}`}
+                      >
+                        <span className="material-symbols-rounded text-lg">delete</span>
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -157,12 +181,14 @@ export default function ProjectSwitcher() {
                   value={newProjectName}
                   onChange={e => setNewProjectName(e.target.value)}
                   placeholder="Project name..."
-                  className="flex-1 bg-background border border-outlineVariant rounded-xl px-3 py-1.5 text-sm font-body focus:border-primary outline-none"
+                  className="flex-1 bg-background border border-outlineVariant rounded-xl px-3 py-1.5 text-sm font-body focus:border-primary outline-none text-onSurface"
                 />
                 <button
                   type="submit"
                   disabled={!newProjectName.trim()}
                   className="text-primary disabled:opacity-50 hover:bg-primary/10 p-1.5 rounded-xl"
+                  aria-label="Create project"
+                  title="Create project"
                 >
                   <span className="material-symbols-rounded text-xl">check</span>
                 </button>

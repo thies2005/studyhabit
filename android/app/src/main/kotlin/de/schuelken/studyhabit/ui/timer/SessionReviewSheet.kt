@@ -3,6 +3,7 @@ package de.schuelken.studyhabit.ui.timer
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -27,6 +28,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -39,6 +41,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import de.schuelken.studyhabit.core.database.AchievementEntity
 import de.schuelken.studyhabit.core.database.StudySessionEntity
@@ -62,7 +69,10 @@ fun SessionReviewSheet(
     container: AppContainer,
     onFinished: () -> Unit
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { it != SheetValue.Hidden }
+    )
     val scope = rememberCoroutineScope()
 
     var confidenceRating by remember { mutableIntStateOf(3) }
@@ -70,6 +80,7 @@ fun SessionReviewSheet(
     var showLevelUp by remember { mutableStateOf(false) }
     var newLevelAwarded by remember { mutableIntStateOf(1) }
     var unlockedAchievements by remember { mutableStateOf<List<AchievementEntity>>(emptyList()) }
+    var showDiscardConfirmDialog by remember { mutableStateOf(false) }
 
     val studiedSeconds = if (timerState.timerType == TimerType.POMODORO) {
         timerState.totalWorkSeconds.coerceAtLeast(timerState.elapsedSeconds)
@@ -80,27 +91,17 @@ fun SessionReviewSheet(
     val plannedMinutes = (timerState.totalSeconds / 60).coerceAtLeast(actualMinutes)
 
     // XP calculation
-    var xpEarned = 0
-    if (timerState.timerType == TimerType.POMODORO) {
-        if (timerState.pomodorosCompleted > 0) {
-            xpEarned += timerState.pomodorosCompleted * XpCalculator.XP_COMPLETE_POMODORO
-        } else if (timerState.totalSeconds > 0 && studiedSeconds >= (timerState.totalSeconds * 0.8)) {
-            xpEarned += XpCalculator.XP_COMPLETE_POMODORO
-        }
-    } else {
-        if (actualMinutes >= 20) {
-            xpEarned += (actualMinutes / 25).coerceAtLeast(1) * XpCalculator.XP_COMPLETE_POMODORO
-        }
-    }
-    if (actualMinutes >= 120) {
-        xpEarned += XpCalculator.XP_LONG_SESSION
-    }
-    if (confidenceRating >= 4) {
-        xpEarned += XpCalculator.XP_CONFIDENCE
-    }
+    val xpEarned = XpCalculator.calculateSessionXp(
+        actualMinutes = actualMinutes,
+        confidence = confidenceRating,
+        isPomodoro = timerState.timerType == TimerType.POMODORO,
+        pomodorosCompleted = timerState.pomodorosCompleted,
+        plannedSeconds = timerState.totalSeconds,
+        studiedSeconds = studiedSeconds
+    )
 
     ModalBottomSheet(
-        onDismissRequest = onFinished,
+        onDismissRequest = { showDiscardConfirmDialog = true },
         sheetState = sheetState
     ) {
         Column(
@@ -152,15 +153,25 @@ fun SessionReviewSheet(
                 horizontalArrangement = Arrangement.Center
             ) {
                 for (star in 1..5) {
-                    Icon(
-                        imageVector = if (star <= confidenceRating) Icons.Filled.Star else Icons.Outlined.Star,
-                        contentDescription = "Star $star",
-                        tint = if (star <= confidenceRating) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                    val isSelected = star == confidenceRating
+                    Box(
                         modifier = Modifier
-                            .size(40.dp)
-                            .clickable { confidenceRating = star }
-                            .padding(4.dp)
-                    )
+                            .size(48.dp)
+                            .semantics {
+                                role = Role.RadioButton
+                                selected = isSelected
+                                contentDescription = "$star star${if (star > 1) "s" else ""}"
+                            }
+                            .clickable { confidenceRating = star },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = if (star <= confidenceRating) Icons.Filled.Star else Icons.Outlined.Star,
+                            contentDescription = null,
+                            tint = if (star <= confidenceRating) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
@@ -305,6 +316,29 @@ fun SessionReviewSheet(
                     }
                 ) {
                     Text("Awesome!")
+                }
+            }
+        )
+    }
+
+    if (showDiscardConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showDiscardConfirmDialog = false },
+            title = { Text("Discard Session?") },
+            text = { Text("Are you sure you want to discard this completed study session without saving?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDiscardConfirmDialog = false
+                        onFinished()
+                    }
+                ) {
+                    Text("Discard", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDiscardConfirmDialog = false }) {
+                    Text("Keep Editing")
                 }
             }
         )

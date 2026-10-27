@@ -32,7 +32,7 @@ router.get('/', async (req, res, next) => {
     const { skip, take, page, limit } = parsePagination(req.query as any);
     const where = {
       subjectId,
-      subject: { project: { userId: req.user.userId } },
+      subject: { isDeleted: false, project: { userId: req.user.userId, isDeleted: false } },
       isDeleted: false,
     };
 
@@ -61,7 +61,7 @@ router.get('/:id', async (req, res, next) => {
     const skillLabel = await prisma.skillLabel.findFirst({
       where: {
         id,
-        subject: { project: { userId: req.user.userId } },
+        subject: { isDeleted: false, project: { userId: req.user.userId, isDeleted: false } },
         isDeleted: false,
       },
     });
@@ -80,9 +80,17 @@ router.post('/', async (req, res, next) => {
   try {
     const data = skillLabelSchema.parse(req.body);
 
+    if (data.chapterId && !data.topicId) {
+      return res.status(400).json({ error: 'Cannot specify chapterId without topicId' });
+    }
+
     // Verify subject ownership before creating skill label
     const subject = await prisma.subject.findFirst({
-      where: { id: data.subjectId, project: { userId: req.user.userId } },
+      where: {
+        id: data.subjectId,
+        isDeleted: false,
+        project: { userId: req.user.userId, isDeleted: false },
+      },
     });
 
     if (!subject) {
@@ -92,7 +100,7 @@ router.post('/', async (req, res, next) => {
     // If topicId is provided, verify it belongs to the subject
     if (data.topicId) {
       const topic = await prisma.topic.findFirst({
-        where: { id: data.topicId, subjectId: data.subjectId },
+        where: { id: data.topicId, subjectId: data.subjectId, isDeleted: false },
       });
       if (!topic) {
         return res.status(404).json({ error: 'Topic not found or does not belong to subject' });
@@ -104,7 +112,8 @@ router.post('/', async (req, res, next) => {
       const chapter = await prisma.chapter.findFirst({
         where: {
           id: data.chapterId,
-          topicId: data.topicId ?? undefined,
+          topicId: data.topicId,
+          isDeleted: false,
         },
       });
       if (!chapter) {
@@ -144,7 +153,7 @@ router.patch('/:id', async (req, res, next) => {
     const existing = await prisma.skillLabel.findFirst({
       where: {
         id,
-        subject: { project: { userId: req.user.userId } },
+        subject: { isDeleted: false, project: { userId: req.user.userId, isDeleted: false } },
         isDeleted: false,
       },
     });
@@ -161,7 +170,7 @@ router.patch('/:id', async (req, res, next) => {
       const result = await tx.skillLabel.updateMany({
         where: {
           id,
-          subject: { project: { userId: req.user.userId } },
+          subject: { isDeleted: false, project: { userId: req.user.userId, isDeleted: false } },
           isDeleted: false,
         },
         data: { label: data.label, updatedAt: new Date() },
@@ -198,7 +207,8 @@ router.delete('/:id', async (req, res, next) => {
     const result = await prisma.skillLabel.updateMany({
       where: {
         id,
-        subject: { project: { userId: req.user.userId } },
+        isDeleted: false,
+        subject: { isDeleted: false, project: { userId: req.user.userId, isDeleted: false } },
       },
       data: { isDeleted: true, updatedAt: new Date() },
     });

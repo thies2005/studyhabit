@@ -10,6 +10,7 @@ interface ProjectContextType {
   refreshProjects: () => Promise<void>;
   createProject: (name: string, colorValue: number) => Promise<Project>;
   updateProject: (id: string, updates: { name?: string; icon?: string; colorValue?: number }) => Promise<Project>;
+  deleteProject: (id: string) => Promise<void>;
 }
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
@@ -62,6 +63,15 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     return updated;
   };
 
+  const deleteProject = async (id: string) => {
+    await apiClient.delete(`/projects/${id}`);
+    const remaining = projects.filter(p => p.id !== id);
+    setProjects(remaining);
+    if (currentProjectId === id) {
+      setCurrentProjectId(remaining.length > 0 ? remaining[0].id : null);
+    }
+  };
+
   return (
     <ProjectContext.Provider value={{
       projects,
@@ -70,7 +80,8 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       loading,
       refreshProjects: fetchProjects,
       createProject,
-      updateProject
+      updateProject,
+      deleteProject,
     }}>
       {children}
     </ProjectContext.Provider>

@@ -63,7 +63,7 @@ class FakeSessionDao : SessionDao {
         upsert(s.copy(isDeleted = true, updatedAt = updatedAt))
     }
 
-    override suspend fun cleanupOrphanedSessions(cutoff: Long, now: Long) {}
+    override suspend fun cleanupOrphanedSessions(cutoffTimestamp: Long, now: Long) {}
 
     override suspend fun deleteAll() {
         sessions.clear()
@@ -118,6 +118,8 @@ class FakeSkillLabelDao : SkillLabelDao {
         flowOf(labels.filter { it.subjectId == subjectId })
 
     override suspend fun getAllSkillLabels(): List<SkillLabelEntity> = labels
+
+    override suspend fun getById(id: String): SkillLabelEntity? = labels.firstOrNull { it.id == id }
 
     override suspend fun getModifiedSince(since: Long): List<SkillLabelEntity> =
         labels.filter { it.updatedAt > since }

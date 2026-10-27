@@ -76,9 +76,9 @@ export default function CreateSubjectDialog({ isOpen, onClose, onSubmit }: Creat
         <button
           onClick={onClose}
           aria-label="Close dialog"
-          className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-surface hover:text-white transition-colors"
+          className="w-11 h-11 rounded-full flex items-center justify-center text-onSurfaceVariant hover:bg-surface hover:text-onSurface transition-colors"
         >
-          <span className="material-symbols-rounded text-lg" aria-hidden="true">close</span>
+          <span className="material-symbols-rounded text-xl" aria-hidden="true">close</span>
         </button>
       </div>
 
@@ -92,7 +92,7 @@ export default function CreateSubjectDialog({ isOpen, onClose, onSubmit }: Creat
 
         {/* Name */}
         <div>
-          <label className="block text-sm font-medium text-gray-400 mb-2 font-body">
+          <label className="block text-sm font-medium text-onSurfaceVariant mb-2 font-body">
             Subject Name <span className="text-red-500">*</span>
           </label>
           <input
@@ -101,13 +101,13 @@ export default function CreateSubjectDialog({ isOpen, onClose, onSubmit }: Creat
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. Organic Chemistry, Algorithms & Data Structures"
-            className="w-full px-4 py-3 bg-surface border border-outlineVariant focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors placeholder:text-gray-600"
+            className="w-full px-4 py-3 bg-surface border border-outlineVariant focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors placeholder:text-outline"
           />
         </div>
 
         {/* Description */}
         <div>
-          <label className="block text-sm font-medium text-gray-400 mb-2 font-body">
+          <label className="block text-sm font-medium text-onSurfaceVariant mb-2 font-body">
             Description (Optional)
           </label>
           <textarea
@@ -115,13 +115,13 @@ export default function CreateSubjectDialog({ isOpen, onClose, onSubmit }: Creat
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Provide a brief description of what this subject covers..."
             rows={3}
-            className="w-full px-4 py-3 bg-surface border border-outlineVariant focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors placeholder:text-gray-600 resize-none"
+            className="w-full px-4 py-3 bg-surface border border-outlineVariant focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors placeholder:text-outline resize-none"
           />
         </div>
 
         {/* Seed Color Selector */}
         <div>
-          <label className="block text-sm font-medium text-gray-400 mb-3 font-body">
+          <label className="block text-sm font-medium text-onSurfaceVariant mb-3 font-body">
             Theme Color
           </label>
           <div className="grid grid-cols-6 gap-3">
@@ -130,6 +130,8 @@ export default function CreateSubjectDialog({ isOpen, onClose, onSubmit }: Creat
                 key={color}
                 type="button"
                 onClick={() => setSelectedColor(color)}
+                aria-label={`Select theme color ${color}`}
+                aria-pressed={selectedColor === color}
                 className={`aspect-square rounded-full transition-all hover:scale-110 flex items-center justify-center ${
                   selectedColor === color ? 'ring-2 ring-white ring-offset-2 ring-offset-surfaceHigh' : ''
                 }`}
@@ -146,10 +148,10 @@ export default function CreateSubjectDialog({ isOpen, onClose, onSubmit }: Creat
 
         {/* Hierarchy Mode Selection */}
         <div>
-          <label className="block text-sm font-medium text-gray-400 mb-3 font-body">
+          <label className="block text-sm font-medium text-onSurfaceVariant mb-3 font-body">
             Curriculum Organization
           </label>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {[
               { id: 'flat', label: 'Flat', desc: 'Subject → Sessions' },
               { id: 'twoLevel', label: '2-Level', desc: 'Subject → Topics' },
@@ -159,10 +161,11 @@ export default function CreateSubjectDialog({ isOpen, onClose, onSubmit }: Creat
                 key={mode.id}
                 type="button"
                 onClick={() => setHierarchyMode(mode.id as any)}
+                aria-pressed={hierarchyMode === mode.id}
                 className={`p-3 border rounded-xl flex flex-col text-left transition-all ${
                   hierarchyMode === mode.id
                     ? 'bg-primary/10 border-primary text-primary'
-                    : 'bg-surface border-outlineVariant hover:border-outlineVariant text-gray-400'
+                    : 'bg-surface border-outlineVariant hover:border-outline text-onSurfaceVariant'
                 }`}
               >
                 <span className="font-bold text-sm font-heading">{mode.label}</span>
@@ -177,7 +180,7 @@ export default function CreateSubjectDialog({ isOpen, onClose, onSubmit }: Creat
           {/* Work Duration */}
           <div>
             <div className="flex justify-between items-center mb-2">
-              <label className="text-sm font-medium text-gray-400 font-body">
+              <label className="text-sm font-medium text-onSurfaceVariant font-body">
                 Focus Block
               </label>
               <span className="text-sm text-primary font-bold">{defaultDurationMinutes}m</span>
@@ -196,7 +199,7 @@ export default function CreateSubjectDialog({ isOpen, onClose, onSubmit }: Creat
           {/* Break Duration */}
           <div>
             <div className="flex justify-between items-center mb-2">
-              <label className="text-sm font-medium text-gray-400 font-body">
+              <label className="text-sm font-medium text-onSurfaceVariant font-body">
                 Break Block
               </label>
               <span className="text-sm text-primary font-bold">{defaultBreakMinutes}m</span>
@@ -218,7 +221,7 @@ export default function CreateSubjectDialog({ isOpen, onClose, onSubmit }: Creat
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="flex-1 py-3 bg-surface hover:bg-gray-800 text-gray-300 font-bold rounded-xl transition-colors font-body text-sm"
+            className="flex-1 py-3 bg-surface hover:bg-surfaceContainerHighest text-onSurfaceVariant hover:text-onSurface font-bold rounded-xl transition-colors font-body text-sm"
           >
             Cancel
           </button>

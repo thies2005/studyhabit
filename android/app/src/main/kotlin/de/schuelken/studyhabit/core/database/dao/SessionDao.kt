@@ -59,8 +59,22 @@ interface SessionDao {
     @Query("UPDATE study_sessions SET is_deleted = 1, updated_at = :updatedAt WHERE id = :id")
     suspend fun softDelete(id: String, updatedAt: Long = System.currentTimeMillis())
 
-    @Query("UPDATE study_sessions SET ended_at = started_at + (planned_duration_minutes * 60000), actual_duration_minutes = planned_duration_minutes, updated_at = :now WHERE ended_at IS NULL AND started_at < :cutoff")
-    suspend fun cleanupOrphanedSessions(cutoff: Long, now: Long = System.currentTimeMillis())
+    @Query("""
+        UPDATE study_sessions
+        SET ended_at = CASE
+            WHEN is_free_timer = 1 OR planned_duration_minutes = 0
+            THEN COALESCE(updated_at, started_at + 60000)
+            ELSE started_at + (planned_duration_minutes * 60000)
+        END,
+        actual_duration_minutes = CASE
+            WHEN is_free_timer = 1 OR planned_duration_minutes = 0
+            THEN MAX(1, CAST((COALESCE(updated_at, :cutoffTimestamp) - started_at) / 60000 AS INTEGER))
+            ELSE planned_duration_minutes
+        END,
+        updated_at = :now
+        WHERE ended_at IS NULL AND started_at < :cutoffTimestamp
+    """)
+    suspend fun cleanupOrphanedSessions(cutoffTimestamp: Long, now: Long = System.currentTimeMillis())
 
     @Query("DELETE FROM study_sessions")
     suspend fun deleteAll()

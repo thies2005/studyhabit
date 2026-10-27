@@ -10,6 +10,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
@@ -74,11 +75,12 @@ fun AppTheme(
             } else {
                 AppThemeTokens.presetSeeds.getOrElse(seedColorIndex) { AppThemeTokens.presetSeeds[0] }
             }
+            val dynamicOnPrimary = if (seed.luminance() > 0.45f) Color(0xFF0F1416) else Color.White
             if (darkTheme) {
                 darkColorScheme(
                     primary = seed,
                     primaryContainer = seed.copy(alpha = 0.4f),
-                    onPrimary = Color.White,
+                    onPrimary = dynamicOnPrimary,
                     background = Color(0xFF0F1416),
                     surface = Color(0xFF111416),
                     surfaceVariant = Color(0xFF192023),
@@ -91,7 +93,7 @@ fun AppTheme(
                 lightColorScheme(
                     primary = seed,
                     primaryContainer = seed.copy(alpha = 0.2f),
-                    onPrimary = Color.White,
+                    onPrimary = dynamicOnPrimary,
                     background = Color(0xFFF5FAFB),
                     surface = Color(0xFFEFF4F6),
                     surfaceVariant = Color(0xFFE3EAEB),

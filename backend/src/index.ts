@@ -28,7 +28,7 @@ const app = express();
 
 app.use(helmet());
 
-app.set('trust proxy', 1);
+app.set('trust proxy', 'loopback, linklocal, uniquelocal');
 
 const allowedOrigins = config.CORS_ORIGIN === '*'
   ? '*'
@@ -92,18 +92,20 @@ app.use((_req, res) => {
 
 app.use(errorHandler);
 
-setInterval(() => {
+const cleanupTimer = setInterval(() => {
   AuthService.cleanupExpiredTokens().catch(() => {});
 }, 60 * 60 * 1000);
 
 process.on('uncaughtException', async (err) => {
   console.error('Uncaught exception:', err);
+  clearInterval(cleanupTimer);
   await prisma.$disconnect();
   process.exit(1);
 });
 
 process.on('unhandledRejection', async (reason) => {
   console.error('Unhandled rejection:', reason);
+  clearInterval(cleanupTimer);
   await prisma.$disconnect();
   process.exit(1);
 });
@@ -115,6 +117,7 @@ const server = app.listen(config.PORT, () => {
 
 process.on('SIGTERM', async () => {
   console.log('SIGTERM received, shutting down gracefully');
+  clearInterval(cleanupTimer);
   server.close();
   await prisma.$disconnect();
   process.exit(0);
@@ -122,6 +125,7 @@ process.on('SIGTERM', async () => {
 
 process.on('SIGINT', async () => {
   console.log('SIGINT received, shutting down gracefully');
+  clearInterval(cleanupTimer);
   server.close();
   await prisma.$disconnect();
   process.exit(0);

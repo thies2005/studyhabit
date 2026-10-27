@@ -1,9 +1,16 @@
 package de.schuelken.studyhabit.core.network
 
+import kotlinx.serialization.Serializable
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Query
+
+@Serializable
+data class RefreshRequest(val refreshToken: String)
+
+@Serializable
+data class RefreshResponse(val accessToken: String, val refreshToken: String)
 
 interface StudyHabitApi {
     @POST("auth/login")
@@ -11,6 +18,9 @@ interface StudyHabitApi {
 
     @POST("auth/register")
     suspend fun register(@Body request: RegisterRequest): ApiResponse<AuthData>
+
+    @POST("auth/refresh")
+    suspend fun refresh(@Body request: RefreshRequest): ApiResponse<RefreshResponse>
 
     @GET("auth/me")
     suspend fun getMe(): ApiResponse<UserInfo>

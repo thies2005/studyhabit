@@ -50,6 +50,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -349,6 +350,34 @@ fun TimelineTab(
     onDeleteSession: (StudySessionEntity) -> Unit
 ) {
     val zone = ZoneId.systemDefault()
+    var sessionToDelete by remember { mutableStateOf<StudySessionEntity?>(null) }
+
+    if (sessionToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { sessionToDelete = null },
+            title = { Text("Delete Session") },
+            text = { Text("Are you sure you want to delete this study session? This action cannot be undone.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val session = sessionToDelete
+                        sessionToDelete = null
+                        if (session != null) {
+                            onDeleteSession(session)
+                        }
+                    }
+                ) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { sessionToDelete = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
     if (sessions.isEmpty()) {
         Box(
             modifier = Modifier.fillMaxSize().padding(32.dp),
@@ -384,7 +413,7 @@ fun TimelineTab(
                                 Text(text = n, style = MaterialTheme.typography.bodySmall)
                             }
                         }
-                        IconButton(onClick = { onDeleteSession(session) }) {
+                        IconButton(onClick = { sessionToDelete = session }) {
                             Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
                         }
                     }
@@ -494,7 +523,10 @@ fun TopicsTab(
                                     label = { Text(label.replaceFirstChar { it.uppercase() }) }
                                 )
                                 IconButton(onClick = { expanded = !expanded }) {
-                                    Icon(if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, contentDescription = null)
+                                    Icon(
+                                        if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                        contentDescription = if (expanded) "Collapse chapters for ${topic.name}" else "Expand chapters for ${topic.name}"
+                                    )
                                 }
                             }
 

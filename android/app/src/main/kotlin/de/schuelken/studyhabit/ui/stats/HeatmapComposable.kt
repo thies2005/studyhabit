@@ -19,6 +19,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -84,11 +86,20 @@ fun HeatmapComposable(
                             else -> MaterialTheme.colorScheme.primary
                         }
 
+                        val cellDescription = if (isFuture) {
+                            "Future date $date"
+                        } else {
+                            "$date: $minutes minutes studied"
+                        }
+
                         Box(
                             modifier = Modifier
                                 .size(16.dp)
                                 .clip(RoundedCornerShape(3.dp))
                                 .background(cellColor)
+                                .semantics {
+                                    contentDescription = cellDescription
+                                }
                         )
                     }
                 }

@@ -22,7 +22,7 @@ router.get('/', async (req, res, next) => {
     const { skip, take, page, limit } = parsePagination(req.query as any);
     const where = {
       topicId,
-      topic: { subject: { project: { userId: req.user.userId } } },
+      topic: { isDeleted: false, subject: { isDeleted: false, project: { userId: req.user.userId, isDeleted: false } } },
       isDeleted: false,
     };
 
@@ -51,7 +51,7 @@ router.get('/:id', async (req, res, next) => {
     const chapter = await prisma.chapter.findFirst({
       where: {
         id,
-        topic: { subject: { project: { userId: req.user.userId } } },
+        topic: { isDeleted: false, subject: { isDeleted: false, project: { userId: req.user.userId, isDeleted: false } } },
         isDeleted: false,
       },
     });
@@ -74,7 +74,8 @@ router.post('/', async (req, res, next) => {
     const topic = await prisma.topic.findFirst({
       where: {
         id: data.topicId,
-        subject: { project: { userId: req.user.userId } },
+        isDeleted: false,
+        subject: { isDeleted: false, project: { userId: req.user.userId, isDeleted: false } },
       },
     });
 
@@ -96,7 +97,7 @@ router.patch('/:id', async (req, res, next) => {
     const result = await prisma.chapter.updateMany({
       where: {
         id,
-        topic: { subject: { project: { userId: req.user.userId } } },
+        topic: { isDeleted: false, subject: { isDeleted: false, project: { userId: req.user.userId, isDeleted: false } } },
         isDeleted: false,
       },
       data: { ...data, updatedAt: new Date() },
@@ -119,7 +120,8 @@ router.delete('/:id', async (req, res, next) => {
     const result = await prisma.chapter.updateMany({
       where: {
         id,
-        topic: { subject: { project: { userId: req.user.userId } } },
+        topic: { isDeleted: false, subject: { isDeleted: false, project: { userId: req.user.userId, isDeleted: false } } },
+        isDeleted: false,
       },
       data: { isDeleted: true, updatedAt: new Date() },
     });

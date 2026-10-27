@@ -113,14 +113,14 @@ class SyncEngine(
                 response.data.push?.errors?.forEach { err ->
                     if (err.error == "forbidden" && err.id != null) {
                         when (err.entity) {
-                            "session", "sessions" -> database.sessionDao().softDelete(err.id, serverTimeMs)
-                            "source", "sources" -> database.sourceDao().softDelete(err.id, serverTimeMs)
-                            "subject", "subjects" -> database.subjectDao().softDelete(err.id, serverTimeMs)
-                            "topic", "topics" -> database.topicDao().softDelete(err.id, serverTimeMs)
-                            "chapter", "chapters" -> database.chapterDao().softDelete(err.id, serverTimeMs)
-                            "project", "projects" -> database.projectDao().softDelete(err.id, serverTimeMs)
-                            "skillLabel", "skillLabels" -> database.skillLabelDao().softDelete(err.id, serverTimeMs)
-                            "subjectMilestone", "milestone", "milestones" -> database.milestoneDao().softDelete(err.id, serverTimeMs)
+                            "session", "sessions" -> database.sessionDao().softDelete(err.id, 0L)
+                            "source", "sources" -> database.sourceDao().softDelete(err.id, 0L)
+                            "subject", "subjects" -> database.subjectDao().softDelete(err.id, 0L)
+                            "topic", "topics" -> database.topicDao().softDelete(err.id, 0L)
+                            "chapter", "chapters" -> database.chapterDao().softDelete(err.id, 0L)
+                            "project", "projects" -> database.projectDao().softDelete(err.id, 0L)
+                            "skillLabel", "skillLabels" -> database.skillLabelDao().softDelete(err.id, 0L)
+                            "subjectMilestone", "milestone", "milestones" -> database.milestoneDao().softDelete(err.id, 0L)
                         }
                     }
                 }
@@ -161,7 +161,7 @@ class SyncEngine(
         }
     }
 
-    private suspend fun clearLocalData() {
+    suspend fun clearLocalData() {
         database.skillLabelDao().deleteAll()
         database.milestoneDao().deleteAll()
         database.sourceDao().deleteAll()
@@ -533,37 +533,45 @@ class SyncEngine(
         // Skill Labels
         var skillLabelsCount = 0
         for (item in pull.skillLabels) {
-            database.skillLabelDao().upsert(
-                SkillLabelEntity(
-                    id = item.id,
-                    subjectId = item.subjectId,
-                    topicId = item.topicId,
-                    chapterId = item.chapterId,
-                    label = item.label,
-                    updatedAt = parseIsoString(item.updatedAt),
-                    isDeleted = item.isDeleted,
+            val serverUpdated = parseIsoString(item.updatedAt)
+            val local = database.skillLabelDao().getById(item.id)
+            if (local == null || serverUpdated > local.updatedAt) {
+                database.skillLabelDao().upsert(
+                    SkillLabelEntity(
+                        id = item.id,
+                        subjectId = item.subjectId,
+                        topicId = item.topicId,
+                        chapterId = item.chapterId,
+                        label = item.label,
+                        updatedAt = serverUpdated,
+                        isDeleted = item.isDeleted,
+                    )
                 )
-            )
-            skillLabelsCount++
+                skillLabelsCount++
+            }
         }
         if (skillLabelsCount > 0) pulled["skillLabels"] = skillLabelsCount
 
         // Milestones
         var milestonesCount = 0
         for (item in pull.subjectMilestones) {
-            database.milestoneDao().upsert(
-                SubjectMilestoneEntity(
-                    id = item.id,
-                    subjectId = item.subjectId,
-                    title = item.title,
-                    isCompleted = item.isCompleted,
-                    sortOrder = item.sortOrder,
-                    completedAt = item.completedAt?.let { parseIsoString(it) },
-                    updatedAt = parseIsoString(item.updatedAt),
-                    isDeleted = item.isDeleted,
+            val serverUpdated = parseIsoString(item.updatedAt)
+            val local = database.milestoneDao().getById(item.id)
+            if (local == null || serverUpdated > local.updatedAt) {
+                database.milestoneDao().upsert(
+                    SubjectMilestoneEntity(
+                        id = item.id,
+                        subjectId = item.subjectId,
+                        title = item.title,
+                        isCompleted = item.isCompleted,
+                        sortOrder = item.sortOrder,
+                        completedAt = item.completedAt?.let { parseIsoString(it) },
+                        updatedAt = serverUpdated,
+                        isDeleted = item.isDeleted,
+                    )
                 )
-            )
-            milestonesCount++
+                milestonesCount++
+            }
         }
         if (milestonesCount > 0) pulled["subjectMilestones"] = milestonesCount
 

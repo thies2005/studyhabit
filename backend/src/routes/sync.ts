@@ -11,13 +11,9 @@ function withUserLock<T>(userId: string, fn: (tx: Prisma.TransactionClient) => P
   const newLock = existing
     .then(() =>
       prisma.$transaction(async (tx) => {
-        // Stable 32-bit key derived from the userId (crc32-style via md5 prefix).
-        const keyResult = await tx.$queryRaw`SELECT ('x' || substr(md5(${userId}::text), 1, 8))::bit(32)::int AS k`;
-        const row = (Array.isArray(keyResult) ? keyResult[0] : null) as
-          | { k?: number }
-          | null;
-        const key = row?.k ?? 0;
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(${key})`;
+        // Stable 64-bit bigint advisory lock derived from the userId to eliminate collisions.
+        const keyResult = await tx.$queryRaw<[{ k: bigint }]>`SELECT ('x' || substr(md5(${userId}::text), 1, 16))::bit(64)::bigint AS k`;
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(${keyResult[0].k})`;
         return fn(tx);
       }, { timeout: 30000 })
     )

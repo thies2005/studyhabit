@@ -92,17 +92,67 @@ router.patch('/:id', async (req, res, next) => {
 router.delete('/:id', async (req, res, next) => {
   try {
     const id = String(req.params.id);
-    const project = await prisma.project.updateMany({
-      where: { id, userId: req.user.userId },
-      data: { isDeleted: true, updatedAt: new Date() },
-    });
 
-    if (project.count === 0) {
-      return res.status(404).json({ error: 'Project not found' });
-    }
+    await prisma.$transaction(async (tx) => {
+      const existing = await tx.project.findFirst({
+        where: { id, userId: req.user.userId, isDeleted: false },
+      });
+
+      if (!existing) {
+        throw new Error('STATUS_404:Project not found');
+      }
+
+      const now = new Date();
+
+      await tx.project.update({
+        where: { id },
+        data: { isDeleted: true, updatedAt: now },
+      });
+
+      await tx.subject.updateMany({
+        where: { projectId: id, isDeleted: false },
+        data: { isDeleted: true, updatedAt: now },
+      });
+
+      await tx.topic.updateMany({
+        where: { subject: { projectId: id }, isDeleted: false },
+        data: { isDeleted: true, updatedAt: now },
+      });
+
+      await tx.chapter.updateMany({
+        where: { topic: { subject: { projectId: id } }, isDeleted: false },
+        data: { isDeleted: true, updatedAt: now },
+      });
+
+      await tx.studySession.updateMany({
+        where: { subject: { projectId: id }, isDeleted: false },
+        data: { isDeleted: true, updatedAt: now },
+      });
+
+      await tx.source.updateMany({
+        where: { subject: { projectId: id }, isDeleted: false },
+        data: { isDeleted: true, updatedAt: now },
+      });
+
+      await tx.subjectMilestone.updateMany({
+        where: { subject: { projectId: id }, isDeleted: false },
+        data: { isDeleted: true, updatedAt: now },
+      });
+
+      await tx.skillLabel.updateMany({
+        where: { subject: { projectId: id }, isDeleted: false },
+        data: { isDeleted: true, updatedAt: now },
+      });
+    });
 
     res.status(204).send();
   } catch (error: unknown) {
+    if (error instanceof Error && error.message.startsWith('STATUS_')) {
+      const colonIdx = error.message.indexOf(':');
+      const status = parseInt(error.message.substring(7, colonIdx), 10);
+      const message = error.message.substring(colonIdx + 1);
+      return res.status(status).json({ error: message });
+    }
     next(error);
   }
 });

@@ -18,6 +18,9 @@ interface MilestoneDao {
     @Query("SELECT * FROM subject_milestones WHERE is_deleted = 0")
     suspend fun getAllMilestones(): List<SubjectMilestoneEntity>
 
+    @Query("SELECT * FROM subject_milestones WHERE id = :id LIMIT 1")
+    suspend fun getById(id: String): SubjectMilestoneEntity?
+
     @Query("SELECT * FROM subject_milestones WHERE updated_at > :since")
     suspend fun getModifiedSince(since: Long): List<SubjectMilestoneEntity>
 

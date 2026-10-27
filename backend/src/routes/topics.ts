@@ -22,7 +22,7 @@ router.get('/', async (req, res, next) => {
     const { skip, take, page, limit } = parsePagination(req.query as any);
     const where = {
       subjectId,
-      subject: { project: { userId: req.user.userId } },
+      subject: { isDeleted: false, project: { userId: req.user.userId, isDeleted: false } },
       isDeleted: false,
     };
 
@@ -32,7 +32,7 @@ router.get('/', async (req, res, next) => {
         orderBy: { order: 'asc' },
         skip,
         take,
-        include: { chapters: { orderBy: { order: 'asc' } } },
+        include: { chapters: { where: { isDeleted: false }, orderBy: { order: 'asc' } } },
       }),
       prisma.topic.count({ where }),
     ]);
@@ -52,10 +52,10 @@ router.get('/:id', async (req, res, next) => {
     const topic = await prisma.topic.findFirst({
       where: {
         id,
-        subject: { project: { userId: req.user.userId } },
+        subject: { isDeleted: false, project: { userId: req.user.userId, isDeleted: false } },
         isDeleted: false,
       },
-      include: { chapters: { orderBy: { order: 'asc' } } },
+      include: { chapters: { where: { isDeleted: false }, orderBy: { order: 'asc' } } },
     });
 
     if (!topic) {
@@ -74,7 +74,11 @@ router.post('/', async (req, res, next) => {
 
     // Verify subject ownership before creating topic
     const subject = await prisma.subject.findFirst({
-      where: { id: data.subjectId, project: { userId: req.user.userId } },
+      where: {
+        id: data.subjectId,
+        isDeleted: false,
+        project: { userId: req.user.userId, isDeleted: false },
+      },
     });
 
     if (!subject) {
@@ -95,7 +99,7 @@ router.patch('/:id', async (req, res, next) => {
     const result = await prisma.topic.updateMany({
       where: {
         id,
-        subject: { project: { userId: req.user.userId } },
+        subject: { isDeleted: false, project: { userId: req.user.userId, isDeleted: false } },
         isDeleted: false,
       },
       data: { ...data, updatedAt: new Date() },
@@ -107,7 +111,7 @@ router.patch('/:id', async (req, res, next) => {
 
     const updated = await prisma.topic.findUnique({
       where: { id },
-      include: { chapters: { orderBy: { order: 'asc' } } },
+      include: { chapters: { where: { isDeleted: false }, orderBy: { order: 'asc' } } },
     });
 
     res.json({ data: updated });
@@ -119,17 +123,30 @@ router.patch('/:id', async (req, res, next) => {
 router.delete('/:id', async (req, res, next) => {
   try {
     const id = String(req.params.id);
-    const result = await prisma.topic.updateMany({
+    const existing = await prisma.topic.findFirst({
       where: {
         id,
-        subject: { project: { userId: req.user.userId } },
+        subject: { isDeleted: false, project: { userId: req.user.userId, isDeleted: false } },
+        isDeleted: false,
       },
-      data: { isDeleted: true, updatedAt: new Date() },
     });
 
-    if (result.count === 0) {
+    if (!existing) {
       return res.status(404).json({ error: 'Topic not found' });
     }
+
+    const now = new Date();
+    await prisma.$transaction(async (tx) => {
+      await tx.topic.update({
+        where: { id },
+        data: { isDeleted: true, updatedAt: now },
+      });
+
+      await tx.chapter.updateMany({
+        where: { topicId: id, isDeleted: false },
+        data: { isDeleted: true, updatedAt: now },
+      });
+    });
 
     res.status(204).send();
   } catch (error: unknown) {

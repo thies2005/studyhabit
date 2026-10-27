@@ -63,6 +63,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
@@ -247,18 +252,29 @@ fun SettingsScreen(
                                 val isSelected = index == seedColorIndex
                                 Box(
                                     modifier = Modifier
-                                        .size(36.dp)
-                                        .clip(CircleShape)
-                                        .background(color)
+                                        .size(48.dp)
+                                        .semantics {
+                                            role = Role.RadioButton
+                                            selected = isSelected
+                                            contentDescription = "Color option ${index + 1}"
+                                        }
                                         .clickable {
                                             container.preferences.setSeedColorIndex(index)
                                             container.triggerDataChangedSync()
-                                        }
-                                        .then(
-                                            if (isSelected) Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
-                                            else Modifier
-                                        )
-                                )
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(CircleShape)
+                                            .background(color)
+                                            .then(
+                                                if (isSelected) Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                                                else Modifier
+                                            )
+                                    )
+                                }
                             }
                         }
                         Spacer(modifier = Modifier.height(16.dp))

@@ -73,7 +73,7 @@ export default function Subjects() {
           <div className="flex justify-between items-center mb-8">
             <div>
               <h1 className="text-3xl font-bold text-onSurface font-heading mb-2">My Subjects</h1>
-              <p className="text-sm text-gray-400 font-body">
+              <p className="text-sm text-onSurfaceVariant font-body">
                 Manage your academic curriculum and track progress across all subjects.
               </p>
             </div>
@@ -108,7 +108,7 @@ export default function Subjects() {
           {/* Empty State */}
           {!loading && !error && subjects.length === 0 && (
             <div className="text-center py-12">
-              <p className="text-gray-400">No subjects yet. Create your first subject to get started!</p>
+              <p className="text-onSurfaceVariant">No subjects yet. Create your first subject to get started!</p>
             </div>
           )}
           
@@ -117,8 +117,17 @@ export default function Subjects() {
               {subjects.map((subject, index) => (
                 <div
                   key={subject.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={subject.name}
                   onClick={() => navigate(`/subjects/${subject.id}`)}
-                  className="bg-surfaceContainerHigh rounded-3xl p-6 hover:bg-surfaceContainerHighest hover:-translate-y-1 transition-all duration-300 cursor-pointer shadow-md hover:shadow-xl border border-transparent hover:border-outlineVariant"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      navigate(`/subjects/${subject.id}`);
+                    }
+                  }}
+                  className="bg-surfaceContainerHigh rounded-3xl p-6 hover:bg-surfaceContainerHighest hover:-translate-y-1 transition-all duration-300 cursor-pointer shadow-md hover:shadow-xl border border-transparent hover:border-outlineVariant focus:outline-none focus:ring-2 focus:ring-primary"
                 >
                   {/* Subject Icon */}
                   <div className="flex items-center justify-between mb-4">
@@ -140,7 +149,7 @@ export default function Subjects() {
 
                   {/* Description */}
                   {subject.description && (
-                    <p className="text-sm text-gray-400 font-body mb-4 line-clamp-2">
+                    <p className="text-sm text-onSurfaceVariant font-body mb-4 line-clamp-2">
                       {subject.description}
                     </p>
                   )}
@@ -148,13 +157,13 @@ export default function Subjects() {
                   {/* Stats */}
                   <div className="space-y-3 pt-4 border-t border-surfaceContainerHighest">
                     <div className="flex justify-between">
-                      <span className="text-sm text-gray-400 font-body">Time Invested</span>
+                      <span className="text-sm text-onSurfaceVariant font-body">Time Invested</span>
                       <span className="text-sm font-medium text-onSurface font-data">
                         {Math.floor((subject.totalStudyMinutes || 0) / 60)}h {(subject.totalStudyMinutes || 0) % 60}m
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-sm text-gray-400 font-body">Total Experience</span>
+                      <span className="text-sm text-onSurfaceVariant font-body">Total Experience</span>
                       <span className="text-sm font-medium text-onSurface font-data">
                         {subject.xpTotal.toLocaleString()} XP
                       </span>

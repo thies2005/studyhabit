@@ -1,12 +1,15 @@
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import type { StatsOverview, SessionWithSubject } from '../types';
 import { useApi } from '../api/hooks';
 import { useProject } from '../contexts/ProjectContext';
 import { levelThreshold, getLevelName, getLevelProgress } from '../utils/xp';
+import PomodoroTimerModal from '../components/PomodoroTimerModal';
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { currentProjectId } = useProject();
+  const [isTimerModalOpen, setIsTimerModalOpen] = useState(false);
 
   const statsUrl = currentProjectId ? `/stats/overview?projectId=${currentProjectId}` : '/stats/overview';
   const sessionsUrl = currentProjectId ? `/sessions?projectId=${currentProjectId}&limit=3` : '/sessions?limit=3';
@@ -79,7 +82,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between flex-wrap gap-4">
               <div>
                 <h2 className="text-2xl font-bold text-onSurface font-heading">Welcome back!</h2>
-                <p className="mt-1 text-sm text-gray-400 font-body">
+                <p className="mt-1 text-sm text-onSurfaceVariant font-body">
                   Today: {todayHours.toFixed(1)}h studied
                 </p>
               </div>
@@ -101,7 +104,7 @@ export default function Dashboard() {
                 <div className="text-xs text-primary font-medium">{getLevelName(currentStats.currentLevel)}</div>
               </div>
               <div className="flex-grow">
-                <div className="flex justify-between text-xs text-gray-400 mb-1">
+                <div className="flex justify-between text-xs text-onSurfaceVariant mb-1">
                   <span>{currentStats.totalXp} XP</span>
                   <span>{levelThreshold(currentStats.currentLevel + 1) - currentStats.totalXp} XP to Level {currentStats.currentLevel + 1}</span>
                 </div>
@@ -115,16 +118,19 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Start Session FAB */}
-          <div className="flex justify-center mb-8">
-            <Link
-              to="/subjects"
-              className="flex items-center gap-2 px-8 py-4 bg-primary hover:bg-primary-container text-white rounded-2xl text-lg font-medium font-body shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
-            >
-              <span className="material-symbols-rounded">play_arrow</span>
-              Start Session
-            </Link>
-          </div>
+          {/* Start Session FAB - only show when user has sessions (THEME-03) */}
+          {sessions && sessions.length > 0 && (
+            <div className="flex justify-center mb-8">
+              <button
+                type="button"
+                onClick={() => setIsTimerModalOpen(true)}
+                className="flex items-center gap-2 px-8 py-4 bg-primary hover:bg-primary-container text-background hover:text-primary-onContainer rounded-2xl text-lg font-medium font-body shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
+              >
+                <span className="material-symbols-rounded">play_arrow</span>
+                Start Session
+              </button>
+            </div>
+          )}
 
           {/* Empty State */}
           {!loading && sessions && sessions.length === 0 && (
@@ -133,16 +139,17 @@ export default function Dashboard() {
               <h3 className="text-3xl font-bold text-onSurface font-heading mb-2 tracking-tight">
                 Let's start learning!
               </h3>
-              <p className="text-gray-400 font-body mb-6">
+              <p className="text-onSurfaceVariant font-body mb-6">
                 Tap the button below to begin your first session
               </p>
-              <Link
-                to="/subjects"
+              <button
+                type="button"
+                onClick={() => setIsTimerModalOpen(true)}
                 className="inline-flex items-center gap-2 px-8 py-4 bg-primary hover:bg-primary-container text-background hover:text-primary-onContainer rounded-full font-heading font-bold transition-all duration-300 hover:scale-105 active:scale-95 shadow-lg"
               >
                 <span className="material-symbols-rounded text-xl">play_arrow</span>
                 Start Your First Session
-              </Link>
+              </button>
             </div>
           )}
 
@@ -152,7 +159,7 @@ export default function Dashboard() {
               <div className="flex items-center space-x-3">
                 <span className="material-symbols-rounded text-2xl text-primary">schedule</span>
                 <div>
-                  <p className="text-sm text-gray-400 font-body">Total Hours</p>
+                  <p className="text-sm text-onSurfaceVariant font-body">Total Hours</p>
                   <p className="text-2xl font-bold text-onSurface font-data">
                     {currentStats.totalHours.toFixed(1)}h
                   </p>
@@ -163,7 +170,7 @@ export default function Dashboard() {
               <div className="flex items-center space-x-3">
                 <span className="material-symbols-rounded text-2xl text-secondary">calendar_today</span>
                 <div>
-                  <p className="text-sm text-gray-400 font-body">This Week</p>
+                  <p className="text-sm text-onSurfaceVariant font-body">This Week</p>
                   <p className="text-2xl font-bold text-onSurface font-data">
                     {currentStats.weekHours.toFixed(1)}h
                   </p>
@@ -174,7 +181,7 @@ export default function Dashboard() {
               <div className="flex items-center space-x-3">
                 <span className="material-symbols-rounded text-2xl text-tertiary">local_fire_department</span>
                 <div>
-                  <p className="text-sm text-gray-400 font-body">Streak</p>
+                  <p className="text-sm text-onSurfaceVariant font-body">Streak</p>
                   <p className="text-2xl font-bold text-onSurface font-data">
                     {currentStats.currentStreak}d
                   </p>
@@ -185,7 +192,7 @@ export default function Dashboard() {
               <div className="flex items-center space-x-3">
                 <span className="material-symbols-rounded text-2xl text-amber-400">star</span>
                 <div>
-                  <p className="text-sm text-gray-400 font-body">Level</p>
+                  <p className="text-sm text-onSurfaceVariant font-body">Level</p>
                   <p className="text-2xl font-bold text-onSurface font-data">
                     {getLevelName(currentStats.currentLevel)}
                   </p>
@@ -210,7 +217,16 @@ export default function Dashboard() {
                   {sessions.map((session) => (
                     <div
                       key={session.id}
-                      className="flex items-center justify-between p-4 bg-surfaceContainer hover:bg-surfaceContainerHighest rounded-2xl transition-all duration-300 cursor-pointer mb-2 last:mb-0"
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`View ${session.subject.name} session details`}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          navigate(`/subjects/${session.subjectId}`);
+                        }
+                      }}
+                      className="flex items-center justify-between p-4 bg-surfaceContainer hover:bg-surfaceContainerHighest rounded-2xl transition-all duration-300 cursor-pointer mb-2 last:mb-0 focus:outline-none focus:ring-2 focus:ring-primary"
                       onClick={() => navigate(`/subjects/${session.subjectId}`)}
                     >
                       <div className="flex items-center space-x-3">
@@ -222,7 +238,7 @@ export default function Dashboard() {
                           <p className="text-sm font-medium text-onSurface font-body">
                             {session.subject.name}
                           </p>
-                          <p className="text-xs text-gray-400 font-body">
+                          <p className="text-xs text-onSurfaceVariant font-body">
                             {new Date(session.startedAt).toLocaleDateString()} at {new Date(session.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </p>
                         </div>
@@ -231,7 +247,7 @@ export default function Dashboard() {
                         <span className="px-3 py-1 text-xs font-bold bg-tertiary/20 text-tertiary rounded-full font-heading tracking-wide">
                           +{session.xpEarned} XP
                         </span>
-                        <span className="text-sm text-gray-400 font-body">{session.actualDurationMinutes} min</span>
+                        <span className="text-sm text-onSurfaceVariant font-body">{session.actualDurationMinutes} min</span>
                       </div>
                     </div>
                   ))}
@@ -263,6 +279,16 @@ export default function Dashboard() {
           )}
         </>
       )}
+
+      {/* Pomodoro & Study Timer Modal */}
+      <PomodoroTimerModal
+        isOpen={isTimerModalOpen}
+        onClose={() => setIsTimerModalOpen(false)}
+        onSessionLogged={() => {
+          refetchStats();
+          refetchSessions();
+        }}
+      />
     </div>
   );
 }

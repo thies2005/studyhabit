@@ -15,6 +15,9 @@ interface SkillLabelDao {
     @Query("SELECT * FROM skill_labels WHERE is_deleted = 0")
     suspend fun getAllSkillLabels(): List<SkillLabelEntity>
 
+    @Query("SELECT * FROM skill_labels WHERE id = :id LIMIT 1")
+    suspend fun getById(id: String): SkillLabelEntity?
+
     @Query("SELECT * FROM skill_labels WHERE updated_at > :since")
     suspend fun getModifiedSince(since: Long): List<SkillLabelEntity>
 

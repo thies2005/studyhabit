@@ -75,9 +75,9 @@ export default function ManageMilestonesDialog({ isOpen, onClose, subjectId, mil
         <button
           onClick={onClose}
           aria-label="Close dialog"
-          className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-surface hover:text-white transition-colors"
+          className="w-11 h-11 rounded-full flex items-center justify-center text-onSurfaceVariant hover:bg-surface hover:text-onSurface transition-colors"
         >
-          <span className="material-symbols-rounded text-lg" aria-hidden="true">close</span>
+          <span className="material-symbols-rounded text-xl" aria-hidden="true">close</span>
         </button>
       </div>
 
@@ -92,7 +92,7 @@ export default function ManageMilestonesDialog({ isOpen, onClose, subjectId, mil
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="flex-1 px-4 py-3 bg-surface border border-outlineVariant focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors"
+            className="flex-1 px-4 py-3 bg-surface border border-outlineVariant focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors placeholder:text-outline"
             placeholder="New milestone..."
           />
           <button
@@ -106,28 +106,32 @@ export default function ManageMilestonesDialog({ isOpen, onClose, subjectId, mil
 
         <div className="max-h-60 overflow-y-auto space-y-2 pr-2">
           {milestones.length === 0 ? (
-            <p className="text-sm text-gray-400 font-body text-center py-4">No milestones yet.</p>
+            <p className="text-sm text-onSurfaceVariant font-body text-center py-4">No milestones yet.</p>
           ) : milestones.sort((a,b) => a.sortOrder - b.sortOrder).map(m => (
-            <div key={m.id} className="flex items-center justify-between p-3 bg-surface rounded-xl border border-outlineVariant">
-              <div className="flex items-center gap-3">
+            <div key={m.id} className="flex items-center justify-between p-2 sm:p-3 bg-surface rounded-xl border border-outlineVariant">
+              <div className="flex items-center gap-2">
                 <button
+                  type="button"
                   onClick={() => toggleMilestone(m)}
                   aria-label={m.isCompleted ? `Mark "${m.title}" as incomplete` : `Mark "${m.title}" as complete`}
                   aria-pressed={m.isCompleted}
-                  className={`w-6 h-6 rounded-md flex items-center justify-center border transition-colors ${m.isCompleted ? 'bg-primary border-primary' : 'border-gray-500'}`}
+                  className="w-11 h-11 flex items-center justify-center rounded-lg hover:bg-surfaceContainerHighest transition-colors"
                 >
-                  {m.isCompleted && <span className="material-symbols-rounded text-white text-[16px]" aria-hidden="true">check</span>}
+                  <span className={`w-6 h-6 rounded-md flex items-center justify-center border transition-colors ${m.isCompleted ? 'bg-primary border-primary' : 'border-outline'}`}>
+                    {m.isCompleted && <span className="material-symbols-rounded text-white text-[16px]" aria-hidden="true">check</span>}
+                  </span>
                 </button>
-                <span className={`text-sm font-body ${m.isCompleted ? 'text-gray-500 line-through' : 'text-onSurface'}`}>
+                <span className={`text-sm font-body ${m.isCompleted ? 'text-onSurfaceVariant line-through' : 'text-onSurface'}`}>
                   {m.title}
                 </span>
               </div>
               <button
+                type="button"
                 onClick={() => deleteMilestone(m.id, m.title)}
                 aria-label={`Delete milestone "${m.title}"`}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-gray-500 hover:text-red-400 hover:bg-surfaceContainerHighest transition-colors"
+                className="w-11 h-11 rounded-full flex items-center justify-center text-onSurfaceVariant hover:text-red-400 hover:bg-surfaceContainerHighest transition-colors"
               >
-                <span className="material-symbols-rounded text-sm" aria-hidden="true">delete</span>
+                <span className="material-symbols-rounded text-lg" aria-hidden="true">delete</span>
               </button>
             </div>
           ))}
@@ -138,7 +142,7 @@ export default function ManageMilestonesDialog({ isOpen, onClose, subjectId, mil
         <button
           type="button"
           onClick={onClose}
-          className="px-8 py-3 bg-surface hover:bg-gray-800 text-gray-300 font-bold rounded-xl transition-colors font-body text-sm"
+          className="px-8 py-3 bg-surface hover:bg-surfaceContainerHighest text-onSurfaceVariant hover:text-onSurface font-bold rounded-xl transition-colors font-body text-sm"
         >
           Done
         </button>

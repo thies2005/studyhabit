@@ -34,6 +34,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,10 +45,13 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import de.schuelken.studyhabit.StudyHabitApplication
 import de.schuelken.studyhabit.core.database.SourceEntity
 import de.schuelken.studyhabit.core.di.AppContainer
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -101,7 +105,13 @@ fun PdfViewerScreen(
                 val pfd = if (pathOrUri.startsWith("content://")) {
                     context.contentResolver.openFileDescriptor(Uri.parse(pathOrUri), "r")
                 } else {
-                    val file = File(pathOrUri)
+                    val file = File(pathOrUri).canonicalFile
+                    val dataDir = File(context.applicationInfo.dataDir).canonicalFile
+                    if (file.path.startsWith(dataDir.path)) {
+                        errorMessage = "Access to internal app files is prohibited."
+                        isLoading = false
+                        return@withContext
+                    }
                     if (!file.exists()) {
                         errorMessage = "PDF file does not exist on device."
                         isLoading = false
@@ -172,13 +182,32 @@ fun PdfViewerScreen(
         }
     }
 
-    DisposableEffect(Unit) {
+    val latestCurrentPage by rememberUpdatedState(currentPage)
+    val latestPageCount by rememberUpdatedState(pageCount)
+
+    DisposableEffect(sourceId) {
         onDispose {
             try {
                 pdfRenderer?.close()
                 fileDescriptor?.close()
             } catch (e: Exception) {
                 // Ignore close error
+            }
+            val p = latestCurrentPage
+            val count = latestPageCount
+            if (p > 0 && count > 0) {
+                val progressPercent = (p.toDouble() / count.toDouble()) * 100.0
+                val app = context.applicationContext as? StudyHabitApplication
+                val appScope = app?.appScope ?: CoroutineScope(Dispatchers.IO)
+                appScope.launch {
+                    container.database.sourceDao().updatePageProgress(
+                        sourceId,
+                        p,
+                        progressPercent,
+                        System.currentTimeMillis()
+                    )
+                    container.triggerDataChangedSync()
+                }
             }
         }
     }
@@ -234,7 +263,7 @@ fun PdfViewerScreen(
         ) {
             when {
                 isLoading -> CircularProgressIndicator()
-                errorMessage != null -> Text(text = errorMessage ?: "", color = Color.White)
+                errorMessage != null -> Text(text = errorMessage ?: "", color = MaterialTheme.colorScheme.onSurface)
                 currentBitmap != null -> {
                     Image(
                         bitmap = currentBitmap!!.asImageBitmap(),

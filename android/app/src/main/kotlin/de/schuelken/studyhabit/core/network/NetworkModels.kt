@@ -24,6 +24,7 @@ data class UserInfo(
 @Serializable
 data class AuthData(
     val accessToken: String,
+    val refreshToken: String? = null,
     val user: UserInfo,
 )
 

@@ -37,31 +37,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setAuth((prev) => ({ ...prev, userEmail: email }));
           }
         })
-        .catch(() => {});
+        .catch((err) => {
+          console.warn('Session check failed:', err);
+        });
     }
   }, [auth.accessToken, auth.userEmail]);
 
   const login = useCallback(async (email: string, password: string) => {
-    const response = await apiClient.post('/auth/login', { email, password });
-    const { accessToken, refreshToken, user } = response.data.data;
-    const finalEmail = user?.email || email;
-    localStorage.setItem('access_token', accessToken);
-    localStorage.setItem('refresh_token', refreshToken);
-    localStorage.setItem('user_email', finalEmail);
-    setAuth({ accessToken, refreshToken, userEmail: finalEmail });
+    try {
+      const response = await apiClient.post('/auth/login', { email, password });
+      const { accessToken, refreshToken, user } = response.data.data;
+      const finalEmail = user?.email || email;
+      localStorage.setItem('access_token', accessToken);
+      localStorage.setItem('refresh_token', refreshToken);
+      localStorage.setItem('user_email', finalEmail);
+      setAuth({ accessToken, refreshToken, userEmail: finalEmail });
+    } catch (err: any) {
+      const msg = err.response?.data?.message || (err instanceof Error ? err.message : 'Login failed');
+      throw new Error(msg);
+    }
   }, []);
 
   const register = useCallback(async (email: string, password: string) => {
-    const response = await apiClient.post('/auth/register', { email, password });
-    const { accessToken, refreshToken, user } = response.data.data;
-    if (!accessToken || !refreshToken) {
-      throw new Error(response.data?.message || 'An account with this email may already exist. Please sign in.');
+    try {
+      const response = await apiClient.post('/auth/register', { email, password });
+      const data = response.data?.data;
+      const accessToken = data?.accessToken;
+      const refreshToken = data?.refreshToken;
+      const user = data?.user;
+      if (!accessToken || !refreshToken) {
+        throw new Error(response.data?.message || 'Registration succeeded, but no session token was received. Please sign in.');
+      }
+      const finalEmail = user?.email || email;
+      localStorage.setItem('access_token', accessToken);
+      localStorage.setItem('refresh_token', refreshToken);
+      localStorage.setItem('user_email', finalEmail);
+      setAuth({ accessToken, refreshToken, userEmail: finalEmail });
+    } catch (err: any) {
+      if (err.response?.status === 409) {
+        throw new Error(err.response?.data?.message || 'An account with this email already exists. Please sign in.');
+      }
+      const msg = err.response?.data?.message || (err instanceof Error ? err.message : 'Registration failed');
+      throw new Error(msg);
     }
-    const finalEmail = user?.email || email;
-    localStorage.setItem('access_token', accessToken);
-    localStorage.setItem('refresh_token', refreshToken);
-    localStorage.setItem('user_email', finalEmail);
-    setAuth({ accessToken, refreshToken, userEmail: finalEmail });
   }, []);
 
   const logout = useCallback(async () => {

@@ -24,7 +24,7 @@ const CustomTooltip = ({ active, payload, label }: TooltipRendererProps) => {
       <div className="bg-surfaceContainerHigh border border-outlineVariant rounded-xl p-3 shadow-lg">
         <p className="text-sm font-medium text-onSurface font-heading mb-1">{label}</p>
         {payload.map((entry: any, index: number) => (
-          <p key={index} className="text-sm text-gray-300 font-body" style={{ color: entry.color }}>
+          <p key={index} className="text-sm text-onSurfaceVariant font-body" style={{ color: entry.color }}>
             {entry.name}: {entry.value}
           </p>
         ))}
@@ -200,7 +200,7 @@ export default function Stats() {
       <span
         key={i}
         className="material-symbols-rounded text-sm"
-        style={{ color: i < rating ? '#FDB87C' : '#323536' }}
+        style={{ color: i < rating ? '#FDB87C' : 'var(--color-outline-variant, #323536)' }}
       >
         star
       </span>
@@ -214,7 +214,7 @@ export default function Stats() {
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-onSurface font-heading">Performance Insights</h1>
-            <p className="mt-1 text-sm text-gray-400 font-body">
+            <p className="mt-1 text-sm text-onSurfaceVariant font-body">
               Track your study progress and efficiency metrics
             </p>
           </div>
@@ -231,7 +231,7 @@ export default function Stats() {
               <h2 className="text-lg font-medium text-onSurface font-heading mb-2">
                 Couldn&apos;t load your stats
               </h2>
-              <p className="text-sm text-gray-400 font-body mb-4">
+              <p className="text-sm text-onSurfaceVariant font-body mb-4">
                 Something went wrong while fetching your performance data. Please try again.
               </p>
               <button
@@ -253,7 +253,7 @@ export default function Stats() {
                     <span className="text-xs text-green-400 font-body">Active study time</span>
                   </div>
                   <p className="text-2xl font-bold text-onSurface font-data">{overview.totalHours.toFixed(1)}h</p>
-                  <p className="text-sm text-gray-400 font-body">Total Study Hours</p>
+                  <p className="text-sm text-onSurfaceVariant font-body">Total Study Hours</p>
                 </div>
 
                 <div className="bg-surfaceContainerHigh rounded-3xl p-6 shadow-md border border-transparent hover:border-outlineVariant transition-colors">
@@ -262,25 +262,25 @@ export default function Stats() {
                     <span className="text-xs text-green-400 font-body">Past 7 days</span>
                   </div>
                   <p className="text-2xl font-bold text-onSurface font-data">{overview.weekHours.toFixed(1)}h</p>
-                  <p className="text-sm text-gray-400 font-body">Weekly Average</p>
+                  <p className="text-sm text-onSurfaceVariant font-body">Weekly Average</p>
                 </div>
 
                 <div className="bg-surfaceContainerHigh rounded-3xl p-6 shadow-md border border-transparent hover:border-outlineVariant transition-colors">
                   <div className="flex items-center justify-between mb-3">
                     <span className="material-symbols-rounded text-3xl text-tertiary">local_fire_department</span>
-                    <span className="text-xs text-gray-400 font-body">Daily commitment</span>
+                    <span className="text-xs text-onSurfaceVariant font-body">Daily commitment</span>
                   </div>
                   <p className="text-2xl font-bold text-onSurface font-data">{overview.currentStreak}d</p>
-                  <p className="text-sm text-gray-400 font-body">Current Streak</p>
+                  <p className="text-sm text-onSurfaceVariant font-body">Current Streak</p>
                 </div>
 
                 <div className="bg-surfaceContainerHigh rounded-3xl p-6 shadow-md border border-transparent hover:border-outlineVariant transition-colors">
                   <div className="flex items-center justify-between mb-3">
                     <span className="material-symbols-rounded text-3xl text-primary">emoji_events</span>
-                    <span className="text-xs text-gray-400 font-body">{overview.totalXp.toLocaleString()} XP total</span>
+                    <span className="text-xs text-onSurfaceVariant font-body">{overview.totalXp.toLocaleString()} XP total</span>
                   </div>
                   <p className="text-2xl font-bold text-onSurface font-data">{overview.currentLevel}</p>
-                  <p className="text-sm text-gray-400 font-body">{overview.levelName}</p>
+                  <p className="text-sm text-onSurfaceVariant font-body">{overview.levelName}</p>
                 </div>
               </div>
 
@@ -290,7 +290,7 @@ export default function Stats() {
                   <h3 className="text-lg font-medium text-onSurface font-heading mb-4">Weekly Activity</h3>
                   <ResponsiveContainer width="100%" height={300}>
                     <BarChart data={weeklyActivity}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#323536" />
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--color-outline-variant, #323536)" />
                       <XAxis
                         dataKey="day"
                         stroke="#9CA3AF"
@@ -306,7 +306,7 @@ export default function Stats() {
                         tickFormatter={(value) => `${value}h`}
                       />
                       <Tooltip content={<WeeklyChartTooltip />} cursor={{ fill: 'rgba(133, 210, 224, 0.1)' }} />
-                      <Bar dataKey="hours" fill="#85D2E0" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="hours" fill="var(--color-primary, #85D2E0)" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -344,8 +344,8 @@ export default function Stats() {
                             className="w-3 h-3 rounded-full"
                             style={{ backgroundColor: item.color }}
                           />
-                          <span className="text-sm text-gray-300 font-body">{item.name}</span>
-                          <span className="text-sm text-gray-400 font-body ml-auto">
+                          <span className="text-sm text-onSurfaceVariant font-body">{item.name}</span>
+                          <span className="text-sm text-onSurfaceVariant font-body ml-auto">
                             {Math.round((item.hours / subjectDistribution.reduce((sum, s) => sum + s.hours, 0)) * 100)}%
                           </span>
                         </div>
@@ -359,18 +359,18 @@ export default function Stats() {
               <div className="bg-surfaceContainerHigh rounded-3xl p-6 mb-6 shadow-md">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-medium text-onSurface font-heading">XP Progress</h3>
-                  <span className="text-xs text-gray-400 font-body">Last 30 days</span>
+                  <span className="text-xs text-onSurfaceVariant font-body">Last 30 days</span>
                 </div>
                 {xpHistory.length > 0 && xpHistory.some((p: any) => p.cumulativeXp > 0 || p.dailyXp > 0) ? (
                   <ResponsiveContainer width="100%" height={300}>
                     <AreaChart data={xpHistory}>
                       <defs>
                         <linearGradient id="xpGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#85D2E0" stopOpacity={0.6}/>
-                          <stop offset="95%" stopColor="#85D2E0" stopOpacity={0}/>
+                          <stop offset="5%" stopColor="var(--color-primary, #85D2E0)" stopOpacity={0.6}/>
+                          <stop offset="95%" stopColor="var(--color-primary, #85D2E0)" stopOpacity={0}/>
                         </linearGradient>
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#323536" />
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--color-outline-variant, #323536)" />
                       <XAxis
                         dataKey="date"
                         stroke="#9CA3AF"
@@ -389,11 +389,11 @@ export default function Stats() {
                         axisLine={false}
                         tickFormatter={(value) => `${value}`}
                       />
-                      <Tooltip content={<XpChartTooltip />} cursor={{ stroke: '#85D2E0', strokeWidth: 1 }} />
+                      <Tooltip content={<XpChartTooltip />} cursor={{ stroke: 'var(--color-primary, #85D2E0)', strokeWidth: 1 }} />
                       <Area
                         type="monotone"
                         dataKey="cumulativeXp"
-                        stroke="#85D2E0"
+                        stroke="var(--color-primary, #85D2E0)"
                         strokeWidth={2}
                         fillOpacity={1}
                         fill="url(#xpGradient)"
@@ -405,10 +405,10 @@ export default function Stats() {
                     <span className="material-symbols-rounded text-5xl text-onSurfaceVariant mb-3" aria-hidden="true">
                       trending_up
                     </span>
-                    <p className="text-sm text-gray-300 font-body max-w-sm">
+                    <p className="text-sm text-onSurfaceVariant font-body max-w-sm">
                       Start logging study sessions to build your XP history and track your progress over time.
                     </p>
-                    <p className="text-xs text-gray-500 font-body mt-2">
+                    <p className="text-xs text-onSurfaceVariant font-body mt-2">
                       Current total: {overview.totalXp.toLocaleString()} XP · Level {overview.currentLevel} ({overview.levelName})
                     </p>
                   </div>
@@ -420,26 +420,29 @@ export default function Stats() {
                 <div className="bg-surfaceContainerHigh rounded-3xl p-6 mb-6 shadow-md">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-medium text-onSurface font-heading">Activity Heatmap</h3>
-                    <span className="text-xs text-gray-400 font-body">Last 12 weeks</span>
+                    <span className="text-xs text-onSurfaceVariant font-body">Last 12 weeks</span>
                   </div>
                   <div className="overflow-x-auto">
                     <div className="flex items-start">
                       {/* Day labels (M to S, 7 days) */}
-                      <div className="flex flex-col gap-1 mr-2 text-[10px] text-gray-400 font-body select-none">
-                        <div className="h-3 flex items-center">M</div>
-                        <div className="h-3 flex items-center">T</div>
-                        <div className="h-3 flex items-center">W</div>
-                        <div className="h-3 flex items-center">T</div>
-                        <div className="h-3 flex items-center">F</div>
-                        <div className="h-3 flex items-center">S</div>
-                        <div className="h-3 flex items-center">S</div>
+                      <div className="flex flex-col gap-1 mr-2 text-[10px] text-onSurfaceVariant font-body select-none">
+                        <div className="h-4 sm:h-5 flex items-center">M</div>
+                        <div className="h-4 sm:h-5 flex items-center">T</div>
+                        <div className="h-4 sm:h-5 flex items-center">W</div>
+                        <div className="h-4 sm:h-5 flex items-center">T</div>
+                        <div className="h-4 sm:h-5 flex items-center">F</div>
+                        <div className="h-4 sm:h-5 flex items-center">S</div>
+                        <div className="h-4 sm:h-5 flex items-center">S</div>
                       </div>
                       {/* Heatmap grid (7 rows x 12 cols, column-flow) */}
-                      <div className="grid grid-rows-7 grid-flow-col gap-1">
+                      <div className="grid grid-rows-7 grid-flow-col gap-1" role="grid" aria-label="12-week study activity calendar">
                         {heatmap.map((cell) => (
                           <div
                             key={cell.id}
-                            className={`w-3 h-3 rounded-sm ${cell.isFuture ? 'opacity-0 pointer-events-none' : getHeatmapColor(cell.intensity)} hover:brightness-125 transition-colors cursor-pointer`}
+                            role={cell.isFuture ? undefined : "gridcell"}
+                            tabIndex={cell.isFuture ? -1 : 0}
+                            aria-label={cell.tooltip || undefined}
+                            className={`w-4 h-4 sm:w-5 sm:h-5 rounded-sm ${cell.isFuture ? 'opacity-0 pointer-events-none' : getHeatmapColor(cell.intensity)} hover:brightness-125 focus:brightness-125 focus:outline-none focus:ring-2 focus:ring-primary transition-colors cursor-pointer`}
                             title={cell.tooltip}
                           />
                         ))}
@@ -447,14 +450,14 @@ export default function Stats() {
                     </div>
                   </div>
                   <div className="flex items-center justify-end gap-2 mt-4">
-                    <span className="text-xs text-gray-400 font-body">Less</span>
+                    <span className="text-xs text-onSurfaceVariant font-body">Less</span>
                     {[0, 1, 2, 3, 4].map((intensity) => (
                       <div
                         key={intensity}
-                        className={`w-3 h-3 rounded-sm ${getHeatmapColor(intensity)}`}
+                        className={`w-4 h-4 sm:w-5 sm:h-5 rounded-sm ${getHeatmapColor(intensity)}`}
                       />
                     ))}
-                    <span className="text-xs text-gray-400 font-body">More</span>
+                    <span className="text-xs text-onSurfaceVariant font-body">More</span>
                   </div>
                 </div>
               )}
@@ -467,19 +470,19 @@ export default function Stats() {
                     <table className="w-full">
                       <thead>
                         <tr className="border-b border-outlineVariant">
-                          <th className="text-left py-3 px-2 text-sm font-medium text-gray-400 font-body">
+                          <th className="text-left py-3 px-2 text-sm font-medium text-onSurfaceVariant font-body">
                             Subject
                           </th>
-                          <th className="text-right py-3 px-2 text-sm font-medium text-gray-400 font-body">
+                          <th className="text-right py-3 px-2 text-sm font-medium text-onSurfaceVariant font-body">
                             Hours
                           </th>
-                          <th className="text-right py-3 px-2 text-sm font-medium text-gray-400 font-body">
+                          <th className="text-right py-3 px-2 text-sm font-medium text-onSurfaceVariant font-body">
                             Sessions
                           </th>
-                          <th className="text-right py-3 px-2 text-sm font-medium text-gray-400 font-body">
+                          <th className="text-right py-3 px-2 text-sm font-medium text-onSurfaceVariant font-body">
                             Avg★
                           </th>
-                          <th className="text-center py-3 px-2 text-sm font-medium text-gray-400 font-body">
+                          <th className="text-center py-3 px-2 text-sm font-medium text-onSurfaceVariant font-body">
                             Skill
                           </th>
                         </tr>
@@ -488,20 +491,20 @@ export default function Stats() {
                         {subjectBreakdown
                           .sort((a, b) => b.hours - a.hours)
                           .map((subject) => (
-                            <tr key={subject.name} className="border-b border-outlineVariant/50 hover:bg-gray-700/20">
+                            <tr key={subject.name} className="border-b border-outlineVariant/50 hover:bg-surfaceContainerHighest/50">
                               <td className="py-3 px-2">
                                 <div className="flex items-center gap-2">
                                   <div
                                     className="w-2 h-2 rounded-full"
                                     style={{ backgroundColor: subject.color }}
                                   />
-                                  <span className="text-sm text-gray-200 font-body">{subject.name}</span>
+                                  <span className="text-sm text-onSurface font-body">{subject.name}</span>
                                 </div>
                               </td>
-                              <td className="text-right py-3 px-2 text-sm text-gray-300 font-data">
+                              <td className="text-right py-3 px-2 text-sm text-onSurfaceVariant font-data">
                                 {subject.hours.toFixed(1)}
                               </td>
-                              <td className="text-right py-3 px-2 text-sm text-gray-300 font-body">
+                              <td className="text-right py-3 px-2 text-sm text-onSurfaceVariant font-body">
                                 {subject.sessions}
                               </td>
                               <td className="text-right py-3 px-2">
@@ -513,7 +516,7 @@ export default function Stats() {
                                 <span className={`px-2 py-1 text-xs rounded-full font-body ${
                                   subject.skillLevel === 'Expert' ? 'bg-tertiary/20 text-tertiary' :
                                   subject.skillLevel === 'Advanced' ? 'bg-primary/20 text-primary' :
-                                  'bg-gray-700 text-gray-300'
+                                  'bg-surfaceContainerHighest text-onSurfaceVariant'
                                 }`}>
                                   {subject.skillLevel}
                                 </span>

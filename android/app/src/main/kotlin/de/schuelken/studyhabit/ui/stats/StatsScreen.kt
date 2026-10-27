@@ -29,6 +29,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
@@ -136,13 +138,25 @@ fun StatsScreen(container: AppContainer) {
                     Spacer(modifier = Modifier.height(16.dp))
                     val barColor = MaterialTheme.colorScheme.primary
                     val trackColor = MaterialTheme.colorScheme.surface
+                    val weeklyChartDescription = remember(weekdayMinutes) {
+                        val dayNames = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+                        "Weekly focus chart: " + weekdayMinutes.mapIndexed { i, m ->
+                            "${dayNames[i]}: ${m / 60} hours ${m % 60} minutes"
+                        }.joinToString(", ")
+                    }
 
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(140.dp)
                     ) {
-                        Canvas(modifier = Modifier.fillMaxSize()) {
+                        Canvas(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .semantics {
+                                    contentDescription = weeklyChartDescription
+                                }
+                        ) {
                             val barWidth = size.width / 15f
                             val spacing = size.width / 7f
 

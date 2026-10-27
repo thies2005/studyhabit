@@ -11,6 +11,7 @@ interface CreateTopicDialogProps {
 export default function CreateTopicDialog({ isOpen, onClose, onSubmit, currentTopicCount }: CreateTopicDialogProps) {
   const [name, setName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -20,11 +21,13 @@ export default function CreateTopicDialog({ isOpen, onClose, onSubmit, currentTo
 
     try {
       setIsSubmitting(true);
+      setError(null);
       await onSubmit({ name: name.trim(), order: currentTopicCount });
       setName('');
       onClose();
-    } catch (error) {
-      console.error('Failed to create topic:', error);
+    } catch (err: any) {
+      console.error('Failed to create topic:', err);
+      setError(err.response?.data?.error || err.message || 'Failed to create topic. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -37,22 +40,28 @@ export default function CreateTopicDialog({ isOpen, onClose, onSubmit, currentTo
         <button
           onClick={onClose}
           aria-label="Close dialog"
-          className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-surface hover:text-white transition-colors"
+          className="w-11 h-11 rounded-full flex items-center justify-center text-onSurfaceVariant hover:bg-surface hover:text-onSurface transition-colors"
         >
-          <span className="material-symbols-rounded text-lg" aria-hidden="true">close</span>
+          <span className="material-symbols-rounded text-xl" aria-hidden="true">close</span>
         </button>
       </div>
 
       <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        {error && (
+          <div role="alert" className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-sm text-red-400 font-body">
+            {error}
+          </div>
+        )}
+
         <div>
-          <label className="block text-sm font-medium text-gray-400 font-body mb-2">
+          <label className="block text-sm font-medium text-onSurfaceVariant font-body mb-2">
             Topic Name
           </label>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full px-4 py-3 bg-surface border border-outlineVariant focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors"
+            className="w-full px-4 py-3 bg-surface border border-outlineVariant focus:border-primary rounded-xl text-onSurface font-body focus:outline-none transition-colors placeholder:text-outline"
             placeholder="e.g., Data Structures"
             autoFocus
             required
@@ -64,7 +73,7 @@ export default function CreateTopicDialog({ isOpen, onClose, onSubmit, currentTo
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="flex-1 py-3 bg-surface hover:bg-gray-800 text-gray-300 font-bold rounded-xl transition-colors font-body text-sm"
+            className="flex-1 py-3 bg-surface hover:bg-surfaceContainerHighest text-onSurfaceVariant hover:text-onSurface font-bold rounded-xl transition-colors font-body text-sm"
           >
             Cancel
           </button>

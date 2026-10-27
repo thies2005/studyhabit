@@ -62,7 +62,7 @@ export default function Register() {
             <span className="text-6xl text-primary material-symbols-rounded">school</span>
           </div>
           <h2 className="text-3xl font-bold text-onSurface font-heading">StudyHabit</h2>
-          <p className="mt-2 text-sm text-gray-400 font-body">
+          <p className="mt-2 text-sm text-onSurfaceVariant font-body">
             Create your account
           </p>
         </div>
@@ -74,21 +74,21 @@ export default function Register() {
           )}
           <div className="space-y-4">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-400 mb-2">
+              <label htmlFor="email" className="block text-sm font-medium text-onSurfaceVariant mb-2">
                 Email address
               </label>
               <input
                 id="email"
                 type="email"
                 required
-                className="appearance-none relative block w-full px-4 py-3 bg-surfaceContainerHighest border border-outlineVariant rounded-lg placeholder-gray-500 text-onSurface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-body"
+                className="appearance-none relative block w-full px-4 py-3 bg-surfaceContainerHighest border border-outlineVariant rounded-lg placeholder-outline text-onSurface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-body"
                 placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
             </div>
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-400 mb-2">
+              <label htmlFor="password" className="block text-sm font-medium text-onSurfaceVariant mb-2">
                 Password
               </label>
               <input
@@ -96,7 +96,7 @@ export default function Register() {
                 type="password"
                 required
                 minLength={8}
-                className="appearance-none relative block w-full px-4 py-3 bg-surfaceContainerHighest border border-outlineVariant rounded-lg placeholder-gray-500 text-onSurface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-body"
+                className="appearance-none relative block w-full px-4 py-3 bg-surfaceContainerHighest border border-outlineVariant rounded-lg placeholder-outline text-onSurface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-body"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -110,22 +110,22 @@ export default function Register() {
                       style={{ width: `${(strength / 4) * 100}%` }}
                     />
                   </div>
-                  <span className="text-xs text-gray-400 font-body w-10">{strengthLabels[strength]}</span>
+                  <span className="text-xs text-onSurfaceVariant font-body w-10">{strengthLabels[strength]}</span>
                 </div>
               )}
-              <p id="password-hint" className="mt-1.5 text-xs text-gray-500 font-body">
+              <p id="password-hint" className="mt-1.5 text-xs text-onSurfaceVariant font-body">
                 At least 8 characters with a lowercase letter and a number.
               </p>
             </div>
             <div>
-              <label htmlFor="confirm-password" className="block text-sm font-medium text-gray-400 mb-2">
+              <label htmlFor="confirm-password" className="block text-sm font-medium text-onSurfaceVariant mb-2">
                 Confirm Password
               </label>
               <input
                 id="confirm-password"
                 type="password"
                 required
-                className="appearance-none relative block w-full px-4 py-3 bg-surfaceContainerHighest border border-outlineVariant rounded-lg placeholder-gray-500 text-onSurface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-body"
+                className="appearance-none relative block w-full px-4 py-3 bg-surfaceContainerHighest border border-outlineVariant rounded-lg placeholder-outline text-onSurface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-body"
                 placeholder="••••••••"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}

@@ -49,13 +49,13 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
               <h1 className="text-2xl font-bold text-onSurface font-heading mb-2">
                 Something went wrong
               </h1>
-              <p className="text-sm text-gray-400 font-body">
+              <p className="text-sm text-onSurfaceVariant font-body">
                 An unexpected error occurred. Please try refreshing the page.
               </p>
             </div>
             {this.state.error && import.meta.env.DEV && (
               <details className="mb-6">
-                <summary className="text-sm text-gray-400 font-body cursor-pointer hover:text-onSurface">
+                <summary className="text-sm text-onSurfaceVariant font-body cursor-pointer hover:text-onSurface">
                   Error details
                 </summary>
                 <pre className="mt-2 p-4 bg-background rounded-lg text-xs text-red-400 font-body overflow-auto max-h-32">
@@ -83,7 +83,7 @@ const LoadingFallback = () => (
   <div className="min-h-screen bg-background flex items-center justify-center">
     <div className="flex flex-col items-center gap-4">
       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      <p className="text-sm text-gray-400 font-body">Loading...</p>
+      <p className="text-sm text-onSurfaceVariant font-body">Loading...</p>
     </div>
   </div>
 );

@@ -21,6 +21,95 @@ import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import java.util.concurrent.TimeUnit
 
+import okhttp3.Authenticator
+import okhttp3.Request
+import okhttp3.Response
+import okhttp3.Route
+import okhttp3.RequestBody.Companion.toRequestBody
+import de.schuelken.studyhabit.core.network.RefreshRequest
+import de.schuelken.studyhabit.core.network.RefreshResponse
+import de.schuelken.studyhabit.core.network.ApiResponse
+
+class TokenAuthenticator(
+    private val tokenStorage: TokenStorage,
+    private val preferences: AppPreferences,
+    private val json: Json,
+) : Authenticator {
+    @Synchronized
+    override fun authenticate(route: Route?, response: Response): Request? {
+        val path = response.request.url.encodedPath
+        if (path.endsWith("auth/login") || path.endsWith("auth/register") || path.endsWith("auth/refresh")) {
+            return null
+        }
+
+        var priorResponse = response.priorResponse
+        var priorCount = 0
+        while (priorResponse != null) {
+            priorCount++
+            if (priorCount >= 2) return null
+            priorResponse = priorResponse.priorResponse
+        }
+
+        val requestAuth = response.request.header("Authorization")
+        val currentToken = tokenStorage.getToken()
+        if (!currentToken.isNullOrBlank() && requestAuth != null && requestAuth != "Bearer $currentToken") {
+            return response.request.newBuilder()
+                .header("Authorization", "Bearer $currentToken")
+                .build()
+        }
+
+        val refreshToken = tokenStorage.getRefreshToken() ?: return null
+
+        val rawUrl = preferences.serverUrl.value.trim().removeSuffix("/")
+        if (rawUrl.isBlank()) return null
+        val baseWithApi = if (rawUrl.endsWith("/api/v1")) "$rawUrl/" else "$rawUrl/api/v1/"
+        val refreshUrl = (baseWithApi.toHttpUrlOrNull() ?: return null).newBuilder()
+            .addPathSegment("auth")
+            .addPathSegment("refresh")
+            .build()
+
+        val refreshPayload = json.encodeToString(
+            RefreshRequest.serializer(),
+            RefreshRequest(refreshToken)
+        )
+        val refreshBody = refreshPayload.toRequestBody("application/json".toMediaType())
+        val refreshReq = Request.Builder()
+            .url(refreshUrl)
+            .post(refreshBody)
+            .build()
+
+        val directClient = OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(20, TimeUnit.SECONDS)
+            .build()
+
+        return try {
+            directClient.newCall(refreshReq).execute().use { refreshRes ->
+                if (refreshRes.isSuccessful) {
+                    val bodyString = refreshRes.body?.string() ?: return null
+                    val refreshResp = json.decodeFromString(
+                        ApiResponse.serializer(RefreshResponse.serializer()),
+                        bodyString
+                    )
+                    val newAccessToken = refreshResp.data.accessToken
+                    val newRefreshToken = refreshResp.data.refreshToken
+                    tokenStorage.saveToken(newAccessToken)
+                    tokenStorage.saveRefreshToken(newRefreshToken)
+
+                    response.request.newBuilder()
+                        .header("Authorization", "Bearer $newAccessToken")
+                        .build()
+                } else {
+                    tokenStorage.clear()
+                    null
+                }
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+}
+
 class AppContainer(val context: Context) {
     val preferences = AppPreferences(context)
     val tokenStorage = TokenStorage(context)
@@ -37,7 +126,7 @@ class AppContainer(val context: Context) {
     private val dynamicUrlInterceptor = Interceptor { chain ->
         var request = chain.request()
         val rawUrl = preferences.serverUrl.value.trim().removeSuffix("/")
-        if (rawUrl.isEmpty()) {
+        if (rawUrl.isBlank()) {
             throw java.io.IOException("Server URL is not configured. Please set your Server URL in Sync Settings.")
         }
         val baseWithApi = if (rawUrl.endsWith("/api/v1")) "$rawUrl/" else "$rawUrl/api/v1/"
@@ -58,6 +147,7 @@ class AppContainer(val context: Context) {
         .writeTimeout(20, TimeUnit.SECONDS)
         .addInterceptor(dynamicUrlInterceptor)
         .addInterceptor(AuthInterceptor(tokenStorage))
+        .authenticator(TokenAuthenticator(tokenStorage, preferences, json))
         .build()
 
     val api: StudyHabitApi = Retrofit.Builder()

@@ -32,24 +32,43 @@ class TokenStorage(context: Context) {
         )
     }
 
-    fun getToken(): String? = prefs.getString("auth_token", null)
-
-    fun saveToken(token: String) {
-        prefs.edit().putString("auth_token", token).apply()
+    companion object {
+        const val KEY_AUTH_TOKEN = "auth_token"
+        const val KEY_REFRESH_TOKEN = "refresh_token"
+        const val KEY_USER_ID = "user_id"
+        const val KEY_USER_EMAIL = "user_email"
     }
 
-    fun getUserId(): String? = prefs.getString("user_id", null)
+    fun getToken(): String? = prefs.getString(KEY_AUTH_TOKEN, null)
 
-    fun getUserEmail(): String? = prefs.getString("user_email", null)
+    fun saveToken(token: String) {
+        prefs.edit().putString(KEY_AUTH_TOKEN, token).apply()
+    }
+
+    fun getRefreshToken(): String? = prefs.getString(KEY_REFRESH_TOKEN, null)
+
+    fun saveRefreshToken(token: String) {
+        prefs.edit().putString(KEY_REFRESH_TOKEN, token).apply()
+    }
+
+    fun getUserId(): String? = prefs.getString(KEY_USER_ID, null)
+
+    fun getUserEmail(): String? = prefs.getString(KEY_USER_EMAIL, null)
 
     fun saveUser(id: String, email: String) {
         prefs.edit()
-            .putString("user_id", id)
-            .putString("user_email", email)
+            .putString(KEY_USER_ID, id)
+            .putString(KEY_USER_EMAIL, email)
             .apply()
     }
 
     fun clear() {
-        prefs.edit().clear().apply()
+        prefs.edit()
+            .remove(KEY_AUTH_TOKEN)
+            .remove(KEY_REFRESH_TOKEN)
+            .remove(KEY_USER_ID)
+            .remove(KEY_USER_EMAIL)
+            .clear()
+            .apply()
     }
 }

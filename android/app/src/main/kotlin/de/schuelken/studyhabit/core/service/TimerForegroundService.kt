@@ -16,9 +16,14 @@ import androidx.core.app.NotificationCompat
 import de.schuelken.studyhabit.MainActivity
 import de.schuelken.studyhabit.R
 import de.schuelken.studyhabit.StudyHabitApplication
+import de.schuelken.studyhabit.core.database.AppDatabase
+import de.schuelken.studyhabit.core.database.StudySessionEntity
+import de.schuelken.studyhabit.core.database.UserStatsEntity
 import de.schuelken.studyhabit.core.model.TimerPhase
 import de.schuelken.studyhabit.core.model.TimerType
 import de.schuelken.studyhabit.core.preferences.AppPreferences
+import de.schuelken.studyhabit.core.service.StreakManager
+import de.schuelken.studyhabit.core.service.XpCalculator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -434,13 +439,81 @@ class TimerForegroundService : Service() {
 
     private fun stopTimer() {
         tickerJob?.cancel()
-        accumulatedElapsedSeconds = 0
-        accumulatedWorkSeconds = 0
-        val stopped = _timerState.value.copy(isRunning = false, isPaused = false)
-        _timerState.value = stopped
-        preferences.clearActiveTimers()
-        stopForeground(STOP_FOREGROUND_REMOVE)
-        stopSelf()
+        val curr = _timerState.value
+        val runningSec = if (curr.isRunning && !curr.isPaused) {
+            ((SystemClock.elapsedRealtime() - baseElapsedRealtime) / 1000).toInt()
+        } else 0
+        val finalElapsedSeconds = accumulatedElapsedSeconds + runningSec
+        val finalWorkSeconds = if (curr.phase == TimerPhase.WORK) {
+            accumulatedWorkSeconds + finalElapsedSeconds
+        } else {
+            accumulatedWorkSeconds
+        }
+
+        serviceScope.launch {
+            if ((accumulatedWorkSeconds >= 60 || accumulatedElapsedSeconds >= 60 || finalWorkSeconds >= 60 || finalElapsedSeconds >= 60) && curr.subjectId.isNotBlank()) {
+                val studySec = if (finalWorkSeconds >= 60) finalWorkSeconds else finalElapsedSeconds
+                val actualMinutes = maxOf(1, studySec / 60)
+                val plannedMinutes = if (curr.timerType == TimerType.FREE_TIMER) 0 else (curr.totalSeconds / 60)
+                val xpEarned = XpCalculator.calculateSessionXp(
+                    actualMinutes = actualMinutes,
+                    confidence = 3,
+                    isPomodoro = curr.timerType == TimerType.POMODORO,
+                    pomodorosCompleted = curr.pomodorosCompleted,
+                    plannedSeconds = curr.totalSeconds,
+                    studiedSeconds = studySec
+                )
+                val app = applicationContext as? StudyHabitApplication
+                val db = AppDatabase.getInstance(applicationContext)
+                val session = StudySessionEntity(
+                    id = curr.sessionId.ifEmpty { UUID.randomUUID().toString() },
+                    subjectId = curr.subjectId,
+                    topicId = curr.topicId,
+                    chapterId = curr.chapterId,
+                    startedAt = curr.startedAt,
+                    endedAt = System.currentTimeMillis(),
+                    plannedDurationMinutes = plannedMinutes,
+                    actualDurationMinutes = actualMinutes,
+                    pomodorosCompleted = curr.pomodorosCompleted,
+                    confidenceRating = 3,
+                    notes = null,
+                    xpEarned = xpEarned,
+                    sourceId = curr.sourceId,
+                    isFreeTimer = curr.timerType == TimerType.FREE_TIMER,
+                    updatedAt = System.currentTimeMillis()
+                )
+                db.sessionDao().upsert(session)
+                db.subjectDao().updateXp(curr.subjectId, xpEarned)
+
+                var bonusXp = 0
+                val streakManager = app?.container?.streakManager ?: StreakManager(db.userStatsDao(), preferences)
+                streakManager.recordStudyDay { reason ->
+                    bonusXp += XpCalculator.xpForReason(reason)
+                }
+
+                val currentStats = db.userStatsDao().getUserStats() ?: UserStatsEntity()
+                val totalAwardedXp = xpEarned + bonusXp
+                val newTotalXp = currentStats.totalXp + totalAwardedXp
+                val newLevel = XpCalculator.calculateLevel(newTotalXp)
+                val newTotalMinutes = currentStats.totalStudyMinutes + actualMinutes
+                db.userStatsDao().upsert(
+                    currentStats.copy(
+                        totalXp = newTotalXp,
+                        currentLevel = newLevel,
+                        totalStudyMinutes = newTotalMinutes,
+                        updatedAt = System.currentTimeMillis()
+                    )
+                )
+                app?.container?.triggerDataChangedSync()
+            }
+            accumulatedElapsedSeconds = 0
+            accumulatedWorkSeconds = 0
+            val stopped = curr.copy(isRunning = false, isPaused = false)
+            _timerState.value = stopped
+            preferences.clearActiveTimers()
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+        }
     }
 
     private fun startTicker() {

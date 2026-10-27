@@ -1,5 +1,5 @@
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import ProjectSwitcher from './ProjectSwitcher';
 
@@ -8,6 +8,17 @@ export default function Layout() {
   const location = useLocation();
   const { logout } = useAuth();
   const [isSidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isSidebarOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setSidebarOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isSidebarOpen]);
 
 
   const handleLogout = async () => {

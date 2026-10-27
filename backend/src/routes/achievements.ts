@@ -46,7 +46,10 @@ router.get('/:key', async (req, res, next) => {
 
 router.post('/check', async (req, res, next) => {
   try {
-    const newlyUnlocked = await AchievementService.checkAndUnlock(req.user.userId);
+    const timezoneOffsetMinutes = typeof req.body?.timezoneOffsetMinutes === 'number'
+      ? req.body.timezoneOffsetMinutes
+      : undefined;
+    const newlyUnlocked = await AchievementService.checkAndUnlock(req.user.userId, undefined, timezoneOffsetMinutes);
     const all = await prisma.achievement.findMany({
       where: { userId: req.user.userId },
       orderBy: { unlockedAt: 'desc' },

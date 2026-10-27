@@ -116,12 +116,40 @@ export default function Settings() {
   }, [seedColor, fontScale, themeMode, workDuration, shortBreak, longBreak, longBreakEvery,
       autoStartBreaks, vibrationOnComplete, enableNotifications, gracePeriod, isLoading]);
 
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  const handleExportData = async () => {
+    try {
+      setIsExporting(true);
+      setExportError(null);
+      const res = await apiClient.get('/export');
+      const dataStr = JSON.stringify(res.data, null, 2);
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const date = new Date().toISOString().split('T')[0];
+      a.href = url;
+      a.download = `studyhabit-export-${date}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      console.error('Failed to export study data:', err);
+      setExportError(err?.response?.data?.error?.message || 'Failed to export study data');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const handleLogout = async () => {
+    if (!window.confirm('Are you sure you want to disconnect and sign out?')) {
+      return;
+    }
     await logout();
     navigate('/login');
   };
-
-  // Data management is mobile-only
 
   const renderFontScaleButton = (scale: 'small' | 'normal' | 'large', label: string) => (
     <button
@@ -129,7 +157,7 @@ export default function Settings() {
       className={`px-4 py-2 rounded-lg text-sm font-medium font-body transition-all ${
         fontScale === scale
           ? 'bg-primary text-[#101415]'
-          : 'bg-surface text-gray-400 hover:text-gray-300'
+          : 'bg-surface text-onSurfaceVariant hover:text-onSurface'
       }`}
     >
       {label}
@@ -143,7 +171,7 @@ export default function Settings() {
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-onSurface font-heading">Settings</h1>
-            <p className="mt-1 text-sm text-gray-400 font-body">
+            <p className="mt-1 text-sm text-onSurfaceVariant font-body">
               Customize your StudyHabit experience
             </p>
           </div>
@@ -167,7 +195,7 @@ export default function Settings() {
             <div className="mb-6">
               <label
                 htmlFor="theme-mode"
-                className="block text-sm font-medium text-gray-400 font-body mb-3"
+                className="block text-sm font-medium text-onSurfaceVariant font-body mb-3"
               >
                 Theme Mode
               </label>
@@ -175,7 +203,7 @@ export default function Settings() {
                 id="theme-mode"
                 value={themeMode}
                 onChange={(e) => setThemeMode(Number(e.target.value))}
-                className="px-4 py-2 bg-surface rounded-lg text-sm text-gray-200 font-body border border-outlineVariant focus:outline-none focus:ring-2 focus:ring-primary"
+                className="px-4 py-2 bg-surface rounded-lg text-sm text-onSurface font-body border border-outlineVariant focus:outline-none focus:ring-2 focus:ring-primary"
               >
                 <option value={2}>Dark</option>
                 <option value={1}>Light</option>
@@ -185,15 +213,18 @@ export default function Settings() {
 
             {/* Seed Color */}
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-400 font-body mb-3">
+              <label className="block text-sm font-medium text-onSurfaceVariant font-body mb-3">
                 Seed Color
               </label>
               <div className="flex flex-wrap gap-3">
                 {PRESET_SEEDS.map((preset) => (
                   <button
                     key={preset.seed}
+                    type="button"
                     onClick={() => setSeedColor(preset.seed)}
-                    className={`w-10 h-10 rounded-full transition-all hover:scale-110 ${
+                    aria-label={`Theme color ${preset.seed}`}
+                    aria-pressed={seedColor === preset.seed}
+                    className={`w-10 h-10 rounded-full transition-all hover:scale-110 focus:outline-none focus:ring-2 focus:ring-primary ${
                       seedColor === preset.seed ? 'ring-2 ring-white ring-offset-2 ring-offset-[#323536]' : ''
                     }`}
                     style={{ backgroundColor: preset.seed }}
@@ -205,7 +236,7 @@ export default function Settings() {
 
             {/* Font Scale */}
             <div>
-              <label className="block text-sm font-medium text-gray-400 font-body mb-3">
+              <label className="block text-sm font-medium text-onSurfaceVariant font-body mb-3">
                 Font Scale
               </label>
               <div className="flex gap-2">
@@ -226,7 +257,7 @@ export default function Settings() {
             {/* Work Duration */}
             <div className="mb-6">
               <div className="flex justify-between items-center mb-3">
-                <label className="text-sm font-medium text-gray-400 font-body">
+                <label className="text-sm font-medium text-onSurfaceVariant font-body">
                   Work Duration
                 </label>
                 <span className="text-sm text-onSurface font-data">{workDuration} min</span>
@@ -239,7 +270,7 @@ export default function Settings() {
                 onChange={(e) => setWorkDuration(Number(e.target.value))}
                 className="w-full h-2 bg-surface rounded-lg appearance-none cursor-pointer accent-primary"
               />
-              <div className="flex justify-between text-xs text-gray-500 font-body mt-1">
+              <div className="flex justify-between text-xs text-onSurfaceVariant font-body mt-1">
                 <span>5 min</span>
                 <span>90 min</span>
               </div>
@@ -248,7 +279,7 @@ export default function Settings() {
             {/* Short Break */}
             <div className="mb-6">
               <div className="flex justify-between items-center mb-3">
-                <label className="text-sm font-medium text-gray-400 font-body">
+                <label className="text-sm font-medium text-onSurfaceVariant font-body">
                   Short Break
                 </label>
                 <span className="text-sm text-onSurface font-data">{shortBreak} min</span>
@@ -261,7 +292,7 @@ export default function Settings() {
                 onChange={(e) => setShortBreak(Number(e.target.value))}
                 className="w-full h-2 bg-surface rounded-lg appearance-none cursor-pointer accent-primary"
               />
-              <div className="flex justify-between text-xs text-gray-500 font-body mt-1">
+              <div className="flex justify-between text-xs text-onSurfaceVariant font-body mt-1">
                 <span>1 min</span>
                 <span>30 min</span>
               </div>
@@ -270,7 +301,7 @@ export default function Settings() {
             {/* Long Break */}
             <div className="mb-6">
               <div className="flex justify-between items-center mb-3">
-                <label className="text-sm font-medium text-gray-400 font-body">
+                <label className="text-sm font-medium text-onSurfaceVariant font-body">
                   Long Break
                 </label>
                 <span className="text-sm text-onSurface font-data">{longBreak} min</span>
@@ -283,7 +314,7 @@ export default function Settings() {
                 onChange={(e) => setLongBreak(Number(e.target.value))}
                 className="w-full h-2 bg-surface rounded-lg appearance-none cursor-pointer accent-primary"
               />
-              <div className="flex justify-between text-xs text-gray-500 font-body mt-1">
+              <div className="flex justify-between text-xs text-onSurfaceVariant font-body mt-1">
                 <span>5 min</span>
                 <span>60 min</span>
               </div>
@@ -292,7 +323,7 @@ export default function Settings() {
             {/* Long Break Every */}
             <div className="mb-6">
               <div className="flex justify-between items-center mb-3">
-                <label className="text-sm font-medium text-gray-400 font-body">
+                <label className="text-sm font-medium text-onSurfaceVariant font-body">
                   Long Break Every
                 </label>
                 <span className="text-sm text-onSurface font-data">{longBreakEvery} pomodoros</span>
@@ -305,7 +336,7 @@ export default function Settings() {
                 onChange={(e) => setLongBreakEvery(Number(e.target.value))}
                 className="w-full h-2 bg-surface rounded-lg appearance-none cursor-pointer accent-primary"
               />
-              <div className="flex justify-between text-xs text-gray-500 font-body mt-1">
+              <div className="flex justify-between text-xs text-onSurfaceVariant font-body mt-1">
                 <span>2 pomodoros</span>
                 <span>8 pomodoros</span>
               </div>
@@ -313,12 +344,16 @@ export default function Settings() {
 
             {/* Auto-start Breaks */}
             <div className="flex items-center justify-between mb-4">
-              <label className="text-sm font-medium text-gray-400 font-body">
+              <label className="text-sm font-medium text-onSurfaceVariant font-body">
                 Auto-start Breaks
               </label>
               <button
+                type="button"
+                role="switch"
+                aria-checked={autoStartBreaks}
+                aria-label="Auto-start Breaks"
                 onClick={() => setAutoStartBreaks(!autoStartBreaks)}
-                className={`w-12 h-6 rounded-full p-1 transition-colors ${
+                className={`w-12 h-6 rounded-full p-1 transition-colors focus:outline-none focus:ring-2 focus:ring-primary ${
                   autoStartBreaks ? 'bg-primary' : 'bg-surface'
                 }`}
               >
@@ -332,12 +367,16 @@ export default function Settings() {
 
             {/* Vibration on Complete */}
             <div className="flex items-center justify-between">
-              <label className="text-sm font-medium text-gray-400 font-body">
+              <label className="text-sm font-medium text-onSurfaceVariant font-body">
                 Vibration on Complete
               </label>
               <button
+                type="button"
+                role="switch"
+                aria-checked={vibrationOnComplete}
+                aria-label="Vibration on Complete"
                 onClick={() => setVibrationOnComplete(!vibrationOnComplete)}
-                className={`w-12 h-6 rounded-full p-1 transition-colors ${
+                className={`w-12 h-6 rounded-full p-1 transition-colors focus:outline-none focus:ring-2 focus:ring-primary ${
                   vibrationOnComplete ? 'bg-primary' : 'bg-surface'
                 }`}
               >
@@ -358,12 +397,16 @@ export default function Settings() {
             </h3>
 
             <div className="flex items-center justify-between">
-              <label className="text-sm font-medium text-gray-400 font-body">
+              <label className="text-sm font-medium text-onSurfaceVariant font-body">
                 Enable Notifications
               </label>
               <button
+                type="button"
+                role="switch"
+                aria-checked={enableNotifications}
+                aria-label="Enable Notifications"
                 onClick={() => setEnableNotifications(!enableNotifications)}
-                className={`w-12 h-6 rounded-full p-1 transition-colors ${
+                className={`w-12 h-6 rounded-full p-1 transition-colors focus:outline-none focus:ring-2 focus:ring-primary ${
                   enableNotifications ? 'bg-primary' : 'bg-surface'
                 }`}
               >
@@ -386,7 +429,7 @@ export default function Settings() {
             {/* Grace Period */}
             <div className="mb-6">
               <div className="flex justify-between items-center mb-3">
-                <label className="text-sm font-medium text-gray-400 font-body">
+                <label className="text-sm font-medium text-onSurfaceVariant font-body">
                   Grace Period
                 </label>
                 <span className="text-sm text-onSurface font-data">{gracePeriod}h</span>
@@ -400,7 +443,7 @@ export default function Settings() {
                 onChange={(e) => setGracePeriod(Number(e.target.value))}
                 className="w-full h-2 bg-surface rounded-lg appearance-none cursor-pointer accent-tertiary"
               />
-              <div className="flex justify-between text-xs text-gray-500 font-body mt-1">
+              <div className="flex justify-between text-xs text-onSurfaceVariant font-body mt-1">
                 <span>0h</span>
                 <span>4h</span>
               </div>
@@ -409,10 +452,10 @@ export default function Settings() {
             {/* Freeze Tokens */}
             <div className="flex items-center justify-between p-4 bg-surface rounded-xl">
               <div>
-                <label className="text-sm font-medium text-gray-400 font-body">
+                <label className="text-sm font-medium text-onSurfaceVariant font-body">
                   Freeze Tokens Available
                 </label>
-                <p className="text-xs text-gray-500 font-body mt-1">
+                <p className="text-xs text-onSurfaceVariant font-body mt-1">
                   Use to protect your streak (max 1/week)
                 </p>
               </div>
@@ -429,14 +472,27 @@ export default function Settings() {
               Data Management
             </h3>
 
-            <div className="w-full flex items-start gap-3 p-4 bg-primary/10 border border-primary/20 rounded-xl">
-              <span className="material-symbols-rounded text-primary mt-0.5">info</span>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-surface rounded-xl">
               <div>
-                <h4 className="text-sm font-bold text-primary font-heading mb-1">Mobile App Required</h4>
-                <p className="text-sm text-primary/80 font-body">
-                  Features like data export, backup import, and local database management are exclusively available in the StudyHabit mobile application.
+                <h4 className="text-sm font-semibold text-onSurface font-heading mb-1">Export Study Data</h4>
+                <p className="text-xs text-onSurfaceVariant font-body">
+                  Download all your projects, subjects, sessions, milestones, and achievements in JSON format.
                 </p>
+                {exportError && (
+                  <p className="text-xs text-red-400 font-body mt-1">{exportError}</p>
+                )}
               </div>
+              <button
+                type="button"
+                onClick={handleExportData}
+                disabled={isExporting}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary hover:bg-primary-container text-white text-sm font-semibold rounded-xl shadow transition-colors font-body shrink-0 disabled:opacity-50"
+              >
+                <span className="material-symbols-rounded text-base">
+                  {isExporting ? 'hourglass_empty' : 'download'}
+                </span>
+                {isExporting ? 'Exporting...' : 'Export JSON'}
+              </button>
             </div>
           </div>
 
@@ -454,7 +510,7 @@ export default function Settings() {
                 </div>
                 <div>
                   <p className="text-sm font-bold text-onSurface font-heading">Cloud Sync Active</p>
-                  <p className="text-xs text-gray-400 font-body">{userEmail || 'Active'}</p>
+                  <p className="text-xs text-onSurfaceVariant font-body">{userEmail || 'Active'}</p>
                 </div>
               </div>
               <span className="px-3 py-1 bg-green-500/20 text-green-400 text-xs font-medium rounded-full font-body">

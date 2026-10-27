@@ -75,9 +75,34 @@ async function verifyHierarchyOwnership(
   return { valid: true };
 }
 
+async function recalculateUserLastStudyDate(tx: Prisma.TransactionClient, userId: string): Promise<void> {
+  const latestSession = await tx.studySession.findFirst({
+    where: {
+      subject: { project: { userId, isDeleted: false }, isDeleted: false },
+      isDeleted: false,
+    },
+    orderBy: { startedAt: 'desc' },
+  });
+
+  const lastStudyDate = latestSession ? new Date(latestSession.startedAt) : null;
+  if (lastStudyDate) {
+    lastStudyDate.setUTCHours(0, 0, 0, 0);
+  }
+
+  await tx.userStats.update({
+    where: { userId },
+    data: {
+      lastStudyDate,
+      currentStreak: latestSession ? undefined : 0,
+      updatedAt: new Date(),
+    },
+  });
+}
+
 router.get('/', async (req, res, next) => {
   try {
     const subjectId = req.query.subjectId ? String(req.query.subjectId) : undefined;
+    const projectId = req.query.projectId ? String(req.query.projectId) : undefined;
     const { skip, take, page, limit } = parsePagination(req.query as any);
     const where: any = {
       subject: { project: { userId: req.user.userId, isDeleted: false }, isDeleted: false },
@@ -85,6 +110,9 @@ router.get('/', async (req, res, next) => {
     };
     if (subjectId) {
       where.subjectId = subjectId;
+    }
+    if (projectId) {
+      where.subject = { ...where.subject, projectId };
     }
     
     const [sessions, total] = await Promise.all([
@@ -202,41 +230,62 @@ router.post('/', async (req, res, next) => {
       });
       if (userStats) {
         const sessionDate = new Date(session.startedAt);
+        sessionDate.setUTCHours(0, 0, 0, 0);
+
         const lastStudyDate = userStats.lastStudyDate ? new Date(userStats.lastStudyDate) : null;
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        sessionDate.setHours(0, 0, 0, 0);
-        const isNewStudyDay = !lastStudyDate ||
-          lastStudyDate.getTime() !== sessionDate.getTime();
+        if (lastStudyDate) {
+          lastStudyDate.setUTCHours(0, 0, 0, 0);
+        }
 
-        if (isNewStudyDay) {
-          const yesterday = new Date(today);
-          yesterday.setDate(yesterday.getDate() - 1);
-          const isConsecutive = lastStudyDate &&
-            lastStudyDate.getTime() >= yesterday.getTime();
+        const daysDiff = lastStudyDate
+          ? Math.round((sessionDate.getTime() - lastStudyDate.getTime()) / (1000 * 60 * 60 * 24))
+          : null;
 
-          const oldStreak = userStats.currentStreak;
-          const newStreak = isConsecutive ? oldStreak + 1 : 1;
-          const longestStreak = Math.max(newStreak, userStats.longestStreak);
+        let newStreak: number;
+        let newLastStudyDate: Date;
 
+        if (daysDiff === null) {
+          newStreak = 1;
+          newLastStudyDate = sessionDate;
+        } else if (daysDiff === 0 || daysDiff < 0) {
+          newStreak = userStats.currentStreak;
+          newLastStudyDate = lastStudyDate;
+        } else if (daysDiff === 1) {
+          newStreak = userStats.currentStreak + 1;
+          newLastStudyDate = sessionDate;
+        } else {
+          newStreak = 1;
+          newLastStudyDate = sessionDate;
+        }
+
+        const oldStreak = userStats.currentStreak;
+        const longestStreak = Math.max(newStreak, userStats.longestStreak);
+
+        if (newStreak > oldStreak) {
           const streakXp = XpService.xpForStreakMilestones(oldStreak, newStreak);
           if (streakXp > 0) {
             await XpService.addXpAndMinutes(req.user.userId, streakXp, 0, tx);
           }
-
-          await tx.userStats.update({
-            where: { userId: req.user.userId },
-            data: {
-              currentStreak: newStreak,
-              longestStreak,
-              lastStudyDate: sessionDate,
-              updatedAt: new Date(),
-            },
-          });
         }
+
+        await tx.userStats.update({
+          where: { userId: req.user.userId },
+          data: {
+            currentStreak: newStreak,
+            longestStreak,
+            lastStudyDate: newLastStudyDate,
+            updatedAt: new Date(),
+          },
+        });
       }
 
-      const newAchievements = await AchievementService.checkAndUnlock(req.user.userId, tx);
+      const newAchievements = await AchievementService.checkAndUnlock(
+        req.user.userId,
+        tx,
+        typeof (req.body as any)?.timezoneOffsetMinutes === 'number'
+          ? (req.body as any).timezoneOffsetMinutes
+          : undefined
+      );
 
       return { session, newAchievements };
     });
@@ -356,6 +405,10 @@ router.patch('/:id', async (req, res, next) => {
         await XpService.addXpAndMinutes(req.user.userId, xpDelta, durationDelta, tx);
       }
 
+      if (data.startedAt !== undefined) {
+        await recalculateUserLastStudyDate(tx, req.user.userId);
+      }
+
       return updated;
     });
 
@@ -405,6 +458,8 @@ router.delete('/:id', async (req, res, next) => {
         -existing.actualDurationMinutes,
         tx
       );
+
+      await recalculateUserLastStudyDate(tx, req.user.userId);
     });
 
     res.status(204).send();

@@ -1,4 +1,4 @@
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { useApi } from '../api/hooks';
 import type { Subject, SubjectMilestone } from '../types';
@@ -6,6 +6,8 @@ import CreateSessionDialog from '../components/CreateSessionDialog';
 import CreateTopicDialog from '../components/CreateTopicDialog';
 import CreateSourceDialog from '../components/CreateSourceDialog';
 import ManageMilestonesDialog from '../components/ManageMilestonesDialog';
+import EditSubjectDialog from '../components/EditSubjectDialog';
+import PomodoroTimerModal from '../components/PomodoroTimerModal';
 import apiClient from '../api/client';
 import { getLevelProgress } from '../utils/xp';
 
@@ -24,6 +26,7 @@ const isValidHttpUrl = (urlString: string | null | undefined): boolean => {
 };
 
 export default function SubjectDetail() {
+  const navigate = useNavigate();
   const { subjectId } = useParams<{ subjectId: string }>();
   const { data: subject, loading: subjectLoading, refetch: refetchSubject } = useApi<Subject & { topics: any[] }>(`/subjects/${subjectId}`);
   const { data: sessions, loading: sessionsLoading, refetch: refetchSessions } = useApi<any[]>(`/sessions?subjectId=${subjectId}`);
@@ -38,6 +41,8 @@ export default function SubjectDetail() {
   const [isTopicDialogOpen, setIsTopicDialogOpen] = useState(false);
   const [isSourceDialogOpen, setIsSourceDialogOpen] = useState(false);
   const [isMilestonesDialogOpen, setIsMilestonesDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isTimerModalOpen, setIsTimerModalOpen] = useState(false);
 
   // Chapter creation state per topic
   const [addingChapterTopicId, setAddingChapterTopicId] = useState<string | null>(null);
@@ -49,8 +54,8 @@ export default function SubjectDetail() {
 
   const loading = subjectLoading || sessionsLoading || sourcesLoading || milestonesLoading;
 
-  if (loading) return <div className="p-8 text-center text-gray-400">Loading...</div>;
-  if (!subject) return <div className="p-8 text-center text-gray-400">Subject not found</div>;
+  if (loading) return <div className="p-8 text-center text-onSurfaceVariant">Loading...</div>;
+  if (!subject) return <div className="p-8 text-center text-onSurfaceVariant">Subject not found</div>;
 
   const displaySubject = subject;
   const currentSkill = skillLabels?.[0]?.label || 'beginner';
@@ -114,6 +119,18 @@ export default function SubjectDetail() {
     refetchSubject();
   };
 
+  const handleDeleteSubject = async () => {
+    if (!window.confirm(`Are you sure you want to delete "${displaySubject.name}"? This action cannot be undone.`)) {
+      return;
+    }
+    try {
+      await apiClient.delete(`/subjects/${subjectId}`);
+      navigate('/subjects');
+    } catch (err) {
+      console.error('Failed to delete subject:', err);
+    }
+  };
+
   const handleCreateSource = async (sourceData: any) => {
     await apiClient.post('/sources', { ...sourceData, subjectId });
     refetchSources();
@@ -172,7 +189,7 @@ export default function SubjectDetail() {
               </button>
             </div>
             {displaySessions.length === 0 ? (
-              <div className="text-center py-8 text-gray-400 font-body">No study sessions logged yet.</div>
+              <div className="text-center py-8 text-onSurfaceVariant font-body">No study sessions logged yet.</div>
             ) : displaySessions.map((session) => (
               <div key={session.id} className="bg-surfaceContainerHigh rounded-3xl p-6 shadow-sm hover:shadow-md transition-shadow border border-transparent hover:border-outlineVariant">
                 <div className="text-xs text-primary font-body font-medium mb-2">
@@ -181,7 +198,7 @@ export default function SubjectDetail() {
                 <h4 className="text-base font-semibold text-onSurface font-heading mb-2">
                   {session.title}
                 </h4>
-                <p className="text-sm text-gray-400 font-body mb-3 line-clamp-2">
+                <p className="text-sm text-onSurfaceVariant font-body mb-3 line-clamp-2">
                   {session.description}
                 </p>
                 <div className="flex flex-wrap gap-2 mb-3">
@@ -194,7 +211,7 @@ export default function SubjectDetail() {
                     </span>
                   ))}
                 </div>
-                <div className="flex items-center gap-4 text-sm text-gray-400 font-body">
+                <div className="flex items-center gap-4 text-sm text-onSurfaceVariant font-body">
                   <span className="flex items-center gap-1">
                     <span className="material-symbols-rounded text-base">schedule</span>
                     {session.duration}
@@ -238,7 +255,7 @@ export default function SubjectDetail() {
               </div>
             </div>
             {displaySources.length === 0 ? (
-              <div className="text-center py-8 text-gray-400 font-body">No sources added yet.</div>
+              <div className="text-center py-8 text-onSurfaceVariant font-body">No sources added yet.</div>
             ) : displaySources.map((source) => (
               <div key={source.id} className="bg-surfaceContainerHigh rounded-3xl p-6 flex items-start gap-4 shadow-sm hover:shadow-md transition-shadow border border-transparent hover:border-outlineVariant">
                 <div className={`flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center ${
@@ -272,11 +289,11 @@ export default function SubjectDetail() {
                       {source.title}
                     </h4>
                   )}
-                  <p className="text-sm text-gray-400 font-body mb-2">
+                  <p className="text-sm text-onSurfaceVariant font-body mb-2">
                     {source.subtitle}
                   </p>
                   {source.type === 'pdf' && (
-                    <div className="w-full bg-gray-700 rounded-full h-1.5">
+                    <div className="w-full bg-surfaceContainerHighest rounded-full h-1.5">
                       <div
                         className="bg-primary h-1.5 rounded-full"
                         style={{ width: `${(source.pagesRead / source.totalPages) * 100}%` }}
@@ -284,7 +301,7 @@ export default function SubjectDetail() {
                     </div>
                   )}
                   {source.type === 'video' && (
-                    <div className="w-full bg-gray-700 rounded-full h-1.5">
+                    <div className="w-full bg-surfaceContainerHighest rounded-full h-1.5">
                       <div
                         className="bg-purple-400 h-1.5 rounded-full"
                         style={{ width: `${source.progress}%` }}
@@ -306,7 +323,7 @@ export default function SubjectDetail() {
                 Topics
               </h3>
               <div className="flex items-center gap-4">
-                <span className="text-sm text-gray-400 font-body">{displayTopics.length} topics</span>
+                <span className="text-sm text-onSurfaceVariant font-body">{displayTopics.length} topics</span>
                 <button
                   onClick={() => setIsTopicDialogOpen(true)}
                   className="text-xs flex items-center gap-1 text-primary hover:text-primary/80 font-medium transition-colors font-body"
@@ -317,19 +334,29 @@ export default function SubjectDetail() {
               </div>
             </div>
             {displayTopics.length === 0 ? (
-              <div className="text-center py-8 text-gray-400 font-body">No topics added yet.</div>
+              <div className="text-center py-8 text-onSurfaceVariant font-body">No topics added yet.</div>
             ) : displayTopics.map((topic) => (
               <div key={topic.id} className="bg-surfaceContainerHigh rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-shadow border border-transparent hover:border-outlineVariant">
                 <div
-                  className="p-6 flex items-center justify-between cursor-pointer hover:bg-surfaceContainerHighest transition-colors"
+                  role="button"
+                  tabIndex={0}
+                  aria-expanded={expandedTopics.has(topic.id)}
+                  aria-label={`Toggle topic ${topic.name}`}
+                  className="p-6 flex items-center justify-between cursor-pointer hover:bg-surfaceContainerHighest transition-colors focus:outline-none focus:ring-2 focus:ring-primary rounded-3xl"
                   onClick={() => toggleTopic(topic.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      toggleTopic(topic.id);
+                    }
+                  }}
                 >
                   <div className="flex items-center justify-between w-full">
                     <div>
                       <h4 className="text-base font-semibold text-onSurface font-heading mb-1">
                         {topic.name}
                       </h4>
-                      <p className="text-sm text-gray-400 font-body">
+                      <p className="text-sm text-onSurfaceVariant font-body">
                         {topic.taskCount} chapters
                       </p>
                     </div>
@@ -384,7 +411,7 @@ export default function SubjectDetail() {
                               setAddingChapterTopicId(null);
                               setNewChapterName('');
                             }}
-                            className="px-3 py-1.5 bg-surface hover:bg-surfaceContainerHighest text-gray-400 rounded-lg text-xs transition-colors"
+                            className="px-3 py-1.5 bg-surface hover:bg-surfaceContainerHighest text-onSurfaceVariant rounded-lg text-xs transition-colors"
                           >
                             Cancel
                           </button>
@@ -436,13 +463,13 @@ export default function SubjectDetail() {
                 <span className="material-symbols-rounded text-sm">event</span>
                 In Progress
               </span>
-              <span className="text-sm text-gray-400 font-body">
+              <span className="text-sm text-onSurfaceVariant font-body">
                 {totalStudyHours}h total study
               </span>
 
               {/* Skill Level Selector */}
               <div className="flex items-center gap-1.5 ml-auto">
-                <span className="text-xs text-gray-400 font-body">Skill:</span>
+                <span className="text-xs text-onSurfaceVariant font-body">Skill:</span>
                 <select
                   value={currentSkill}
                   disabled={isUpdatingSkill}
@@ -457,12 +484,44 @@ export default function SubjectDetail() {
                 </select>
               </div>
             </div>
-            <h1 className="text-3xl font-bold text-onSurface font-heading mb-2">
-              {displaySubject.name}
-            </h1>
-            {displaySubject.description && (
-              <p className="text-gray-400 font-body">{displaySubject.description}</p>
-            )}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h1 className="text-3xl font-bold text-onSurface font-heading mb-2">
+                  {displaySubject.name}
+                </h1>
+                {displaySubject.description && (
+                  <p className="text-onSurfaceVariant font-body">{displaySubject.description}</p>
+                )}
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setIsTimerModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary-container text-white text-sm font-semibold rounded-xl shadow transition-colors font-body"
+                >
+                  <span className="material-symbols-rounded text-base">timer</span>
+                  Start Timer
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsEditDialogOpen(true)}
+                  aria-label="Edit subject"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 bg-surfaceContainerHighest hover:bg-surfaceContainerHigh text-onSurface text-sm font-medium rounded-xl border border-outlineVariant transition-colors font-body"
+                >
+                  <span className="material-symbols-rounded text-base">edit</span>
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteSubject}
+                  aria-label="Delete subject"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 bg-surfaceContainerHighest hover:bg-red-500/20 text-red-400 text-sm font-medium rounded-xl border border-outlineVariant transition-colors font-body"
+                >
+                  <span className="material-symbols-rounded text-base">delete</span>
+                  Delete
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Tab Buttons */}
@@ -474,7 +533,7 @@ export default function SubjectDetail() {
                 className={`pb-3 text-sm font-medium font-body flex items-center gap-2 border-b-2 transition-colors ${
                   activeTab === tab
                     ? 'text-primary border-primary'
-                    : 'text-gray-400 border-transparent hover:text-gray-300'
+                    : 'text-onSurfaceVariant border-transparent hover:text-onSurface'
                 }`}
               >
                 <span className="material-symbols-rounded text-lg">
@@ -500,7 +559,7 @@ export default function SubjectDetail() {
               <div className="bg-surfaceContainerHigh rounded-3xl p-6">
                 <div className="flex items-center gap-4 mb-4">
                   <div className="flex-1">
-                    <div className="text-sm text-gray-400 font-body mb-1">XP Level</div>
+                    <div className="text-sm text-onSurfaceVariant font-body mb-1">XP Level</div>
                     <div className="text-2xl font-bold text-onSurface font-data">{level}</div>
                   </div>
                   <div className="w-12 h-12 rounded-full border-4 border-primary flex items-center justify-center">
@@ -517,7 +576,7 @@ export default function SubjectDetail() {
                   <span className="material-symbols-rounded text-tertiary text-2xl">local_fire_department</span>
                 </div>
                 <div>
-                  <div className="text-sm text-gray-400 font-body mb-1">Current Streak</div>
+                  <div className="text-sm text-onSurfaceVariant font-body mb-1">Current Streak</div>
                   <div className="text-2xl font-bold text-onSurface font-data">{stats?.currentStreak || 0}d</div>
                 </div>
               </div>
@@ -529,7 +588,7 @@ export default function SubjectDetail() {
                 </div>
                 <div className="relative z-10">
                   <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-sm text-gray-400 font-body">Next Milestone</h4>
+                    <h4 className="text-sm text-onSurfaceVariant font-body">Next Milestone</h4>
                     <button onClick={() => setIsMilestonesDialogOpen(true)} className="text-xs text-primary hover:underline">Manage</button>
                   </div>
                   
@@ -538,12 +597,12 @@ export default function SubjectDetail() {
                       <h3 className="text-lg font-semibold text-onSurface font-heading mb-2">
                         {milestones.filter((m) => !m.isCompleted).sort((a, b) => a.sortOrder - b.sortOrder)[0].title}
                       </h3>
-                      <p className="text-xs text-gray-400 font-body mb-3">
+                      <p className="text-xs text-onSurfaceVariant font-body mb-3">
                         Keep going to unlock this!
                       </p>
                     </>
                   ) : (
-                    <div className="text-sm text-gray-400 my-4">No upcoming milestones</div>
+                    <div className="text-sm text-onSurfaceVariant my-4">No upcoming milestones</div>
                   )}
                   
                   <button onClick={() => setIsSessionDialogOpen(true)} className="w-full bg-primary/20 text-primary py-2 rounded-lg text-sm font-medium hover:bg-primary/30 transition-colors font-body">
@@ -579,6 +638,21 @@ export default function SubjectDetail() {
         subjectId={subjectId!}
         milestones={milestones || []}
         onUpdate={refetchMilestones}
+      />
+      <EditSubjectDialog
+        isOpen={isEditDialogOpen}
+        onClose={() => setIsEditDialogOpen(false)}
+        subject={displaySubject as Subject}
+        onUpdated={refetchSubject}
+      />
+      <PomodoroTimerModal
+        isOpen={isTimerModalOpen}
+        onClose={() => setIsTimerModalOpen(false)}
+        initialSubjectId={subjectId}
+        onSessionLogged={() => {
+          refetchSubject();
+          refetchSessions();
+        }}
       />
     </div>
   );

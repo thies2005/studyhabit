@@ -17,7 +17,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material.icons.Icons
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
@@ -80,6 +83,7 @@ fun PomodoroScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .systemBarsPadding()
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
@@ -109,7 +113,25 @@ fun PomodoroScreen(
             contentAlignment = Alignment.Center,
             modifier = Modifier.size(280.dp)
         ) {
-            Canvas(modifier = Modifier.size(260.dp)) {
+            val progressPercent = (progress * 100).toInt()
+            val phaseText = when {
+                timerState.isOvertime -> "Continuous Focus (Overtime)"
+                timerState.phase == TimerPhase.WORK -> "Focus Phase"
+                timerState.phase == TimerPhase.SHORT_BREAK -> "Short Break"
+                timerState.phase == TimerPhase.LONG_BREAK -> "Long Break"
+                else -> "Paused"
+            }
+            Canvas(
+                modifier = Modifier
+                    .size(260.dp)
+                    .semantics {
+                        contentDescription = if (timerState.isOvertime) {
+                            "Overtime focus: ${timerState.overtimeSeconds / 60} minutes ${timerState.overtimeSeconds % 60} seconds"
+                        } else {
+                            "$phaseText progress: $progressPercent%"
+                        }
+                    }
+            ) {
                 val strokeWidth = 16.dp.toPx()
                 val radius = (size.minDimension - strokeWidth) / 2
                 val center = Offset(size.width / 2, size.height / 2)

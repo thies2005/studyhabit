@@ -432,7 +432,20 @@ export default function Achievements() {
   const totalXp = stats?.totalXp || 0;
   const loading = statsLoading || achievementsLoading;
 
-  const achievements = serverAchievements || [];
+  const serverMap = new Map((serverAchievements || []).map((a) => [a.key, a]));
+  const achievements: Achievement[] = Object.keys(ACHIEVEMENTS_METADATA).map((key) => {
+    const existing = serverMap.get(key);
+    if (existing) return existing;
+    return {
+      id: key,
+      userId: '',
+      key,
+      progress: 0,
+      unlockedAt: null,
+      createdAt: '',
+      updatedAt: '',
+    };
+  });
 
   const getInfo = (key: string): AchievementInfo => {
     return ACHIEVEMENTS_METADATA[key] || {
@@ -466,7 +479,7 @@ export default function Achievements() {
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-onSurface font-heading">Achievements</h1>
-            <p className="mt-1 text-sm text-gray-400 font-body">
+            <p className="mt-1 text-sm text-onSurfaceVariant font-body">
               Track your progress and unlock badges as you learn
             </p>
           </div>
@@ -489,18 +502,18 @@ export default function Achievements() {
                         {getLevelName(currentLevel)}
                       </span>
                     </div>
-                    <p className="text-sm text-gray-400 font-body">
+                    <p className="text-sm text-onSurfaceVariant font-body">
                       Total XP: <span className="text-primary font-data">{totalXp.toLocaleString()}</span>
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm text-gray-400 font-body mb-1">XP Progress</p>
+                    <p className="text-sm text-onSurfaceVariant font-body mb-1">XP Progress</p>
                     <p className="text-sm font-medium text-onSurface font-data">
                       {Math.max(0, xpInCurrentLevel).toLocaleString()} / {Math.max(1, xpNeeded).toLocaleString()} XP
                     </p>
                   </div>
                 </div>
-                <div className="w-full bg-gray-700 rounded-full h-3">
+                <div className="w-full bg-surfaceContainerHighest rounded-full h-3">
                   <div
                     className="bg-primary h-3 rounded-full transition-all"
                     style={{ width: `${Math.max(3, progressPercent)}%` }}
@@ -518,19 +531,19 @@ export default function Achievements() {
                     <p className="text-2xl font-bold text-onSurface font-data">
                       {achievements.filter((a) => a.unlockedAt).length}
                     </p>
-                    <p className="text-sm text-gray-400 font-body">Unlocked</p>
+                    <p className="text-sm text-onSurfaceVariant font-body">Unlocked</p>
                   </div>
                 </div>
 
                 <div className="bg-surfaceContainerHigh rounded-3xl p-6 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow">
-                  <div className="w-12 h-12 rounded-full bg-gray-700 flex items-center justify-center">
-                    <span className="material-symbols-rounded text-gray-400 text-2xl">lock</span>
+                  <div className="w-12 h-12 rounded-full bg-surfaceContainerHighest flex items-center justify-center">
+                    <span className="material-symbols-rounded text-onSurfaceVariant text-2xl">lock</span>
                   </div>
                   <div>
                     <p className="text-2xl font-bold text-onSurface font-data">
                       {achievements.filter((a) => !a.unlockedAt).length}
                     </p>
-                    <p className="text-sm text-gray-400 font-body">Locked</p>
+                    <p className="text-sm text-onSurfaceVariant font-body">Locked</p>
                   </div>
                 </div>
 
@@ -544,7 +557,7 @@ export default function Achievements() {
                         ? `${Math.round((achievements.reduce((sum, a) => sum + a.progress, 0) / achievements.length) * 100)}%`
                         : '0%'}
                     </p>
-                    <p className="text-sm text-gray-400 font-body">Complete</p>
+                    <p className="text-sm text-onSurfaceVariant font-body">Complete</p>
                   </div>
                 </div>
               </div>
@@ -558,7 +571,7 @@ export default function Achievements() {
                     className={`px-4 py-2 rounded-full text-xs font-medium font-body transition-colors shrink-0 ${
                       selectedCategory === cat
                         ? 'bg-primary text-background font-bold'
-                        : 'bg-surfaceContainerHigh text-gray-300 hover:bg-surfaceContainerHighest'
+                        : 'bg-surfaceContainerHigh text-onSurfaceVariant hover:bg-surfaceContainerHighest hover:text-onSurface'
                     }`}
                   >
                     {cat}
@@ -570,10 +583,10 @@ export default function Achievements() {
               {filteredAchievements.length === 0 ? (
                 <div className="bg-surfaceContainerHigh rounded-3xl p-12 text-center shadow-md">
                   <div className="w-16 h-16 bg-surface/50 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <span className="material-symbols-rounded text-gray-500 text-3xl">emoji_events</span>
+                    <span className="material-symbols-rounded text-onSurfaceVariant text-3xl">emoji_events</span>
                   </div>
                   <h3 className="text-xl font-bold text-onSurface font-heading mb-2">No achievements found</h3>
-                  <p className="text-gray-400 font-body">
+                  <p className="text-onSurfaceVariant font-body">
                     Start studying and tracking your sessions to earn achievements!
                   </p>
                 </div>
@@ -586,10 +599,19 @@ export default function Achievements() {
                     return (
                       <div
                         key={achievement.id}
-                        className={`bg-surfaceContainerHigh rounded-3xl p-6 transition-all hover:-translate-y-1 hover:shadow-xl cursor-pointer border border-transparent hover:border-outlineVariant ${
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`${info.name}: ${isUnlocked ? 'Unlocked' : `${Math.round(achievement.progress * 100)}% complete`}`}
+                        className={`bg-surfaceContainerHigh rounded-3xl p-6 transition-all hover:-translate-y-1 hover:shadow-xl cursor-pointer border border-transparent hover:border-outlineVariant focus:outline-none focus:ring-2 focus:ring-primary ${
                           isUnlocked ? 'shadow-md' : 'grayscale opacity-70 shadow-sm'
                         }`}
                         onClick={() => setSelectedAchievement(achievement)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setSelectedAchievement(achievement);
+                          }
+                        }}
                       >
                         <div className="flex items-center justify-between mb-4">
                           <div
@@ -608,7 +630,7 @@ export default function Achievements() {
                             </span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-surface text-gray-400">
+                            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-surface text-onSurfaceVariant">
                               {info.category}
                             </span>
                             {isUnlocked && (
@@ -623,24 +645,24 @@ export default function Achievements() {
                           {info.name}
                         </h3>
 
-                        <p className="text-sm text-gray-400 font-body mb-4 line-clamp-2">
+                        <p className="text-sm text-onSurfaceVariant font-body mb-4 line-clamp-2">
                           {info.description}
                         </p>
 
                         {isUnlocked ? (
-                          <p className="text-xs text-gray-500 font-body flex items-center gap-1">
+                          <p className="text-xs text-onSurfaceVariant font-body flex items-center gap-1">
                             <span className="material-symbols-rounded text-sm">event</span>
                             {new Date(achievement.unlockedAt!).toLocaleDateString()}
                           </p>
                         ) : (
                           <div>
-                            <div className="w-full bg-gray-700 rounded-full h-2 mb-2">
+                            <div className="w-full bg-surfaceContainerHighest rounded-full h-2 mb-2">
                               <div
                                 className="bg-primary h-2 rounded-full transition-all"
                                 style={{ width: `${Math.round(achievement.progress * 100)}%` }}
                               />
                             </div>
-                            <p className="text-xs text-gray-400 font-body">
+                            <p className="text-xs text-onSurfaceVariant font-body">
                               {Math.round(achievement.progress * 100)}% complete
                             </p>
                           </div>
@@ -689,7 +711,7 @@ export default function Achievements() {
                     {getInfo(selectedAchievement.key).name}
                   </h3>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-surface text-gray-400">
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-surface text-onSurfaceVariant">
                       {getInfo(selectedAchievement.key).category}
                     </span>
                     {selectedAchievement.unlockedAt && (
@@ -703,22 +725,22 @@ export default function Achievements() {
               <button
                 onClick={() => setSelectedAchievement(null)}
                 aria-label="Close dialog"
-                className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-surface hover:text-white transition-colors"
+                className="w-11 h-11 rounded-full flex items-center justify-center text-onSurfaceVariant hover:bg-surfaceContainerHighest hover:text-onSurface transition-colors"
               >
                 <span className="material-symbols-rounded text-lg">close</span>
               </button>
             </div>
 
-            <p className="text-base text-gray-300 font-body mb-6">
+            <p className="text-base text-onSurfaceVariant font-body mb-6">
               {getInfo(selectedAchievement.key).description}
             </p>
 
             <div className="mb-6">
-              <div className="flex justify-between text-sm text-gray-400 font-body mb-2">
+              <div className="flex justify-between text-sm text-onSurfaceVariant font-body mb-2">
                 <span>Progress</span>
                 <span>{Math.round(selectedAchievement.progress * 100)}%</span>
               </div>
-              <div className="w-full bg-gray-700 rounded-full h-3">
+              <div className="w-full bg-surfaceContainerHighest rounded-full h-3">
                 <div
                   className={`h-3 rounded-full transition-all ${
                     selectedAchievement.unlockedAt
@@ -731,7 +753,7 @@ export default function Achievements() {
             </div>
 
             {selectedAchievement.unlockedAt && (
-              <div className="flex items-center gap-2 text-sm text-gray-400 font-body">
+              <div className="flex items-center gap-2 text-sm text-onSurfaceVariant font-body">
                 <span className="material-symbols-rounded">event</span>
                 Unlocked on {new Date(selectedAchievement.unlockedAt!).toLocaleDateString()}
               </div>

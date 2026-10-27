@@ -5,15 +5,21 @@ import path from "path"
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
+  const parentEnv = loadEnv(mode, path.resolve(__dirname, '..'), '')
+  const apiUrl = env.VITE_API_URL || parentEnv.VITE_API_URL || parentEnv.API_URL || process.env.VITE_API_URL || process.env.API_URL
 
   // Fail the production build loudly if the API URL is unset. Previously the
   // client silently fell back to http://localhost:3001, so a production SPA
   // built without the build arg pointed at a dev backend.
-  if (mode === 'production' && !env.VITE_API_URL) {
+  if (mode === 'production' && !apiUrl) {
     throw new Error(
       'VITE_API_URL must be set for a production build. Pass it as a build arg ' +
       '(e.g. vite build --mode production) or Dockerfile ARG.'
     )
+  }
+
+  if (apiUrl && !process.env.VITE_API_URL) {
+    process.env.VITE_API_URL = apiUrl
   }
 
   return {

@@ -37,7 +37,7 @@ class StreakManager(
         } else {
             daysDiff = ChronoUnit.DAYS.between(lastStudyDate, today).toInt()
             when {
-                daysDiff == 0 -> {
+                daysDiff <= 0 -> {
                     newStreak = stats.currentStreak
                 }
                 daysDiff == 1 -> {
@@ -77,7 +77,7 @@ class StreakManager(
         val updatedStats = stats.copy(
             currentStreak = newStreak,
             longestStreak = newLongest,
-            lastStudyDate = if (daysDiff != 0) todayEpochDayMs else stats.lastStudyDate,
+            lastStudyDate = if (daysDiff > 0) todayEpochDayMs else stats.lastStudyDate,
             freezeTokens = freezeTokens,
             updatedAt = System.currentTimeMillis()
         )

@@ -48,18 +48,7 @@ router.post('/register', async (req, res, next) => {
     if (existing) {
       // Perform dummy bcrypt hash to match timing and prevent timing side-channel attacks
       await bcrypt.hash('dummy', 12);
-      return res.status(201).json({
-        data: {
-          user: {
-            id: crypto.randomUUID(),
-            email: existing.email,
-            createdAt: new Date().toISOString(),
-          },
-          accessToken: '',
-          refreshToken: '',
-        },
-        message: 'Registration processed. If this email is not yet registered, an account has been created.',
-      });
+      return res.status(409).json({ error: 'An account with this email already exists' });
     }
 
     const user = await AuthService.register(email, password);

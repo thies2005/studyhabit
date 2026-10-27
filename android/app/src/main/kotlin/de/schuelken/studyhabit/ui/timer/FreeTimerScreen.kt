@@ -11,7 +11,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material.icons.Icons
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
@@ -54,6 +57,7 @@ fun FreeTimerScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .systemBarsPadding()
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
@@ -76,7 +80,18 @@ fun FreeTimerScreen(
             contentAlignment = Alignment.Center,
             modifier = Modifier.size(280.dp)
         ) {
-            Canvas(modifier = Modifier.size(260.dp)) {
+            val h = elapsed / 3600
+            val m = (elapsed % 3600) / 60
+            val s = elapsed % 60
+            val formattedTime = if (h > 0) "%02d:%02d:%02d".format(h, m, s) else "%02d:%02d".format(m, s)
+
+            Canvas(
+                modifier = Modifier
+                    .size(260.dp)
+                    .semantics {
+                        contentDescription = "Timer elapsed: $formattedTime"
+                    }
+            ) {
                 val strokeWidth = 16.dp.toPx()
                 val radius = (size.minDimension - strokeWidth) / 2
                 val center = Offset(size.width / 2, size.height / 2)

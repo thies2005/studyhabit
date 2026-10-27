@@ -38,10 +38,16 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import de.schuelken.studyhabit.core.database.SubjectEntity
@@ -110,20 +116,32 @@ fun CreateSubjectSheet(
             Text(text = "Color", style = MaterialTheme.typography.titleSmall)
             Spacer(modifier = Modifier.height(8.dp))
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(AppThemeTokens.presetSeeds) { color ->
+                items(AppThemeTokens.presetSeeds.indices.toList()) { index ->
+                    val color = AppThemeTokens.presetSeeds[index]
                     val argb = color.toArgb()
                     val isSelected = argb == selectedColorArgb
                     Box(
                         modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(color)
-                            .clickable { selectedColorArgb = argb }
-                            .then(
-                                if (isSelected) Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
-                                else Modifier
-                            )
-                    )
+                            .size(48.dp)
+                            .semantics {
+                                role = Role.RadioButton
+                                selected = isSelected
+                                contentDescription = "Color option ${index + 1}"
+                            }
+                            .clickable { selectedColorArgb = argb },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(color)
+                                .then(
+                                    if (isSelected) Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                                    else Modifier
+                                )
+                        )
+                    }
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))

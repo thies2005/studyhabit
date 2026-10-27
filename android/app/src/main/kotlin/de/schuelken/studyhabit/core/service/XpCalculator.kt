@@ -43,6 +43,35 @@ object XpCalculator {
         XpReason.DAILY_GOAL -> XP_DAILY_GOAL
     }
 
+    fun calculateSessionXp(
+        actualMinutes: Int,
+        confidence: Int? = null,
+        isPomodoro: Boolean = false,
+        pomodorosCompleted: Int = 0,
+        plannedSeconds: Int = 0,
+        studiedSeconds: Int = actualMinutes * 60,
+    ): Int {
+        var xp = 0
+        if (isPomodoro) {
+            if (pomodorosCompleted > 0) {
+                xp += pomodorosCompleted * XP_COMPLETE_POMODORO
+            } else if (plannedSeconds > 0 && studiedSeconds >= (plannedSeconds * 0.8)) {
+                xp += XP_COMPLETE_POMODORO
+            }
+        } else {
+            if (actualMinutes >= 20) {
+                xp += (actualMinutes / 25).coerceAtLeast(1) * XP_COMPLETE_POMODORO
+            }
+        }
+        if (actualMinutes >= 120) {
+            xp += XP_LONG_SESSION
+        }
+        if (confidence != null && confidence >= 4) {
+            xp += XP_CONFIDENCE
+        }
+        return xp
+    }
+
     fun calculateLevel(totalXp: Int): Int {
         if (totalXp < 500) return 1
         if (totalXp < 1500) return 2

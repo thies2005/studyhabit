@@ -202,21 +202,51 @@ router.patch('/:id', async (req, res, next) => {
 router.delete('/:id', async (req, res, next) => {
   try {
     const id = String(req.params.id);
-    const result = await prisma.source.updateMany({
-      where: {
-        id,
-        subject: { project: { userId: req.user.userId, isDeleted: false }, isDeleted: false },
-        isDeleted: false,
-      },
-      data: { isDeleted: true, updatedAt: new Date() },
-    });
 
-    if (result.count === 0) {
-      return res.status(404).json({ error: 'Source not found' });
-    }
+    await prisma.$transaction(async (tx) => {
+      const existing = await tx.source.findFirst({
+        where: {
+          id,
+          subject: { isDeleted: false, project: { userId: req.user.userId, isDeleted: false } },
+          isDeleted: false,
+        },
+      });
+
+      if (!existing) {
+        throw new Error('STATUS_404:Source not found');
+      }
+
+      await tx.source.update({
+        where: { id },
+        data: { isDeleted: true, updatedAt: new Date() },
+      });
+
+      const userStats = await tx.userStats.findUnique({
+        where: { userId: req.user.userId },
+      });
+
+      if (userStats) {
+        const newTotalXp = Math.max(0, userStats.totalXp - 5);
+        const newLevel = XpService.calculateLevel(newTotalXp);
+        await tx.userStats.update({
+          where: { userId: req.user.userId },
+          data: {
+            totalXp: newTotalXp,
+            currentLevel: newLevel,
+            updatedAt: new Date(),
+          },
+        });
+      }
+    });
 
     res.status(204).send();
   } catch (error: unknown) {
+    if (error instanceof Error && error.message.startsWith('STATUS_')) {
+      const colonIdx = error.message.indexOf(':');
+      const status = parseInt(error.message.substring(7, colonIdx), 10);
+      const message = error.message.substring(colonIdx + 1);
+      return res.status(status).json({ error: message });
+    }
     next(error);
   }
 });

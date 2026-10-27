@@ -16,7 +16,7 @@ class StudyHabitApplication : Application() {
     lateinit var container: AppContainer
         private set
 
-    private val appScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    val appScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     override fun onCreate() {
         super.onCreate()
@@ -55,6 +55,11 @@ class StudyHabitApplication : Application() {
                         !container.preferences.folderSyncUri.value.isNullOrBlank()
                     ) {
                         container.folderSyncService.syncWithFolder()
+                    }
+                    if (!container.tokenStorage.getToken().isNullOrBlank() &&
+                        container.preferences.serverUrl.value.isNotBlank()
+                    ) {
+                        container.syncEngine.syncNow()
                     }
                 }
             }

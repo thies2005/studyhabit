@@ -29,7 +29,7 @@ export default function Login() {
             <span className="text-6xl text-primary material-symbols-rounded">school</span>
           </div>
           <h2 className="text-3xl font-bold text-onSurface font-heading">StudyHabit</h2>
-          <p className="mt-2 text-sm text-gray-400 font-body">
+          <p className="mt-2 text-sm text-onSurfaceVariant font-body">
             Focus. Track. Grow.
           </p>
         </div>
@@ -41,28 +41,28 @@ export default function Login() {
           )}
           <div className="space-y-4">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-400 mb-2">
+              <label htmlFor="email" className="block text-sm font-medium text-onSurfaceVariant mb-2">
                 Email address
               </label>
               <input
                 id="email"
                 type="email"
                 required
-                className="appearance-none relative block w-full px-4 py-3 bg-surfaceContainerHighest border border-outlineVariant rounded-lg placeholder-gray-500 text-onSurface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-body"
+                className="appearance-none relative block w-full px-4 py-3 bg-surfaceContainerHighest border border-outlineVariant rounded-lg placeholder-outline text-onSurface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-body"
                 placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
             </div>
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-400 mb-2">
+              <label htmlFor="password" className="block text-sm font-medium text-onSurfaceVariant mb-2">
                 Password
               </label>
               <input
                 id="password"
                 type="password"
                 required
-                className="appearance-none relative block w-full px-4 py-3 bg-surfaceContainerHighest border border-outlineVariant rounded-lg placeholder-gray-500 text-onSurface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-body"
+                className="appearance-none relative block w-full px-4 py-3 bg-surfaceContainerHighest border border-outlineVariant rounded-lg placeholder-outline text-onSurface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-body"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

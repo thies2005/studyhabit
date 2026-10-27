@@ -150,17 +150,62 @@ router.patch('/:id', async (req, res, next) => {
 router.delete('/:id', async (req, res, next) => {
   try {
     const id = String(req.params.id);
-    const result = await prisma.subject.updateMany({
-      where: { id, project: { userId: req.user.userId, isDeleted: false }, isDeleted: false },
-      data: { isDeleted: true, updatedAt: new Date() },
-    });
 
-    if (result.count === 0) {
-      return res.status(404).json({ error: 'Subject not found' });
-    }
+    await prisma.$transaction(async (tx) => {
+      const existing = await tx.subject.findFirst({
+        where: { id, project: { userId: req.user.userId, isDeleted: false }, isDeleted: false },
+      });
+
+      if (!existing) {
+        throw new Error('STATUS_404:Subject not found');
+      }
+
+      const now = new Date();
+
+      await tx.subject.update({
+        where: { id },
+        data: { isDeleted: true, updatedAt: now },
+      });
+
+      await tx.topic.updateMany({
+        where: { subjectId: id, isDeleted: false },
+        data: { isDeleted: true, updatedAt: now },
+      });
+
+      await tx.chapter.updateMany({
+        where: { topic: { subjectId: id }, isDeleted: false },
+        data: { isDeleted: true, updatedAt: now },
+      });
+
+      await tx.studySession.updateMany({
+        where: { subjectId: id, isDeleted: false },
+        data: { isDeleted: true, updatedAt: now },
+      });
+
+      await tx.source.updateMany({
+        where: { subjectId: id, isDeleted: false },
+        data: { isDeleted: true, updatedAt: now },
+      });
+
+      await tx.subjectMilestone.updateMany({
+        where: { subjectId: id, isDeleted: false },
+        data: { isDeleted: true, updatedAt: now },
+      });
+
+      await tx.skillLabel.updateMany({
+        where: { subjectId: id, isDeleted: false },
+        data: { isDeleted: true, updatedAt: now },
+      });
+    });
 
     res.status(204).send();
   } catch (error: unknown) {
+    if (error instanceof Error && error.message.startsWith('STATUS_')) {
+      const colonIdx = error.message.indexOf(':');
+      const status = parseInt(error.message.substring(7, colonIdx), 10);
+      const message = error.message.substring(colonIdx + 1);
+      return res.status(status).json({ error: message });
+    }
     next(error);
   }
 });
@@ -219,7 +264,7 @@ export function createProjectSubjectRoutes(): Router {
   projectRouter.post('/', async (req, res, next) => {
     try {
       const projectId = String((req.params as any).projectId);
-      const data = subjectSchema.parse(req.body);
+      const data = subjectSchema.parse({ ...req.body, projectId });
 
       // Verify project ownership before creating subject
       const project = await prisma.project.findFirst({

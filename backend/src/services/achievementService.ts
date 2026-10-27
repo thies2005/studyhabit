@@ -128,9 +128,13 @@ const ACHIEVEMENT_THRESHOLDS: AchievementThreshold[] = [
 ];
 
 export class AchievementService {
-  static async checkAndUnlock(userId: string, tx?: Prisma.TransactionClient): Promise<string[]> {
+  static async checkAndUnlock(
+    userId: string,
+    tx?: Prisma.TransactionClient,
+    timezoneOffsetMinutes?: number
+  ): Promise<string[]> {
     const client = tx || globalPrisma;
-    const context = await AchievementService.buildContext(userId, client);
+    const context = await AchievementService.buildContext(userId, client, timezoneOffsetMinutes);
     const newlyUnlocked: string[] = [];
 
     for (const threshold of ACHIEVEMENT_THRESHOLDS) {
@@ -171,7 +175,11 @@ export class AchievementService {
     return newlyUnlocked;
   }
 
-  private static async buildContext(userId: string, client: Prisma.TransactionClient | PrismaClient): Promise<AchievementContext> {
+  private static async buildContext(
+    userId: string,
+    client: Prisma.TransactionClient | PrismaClient,
+    timezoneOffsetMinutes?: number
+  ): Promise<AchievementContext> {
     const [userStats, sessions, sources, skills, unlockedAchievements] = await Promise.all([
       client.userStats.findUnique({ where: { userId } }),
       client.studySession.findMany({
@@ -262,7 +270,13 @@ export class AchievementService {
       if (s.actualDurationMinutes >= 180) longSession3h++;
       if (s.actualDurationMinutes >= 300) longSession5h++;
 
-      const hour = s.startedAt.getUTCHours();
+      let hour: number;
+      if (typeof timezoneOffsetMinutes === 'number' && !Number.isNaN(timezoneOffsetMinutes)) {
+        const localDate = new Date(s.startedAt.getTime() - timezoneOffsetMinutes * 60 * 1000);
+        hour = localDate.getUTCHours();
+      } else {
+        hour = s.startedAt.getUTCHours();
+      }
       if (hour < 7) sessionsBefore7am++;
       if (hour >= 22) sessionsAfter10pm++;
     }
