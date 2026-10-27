@@ -249,7 +249,7 @@ router.post('/', async (req, res, next) => {
           newLastStudyDate = sessionDate;
         } else if (daysDiff === 0 || daysDiff < 0) {
           newStreak = userStats.currentStreak;
-          newLastStudyDate = lastStudyDate;
+          newLastStudyDate = lastStudyDate ?? sessionDate;
         } else if (daysDiff === 1) {
           newStreak = userStats.currentStreak + 1;
           newLastStudyDate = sessionDate;
