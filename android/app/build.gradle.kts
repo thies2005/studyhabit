@@ -23,8 +23,8 @@ android {
         applicationId = "de.schuelken.studyhabit"
         minSdk = 26
         targetSdk = 35
-        versionCode = 79
-        versionName = "2.0.7"
+        versionCode = 80
+        versionName = "2.0.8"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
