@@ -68,6 +68,10 @@ class AppPreferences(private val prefs: SharedPreferences) {
         const val PREF_DAILY_GOAL_SUNDAY = "goal.sunday"
         const val PREF_LAST_DAILY_GOAL_AWARD_DATE = "goal.lastAwardDate"
 
+        const val PREF_APP_BLOCKER_ENABLED = "blocker.enabled"
+        const val PREF_BLOCK_ONLY_FOCUS = "blocker.onlyFocusPhase"
+        const val PREF_BLOCKED_APPS = "blocker.packages"
+
         private val floatKeys = setOf(PREF_FONT_SCALE, PREF_GRACE_PERIOD)
         private val intKeys = setOf(
             PREF_SEED_COLOR_INDEX, PREF_THEME_MODE, PREF_THEME_STYLE,
@@ -81,7 +85,7 @@ class AppPreferences(private val prefs: SharedPreferences) {
             PREF_DYNAMIC_COLOR, PREF_AUTO_START_BREAKS, PREF_AUTO_START_WORK,
             PREF_VIBRATION, PREF_CONTINUOUS_FOCUS, PREF_NOTIFICATIONS_ENABLED,
             PREF_STUDY_REMINDER_ENABLED, PREF_HAS_MIGRATED_OFFLINE,
-            PREF_FOLDER_SYNC_ENABLED
+            PREF_FOLDER_SYNC_ENABLED, PREF_APP_BLOCKER_ENABLED, PREF_BLOCK_ONLY_FOCUS
         )
         private val longKeys = setOf(
             PREF_LAST_SYNCED, PREF_SETTINGS_UPDATED_AT, PREF_FOLDER_LAST_SYNCED
@@ -92,7 +96,8 @@ class AppPreferences(private val prefs: SharedPreferences) {
             k.startsWith("pomodoro.") ||
             k.startsWith("notifications.") ||
             k.startsWith("streak.") ||
-            k.startsWith("goal.")
+            k.startsWith("goal.") ||
+            k.startsWith("blocker.")
     }
 
     private fun healAndMigratePreferences() {
@@ -468,6 +473,29 @@ class AppPreferences(private val prefs: SharedPreferences) {
 
     val folderLastSyncedAt: Long
         get() = getLongSafe(PREF_FOLDER_LAST_SYNCED, 0L)
+
+    var appBlockerEnabled: Boolean
+        get() = getBooleanSafe(PREF_APP_BLOCKER_ENABLED, true)
+        set(value) {
+            prefs.edit().putBoolean(PREF_APP_BLOCKER_ENABLED, value).apply()
+        }
+
+    var blockOnlyDuringFocusPhase: Boolean
+        get() = getBooleanSafe(PREF_BLOCK_ONLY_FOCUS, true)
+        set(value) {
+            prefs.edit().putBoolean(PREF_BLOCK_ONLY_FOCUS, value).apply()
+        }
+
+    var blockedAppPackages: Set<String>
+        get() {
+            val raw = getStringSafe(PREF_BLOCKED_APPS, "") ?: ""
+            if (raw.isBlank()) return emptySet()
+            return raw.split(",").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+        }
+        set(value) {
+            val raw = value.joinToString(",")
+            prefs.edit().putString(PREF_BLOCKED_APPS, raw).apply()
+        }
 
     fun getAllowedSettingsMap(): Map<String, Any> {
         val result = mutableMapOf<String, Any>()

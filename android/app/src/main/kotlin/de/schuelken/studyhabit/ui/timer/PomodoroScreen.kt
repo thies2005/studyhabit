@@ -241,7 +241,7 @@ fun PomodoroScreen(
             timerState = timerState,
             container = container,
             onFinished = {
-                TimerForegroundService.stop(context)
+                TimerForegroundService.finishWithoutSaving(context)
                 showReviewSheet = false
                 onNavigateBack()
             }

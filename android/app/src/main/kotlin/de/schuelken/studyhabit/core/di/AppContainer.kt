@@ -8,6 +8,7 @@ import de.schuelken.studyhabit.core.network.StudyHabitApi
 import de.schuelken.studyhabit.core.network.TokenStorage
 import de.schuelken.studyhabit.core.preferences.AppPreferences
 import de.schuelken.studyhabit.core.service.AchievementEvaluator
+import de.schuelken.studyhabit.core.service.AnkiDroidService
 import de.schuelken.studyhabit.core.service.ExportImportService
 import de.schuelken.studyhabit.core.service.FolderSyncService
 import de.schuelken.studyhabit.core.service.ReminderScheduler
@@ -165,6 +166,15 @@ class AppContainer(val context: Context) {
         FolderSyncService(context, database, preferences, exportImportService)
     }
     val reminderScheduler = ReminderScheduler(context, preferences)
+    val ankiDroidService = AnkiDroidService(
+        context = context,
+        database = database,
+        preferences = preferences,
+        streakManager = streakManager,
+        achievementEvaluator = achievementEvaluator
+    ) {
+        triggerDataChangedSync()
+    }
 
     fun triggerDataChangedSync() {
         if (!tokenStorage.getToken().isNullOrBlank() && preferences.serverUrl.value.isNotBlank()) {

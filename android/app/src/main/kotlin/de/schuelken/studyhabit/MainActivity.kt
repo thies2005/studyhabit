@@ -1,5 +1,6 @@
 package de.schuelken.studyhabit
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -8,15 +9,25 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.rememberNavController
 import de.schuelken.studyhabit.core.theme.AppTheme
 import de.schuelken.studyhabit.ui.navigation.AppNavHost
+import de.schuelken.studyhabit.ui.widget.StudyHabitWidgetProvider
 
 class MainActivity : ComponentActivity() {
+
+    private var openStartSessionFromWidget by mutableStateOf(false)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        if (intent?.action == StudyHabitWidgetProvider.ACTION_START_SESSION_FROM_WIDGET) {
+            openStartSessionFromWidget = true
+        }
 
         val app = application as StudyHabitApplication
         val container = app.container
@@ -39,10 +50,20 @@ class MainActivity : ComponentActivity() {
                     val navController = rememberNavController()
                     AppNavHost(
                         navController = navController,
-                        container = container
+                        container = container,
+                        openStartSessionFromWidget = openStartSessionFromWidget,
+                        onConsumeStartSessionFromWidget = { openStartSessionFromWidget = false }
                     )
                 }
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent.action == StudyHabitWidgetProvider.ACTION_START_SESSION_FROM_WIDGET) {
+            openStartSessionFromWidget = true
         }
     }
 }

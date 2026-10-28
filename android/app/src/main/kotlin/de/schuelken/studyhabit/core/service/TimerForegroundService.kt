@@ -24,6 +24,7 @@ import de.schuelken.studyhabit.core.model.TimerType
 import de.schuelken.studyhabit.core.preferences.AppPreferences
 import de.schuelken.studyhabit.core.service.StreakManager
 import de.schuelken.studyhabit.core.service.XpCalculator
+import de.schuelken.studyhabit.ui.widget.StudyHabitWidgetProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -90,6 +91,7 @@ class TimerForegroundService : Service() {
         const val ACTION_RESUME = "de.schuelken.studyhabit.RESUME"
         const val ACTION_SKIP_PHASE = "de.schuelken.studyhabit.SKIP_PHASE"
         const val ACTION_STOP = "de.schuelken.studyhabit.STOP"
+        const val ACTION_FINISH_WITHOUT_SAVING = "de.schuelken.studyhabit.FINISH_WITHOUT_SAVING"
 
         const val EXTRA_SUBJECT_ID = "subject_id"
         const val EXTRA_SUBJECT_NAME = "subject_name"
@@ -204,6 +206,10 @@ class TimerForegroundService : Service() {
         fun stop(context: Context) {
             context.startService(Intent(context, TimerForegroundService::class.java).apply { action = ACTION_STOP })
         }
+
+        fun finishWithoutSaving(context: Context) {
+            context.startService(Intent(context, TimerForegroundService::class.java).apply { action = ACTION_FINISH_WITHOUT_SAVING })
+        }
     }
 
     private val serviceScope = CoroutineScope(Dispatchers.Default)
@@ -244,6 +250,7 @@ class TimerForegroundService : Service() {
             ACTION_RESUME -> resumeTimer()
             ACTION_SKIP_PHASE -> skipToNextPhase()
             ACTION_STOP -> stopTimer()
+            ACTION_FINISH_WITHOUT_SAVING -> finishWithoutSavingInternal()
         }
         return START_NOT_STICKY
     }
@@ -285,6 +292,7 @@ class TimerForegroundService : Service() {
         persistState(state)
         startForegroundWithNotification(state)
         startTicker()
+        StudyHabitWidgetProvider.updateAllWidgets(this)
     }
 
     private fun initFreeTimer(
@@ -322,6 +330,7 @@ class TimerForegroundService : Service() {
         persistState(state)
         startForegroundWithNotification(state)
         startTicker()
+        StudyHabitWidgetProvider.updateAllWidgets(this)
     }
 
     private fun pauseTimer() {
@@ -333,6 +342,7 @@ class TimerForegroundService : Service() {
         persistState(updated)
         tickerJob?.cancel()
         updateNotification(updated)
+        StudyHabitWidgetProvider.updateAllWidgets(this)
     }
 
     private fun resumeTimer() {
@@ -354,6 +364,7 @@ class TimerForegroundService : Service() {
         startForegroundWithNotification(updated)
         startTicker()
         updateNotification(updated)
+        StudyHabitWidgetProvider.updateAllWidgets(this)
     }
 
     private fun skipToNextPhase() {
@@ -406,6 +417,7 @@ class TimerForegroundService : Service() {
         _timerState.value = updated
         persistState(updated)
         updateNotification(updated)
+        StudyHabitWidgetProvider.updateAllWidgets(this)
 
         if (shouldPause) {
             tickerJob?.cancel()
@@ -437,6 +449,18 @@ class TimerForegroundService : Service() {
         }
     }
 
+    private fun finishWithoutSavingInternal() {
+        tickerJob?.cancel()
+        accumulatedElapsedSeconds = 0
+        accumulatedWorkSeconds = 0
+        val stopped = _timerState.value.copy(isRunning = false, isPaused = false)
+        _timerState.value = stopped
+        preferences.clearActiveTimers()
+        StudyHabitWidgetProvider.updateAllWidgets(this)
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
+    }
+
     private fun stopTimer() {
         tickerJob?.cancel()
         val curr = _timerState.value
@@ -450,67 +474,73 @@ class TimerForegroundService : Service() {
             accumulatedWorkSeconds
         }
 
+        val stopped = curr.copy(isRunning = false, isPaused = false)
+        _timerState.value = stopped
+        preferences.clearActiveTimers()
+        StudyHabitWidgetProvider.updateAllWidgets(this)
+
         serviceScope.launch {
             if ((accumulatedWorkSeconds >= 60 || accumulatedElapsedSeconds >= 60 || finalWorkSeconds >= 60 || finalElapsedSeconds >= 60) && curr.subjectId.isNotBlank()) {
-                val studySec = if (finalWorkSeconds >= 60) finalWorkSeconds else finalElapsedSeconds
-                val actualMinutes = maxOf(1, studySec / 60)
-                val plannedMinutes = if (curr.timerType == TimerType.FREE_TIMER) 0 else (curr.totalSeconds / 60)
-                val xpEarned = XpCalculator.calculateSessionXp(
-                    actualMinutes = actualMinutes,
-                    confidence = 3,
-                    isPomodoro = curr.timerType == TimerType.POMODORO,
-                    pomodorosCompleted = curr.pomodorosCompleted,
-                    plannedSeconds = curr.totalSeconds,
-                    studiedSeconds = studySec
-                )
-                val app = applicationContext as? StudyHabitApplication
                 val db = AppDatabase.getInstance(applicationContext)
-                val session = StudySessionEntity(
-                    id = curr.sessionId.ifEmpty { UUID.randomUUID().toString() },
-                    subjectId = curr.subjectId,
-                    topicId = curr.topicId,
-                    chapterId = curr.chapterId,
-                    startedAt = curr.startedAt,
-                    endedAt = System.currentTimeMillis(),
-                    plannedDurationMinutes = plannedMinutes,
-                    actualDurationMinutes = actualMinutes,
-                    pomodorosCompleted = curr.pomodorosCompleted,
-                    confidenceRating = 3,
-                    notes = null,
-                    xpEarned = xpEarned,
-                    sourceId = curr.sourceId,
-                    isFreeTimer = curr.timerType == TimerType.FREE_TIMER,
-                    updatedAt = System.currentTimeMillis()
-                )
-                db.sessionDao().upsert(session)
-                db.subjectDao().updateXp(curr.subjectId, xpEarned)
-
-                var bonusXp = 0
-                val streakManager = app?.container?.streakManager ?: StreakManager(db.userStatsDao(), preferences)
-                streakManager.recordStudyDay { reason ->
-                    bonusXp += XpCalculator.xpForReason(reason)
-                }
-
-                val currentStats = db.userStatsDao().getUserStats() ?: UserStatsEntity()
-                val totalAwardedXp = xpEarned + bonusXp
-                val newTotalXp = currentStats.totalXp + totalAwardedXp
-                val newLevel = XpCalculator.calculateLevel(newTotalXp)
-                val newTotalMinutes = currentStats.totalStudyMinutes + actualMinutes
-                db.userStatsDao().upsert(
-                    currentStats.copy(
-                        totalXp = newTotalXp,
-                        currentLevel = newLevel,
-                        totalStudyMinutes = newTotalMinutes,
+                val existing = db.sessionDao().getSessionById(curr.sessionId)
+                if (existing == null) {
+                    val studySec = if (finalWorkSeconds >= 60) finalWorkSeconds else finalElapsedSeconds
+                    val actualMinutes = maxOf(1, studySec / 60)
+                    val plannedMinutes = if (curr.timerType == TimerType.FREE_TIMER) 0 else (curr.totalSeconds / 60)
+                    val xpEarned = XpCalculator.calculateSessionXp(
+                        actualMinutes = actualMinutes,
+                        confidence = 3,
+                        isPomodoro = curr.timerType == TimerType.POMODORO,
+                        pomodorosCompleted = curr.pomodorosCompleted,
+                        plannedSeconds = curr.totalSeconds,
+                        studiedSeconds = studySec
+                    )
+                    val app = applicationContext as? StudyHabitApplication
+                    val session = StudySessionEntity(
+                        id = curr.sessionId.ifEmpty { UUID.randomUUID().toString() },
+                        subjectId = curr.subjectId,
+                        topicId = curr.topicId,
+                        chapterId = curr.chapterId,
+                        startedAt = curr.startedAt,
+                        endedAt = System.currentTimeMillis(),
+                        plannedDurationMinutes = plannedMinutes,
+                        actualDurationMinutes = actualMinutes,
+                        pomodorosCompleted = curr.pomodorosCompleted,
+                        confidenceRating = 3,
+                        notes = null,
+                        xpEarned = xpEarned,
+                        sourceId = curr.sourceId,
+                        isFreeTimer = curr.timerType == TimerType.FREE_TIMER,
                         updatedAt = System.currentTimeMillis()
                     )
-                )
-                app?.container?.triggerDataChangedSync()
+                    db.sessionDao().upsert(session)
+                    db.subjectDao().updateXp(curr.subjectId, xpEarned)
+
+                    var bonusXp = 0
+                    val streakManager = app?.container?.streakManager ?: StreakManager(db.userStatsDao(), preferences)
+                    streakManager.recordStudyDay { reason ->
+                        bonusXp += XpCalculator.xpForReason(reason)
+                    }
+
+                    val currentStats = db.userStatsDao().getUserStats() ?: UserStatsEntity()
+                    val totalAwardedXp = xpEarned + bonusXp
+                    val newTotalXp = currentStats.totalXp + totalAwardedXp
+                    val newLevel = XpCalculator.calculateLevel(newTotalXp)
+                    val newTotalMinutes = currentStats.totalStudyMinutes + actualMinutes
+                    db.userStatsDao().upsert(
+                        currentStats.copy(
+                            totalXp = newTotalXp,
+                            currentLevel = newLevel,
+                            totalStudyMinutes = newTotalMinutes,
+                            updatedAt = System.currentTimeMillis()
+                        )
+                    )
+                    app?.container?.triggerDataChangedSync()
+                    StudyHabitWidgetProvider.updateAllWidgets(applicationContext)
+                }
             }
             accumulatedElapsedSeconds = 0
             accumulatedWorkSeconds = 0
-            val stopped = curr.copy(isRunning = false, isPaused = false)
-            _timerState.value = stopped
-            preferences.clearActiveTimers()
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         }

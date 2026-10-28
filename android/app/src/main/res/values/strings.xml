@@ -2,4 +2,7 @@
 <resources>
     <string name="app_name">StudyHabit</string>
     <string name="fgs_special_use_subtype">Runs the Pomodoro study timer in the background so timed study sessions stay accurate and completion notifications are delivered while the app is not in the foreground.</string>
+    <string name="widget_name">StudyHabit Progress</string>
+    <string name="widget_description">Shows today\'s study time, daily goal progress, and streak.</string>
+    <string name="accessibility_service_description">Monitors active apps during study sessions to block distracting apps you have selected.</string>
 </resources>

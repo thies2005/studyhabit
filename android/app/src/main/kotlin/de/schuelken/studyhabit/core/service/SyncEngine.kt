@@ -512,7 +512,7 @@ class SyncEngine(
                         subjectId = item.subjectId,
                         topicId = item.topicId,
                         chapterId = item.chapterId,
-                        type = item.type,
+                        type = if (item.filePath?.startsWith("anki://") == true) "anki" else item.type,
                         title = item.title,
                         filePath = item.filePath,
                         url = item.url,

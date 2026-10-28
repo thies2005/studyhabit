@@ -101,7 +101,7 @@ export interface SyncSource {
   subjectId: string;
   topicId: string | null;
   chapterId: string | null;
-  type: 'pdf' | 'url' | 'videoUrl';
+  type: 'pdf' | 'url' | 'videoUrl' | 'anki';
   title: string;
   filePath: string | null;
   url: string | null;

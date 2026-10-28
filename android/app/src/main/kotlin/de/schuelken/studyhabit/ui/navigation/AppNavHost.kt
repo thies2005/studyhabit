@@ -22,6 +22,7 @@ import de.schuelken.studyhabit.core.service.TimerForegroundService
 import de.schuelken.studyhabit.ui.achievements.AchievementsScreen
 import de.schuelken.studyhabit.ui.components.AppShellScaffold
 import de.schuelken.studyhabit.ui.home.HomeScreen
+import de.schuelken.studyhabit.ui.settings.AppBlockerScreen
 import de.schuelken.studyhabit.ui.settings.BatteryOptimizationScreen
 import de.schuelken.studyhabit.ui.settings.DiagnosticLogsScreen
 import de.schuelken.studyhabit.ui.settings.LoginScreen
@@ -40,7 +41,9 @@ import java.util.UUID
 fun AppNavHost(
     navController: NavHostController,
     container: AppContainer,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    openStartSessionFromWidget: Boolean = false,
+    onConsumeStartSessionFromWidget: () -> Unit = {}
 ) {
     val scope = rememberCoroutineScope()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -73,6 +76,25 @@ fun AppNavHost(
                 navController.navigate("pomodoro/${active.subjectId}")
             } else {
                 navController.navigate("free_timer/${active.subjectId}")
+            }
+        }
+    }
+
+    LaunchedEffect(openStartSessionFromWidget) {
+        if (openStartSessionFromWidget) {
+            val active = TimerForegroundService.timerState.value
+            if (active.isRunning && active.subjectId.isNotEmpty()) {
+                if (active.timerType == TimerType.POMODORO) {
+                    navController.navigate("pomodoro/${active.subjectId}")
+                } else {
+                    navController.navigate("free_timer/${active.subjectId}")
+                }
+                onConsumeStartSessionFromWidget()
+            } else if (currentRoute != "home") {
+                navController.navigate("home") {
+                    popUpTo("home") { inclusive = false }
+                    launchSingleTop = true
+                }
             }
         }
     }
@@ -129,14 +151,21 @@ fun AppNavHost(
         onOpenSettings = { navController.navigate("settings") },
         showNavigationBars = isTopLevelDestination
     ) {
-        NavContent(navController, container)
+        NavContent(
+            navController = navController,
+            container = container,
+            openStartSessionFromWidget = openStartSessionFromWidget,
+            onConsumeStartSessionFromWidget = onConsumeStartSessionFromWidget
+        )
     }
 }
 
 @Composable
 private fun NavContent(
     navController: NavHostController,
-    container: AppContainer
+    container: AppContainer,
+    openStartSessionFromWidget: Boolean = false,
+    onConsumeStartSessionFromWidget: () -> Unit = {}
 ) {
     NavHost(
         navController = navController,
@@ -147,7 +176,9 @@ private fun NavContent(
                 container = container,
                 onNavigateToPomodoro = { subjId -> navController.navigate("pomodoro/$subjId") },
                 onNavigateToFreeTimer = { subjId -> navController.navigate("free_timer/$subjId") },
-                onNavigateToSubjectDetail = { subjId -> navController.navigate("subject_detail/$subjId") }
+                onNavigateToSubjectDetail = { subjId -> navController.navigate("subject_detail/$subjId") },
+                openStartSheetImmediately = openStartSessionFromWidget,
+                onConsumeOpenStartSheet = onConsumeStartSessionFromWidget
             )
         }
 
@@ -187,7 +218,15 @@ private fun NavContent(
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToSync = { navController.navigate("sync_settings") },
                 onNavigateToBattery = { navController.navigate("battery_optimization") },
-                onNavigateToDiagnostics = { navController.navigate("diagnostic_logs") }
+                onNavigateToDiagnostics = { navController.navigate("diagnostic_logs") },
+                onNavigateToAppBlocker = { navController.navigate("app_blocker") }
+            )
+        }
+
+        composable("app_blocker") {
+            AppBlockerScreen(
+                container = container,
+                onNavigateBack = { navController.popBackStack() }
             )
         }
 

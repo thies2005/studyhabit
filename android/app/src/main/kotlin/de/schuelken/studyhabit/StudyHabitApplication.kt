@@ -34,6 +34,7 @@ class StudyHabitApplication : Application() {
         ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStart(owner: LifecycleOwner) {
                 appScope.launch {
+                    container.ankiDroidService.syncLinkedDecks()
                     if (container.preferences.folderSyncEnabled.value &&
                         !container.preferences.folderSyncUri.value.isNullOrBlank()
                     ) {

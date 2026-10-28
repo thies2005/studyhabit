@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.AlertDialog
@@ -85,7 +86,8 @@ fun SettingsScreen(
     onNavigateBack: () -> Unit,
     onNavigateToSync: () -> Unit,
     onNavigateToBattery: () -> Unit,
-    onNavigateToDiagnostics: () -> Unit
+    onNavigateToDiagnostics: () -> Unit,
+    onNavigateToAppBlocker: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -203,6 +205,34 @@ fun SettingsScreen(
                             Icon(Icons.Default.BatteryChargingFull, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                             Spacer(modifier = Modifier.width(12.dp))
                             Text(text = "Battery & Background Reliability", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                            Icon(Icons.Default.ChevronRight, contentDescription = null)
+                        }
+                        HorizontalDivider()
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onNavigateToAppBlocker() }
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(text = "Focus App Blocker", style = MaterialTheme.typography.titleMedium)
+                                val blockerCount = container.preferences.blockedAppPackages.size
+                                val statusText = if (!container.preferences.appBlockerEnabled) {
+                                    "Disabled"
+                                } else if (blockerCount == 0) {
+                                    "No apps blocked"
+                                } else {
+                                    "$blockerCount apps blocked"
+                                }
+                                Text(
+                                    text = statusText,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                             Icon(Icons.Default.ChevronRight, contentDescription = null)
                         }
                         HorizontalDivider()

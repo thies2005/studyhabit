@@ -25,12 +25,19 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Sync
+import androidx.compose.runtime.LaunchedEffect
+import de.schuelken.studyhabit.core.service.AnkiDeck
+import de.schuelken.studyhabit.core.service.SessionEditHelper
+import de.schuelken.studyhabit.ui.components.EditSessionDialog
+import de.schuelken.studyhabit.ui.widget.StudyHabitWidgetProvider
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -45,6 +52,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
@@ -103,12 +111,17 @@ fun SubjectDetailScreen(
     val topics by container.database.topicDao().getTopicsForSubjectFlow(subjectId).collectAsState(initial = emptyList())
     val skillLabels by container.database.skillLabelDao().getSkillLabelsForSubjectFlow(subjectId).collectAsState(initial = emptyList())
 
+    LaunchedEffect(subjectId) {
+        container.ankiDroidService.syncLinkedDecks(subjectId)
+    }
+
     var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = listOf("Timeline", "Sources", "Topics")
 
     var showStartSheet by remember { mutableStateOf(false) }
     var showAddSourceDialog by remember { mutableStateOf(false) }
     var showAddTopicDialog by remember { mutableStateOf(false) }
+    var editingSession by remember { mutableStateOf<StudySessionEntity?>(null) }
 
     // Dialog state for skill selector
     var skillSelectorTopicId by remember { mutableStateOf<String?>(null) }
@@ -119,6 +132,9 @@ fun SubjectDetailScreen(
 
     val totalStudyMinutes = sessions.sumOf { it.actualDurationMinutes }
     val totalStudyHours = totalStudyMinutes / 60.0
+    val totalAnkiCards = sessions.filter {
+        it.notes?.startsWith("AnkiDroid:") == true || sources.any { s -> s.id == it.sourceId && s.type == "anki" }
+    }.sumOf { it.endPage ?: 0 }
     val level = XpCalculator.calculateLevel(currentSubj.xpTotal)
     val levelName = XpCalculator.levelName(level)
     val color = Color(currentSubj.colorValue)
@@ -176,6 +192,12 @@ fun SubjectDetailScreen(
                         Text(text = "XP Total", style = MaterialTheme.typography.labelMedium)
                         Text(text = "${currentSubj.xpTotal}", style = MaterialTheme.typography.titleLarge)
                     }
+                    if (totalAnkiCards > 0) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(text = "Anki Cards", style = MaterialTheme.typography.labelMedium)
+                            Text(text = "$totalAnkiCards", style = MaterialTheme.typography.titleLarge)
+                        }
+                    }
                 }
             }
 
@@ -193,6 +215,7 @@ fun SubjectDetailScreen(
             when (selectedTab) {
                 0 -> TimelineTab(
                     sessions = sessions,
+                    onEditSession = { session -> editingSession = session },
                     onDeleteSession = { session ->
                         scope.launch {
                             container.database.sessionDao().softDelete(session.id)
@@ -210,6 +233,7 @@ fun SubjectDetailScreen(
                                     )
                                 )
                             }
+                            StudyHabitWidgetProvider.updateAllWidgets(context)
                             container.triggerDataChangedSync()
                         }
                     }
@@ -217,8 +241,29 @@ fun SubjectDetailScreen(
                 1 -> SourcesTab(
                     sources = sources,
                     onAddSourceClick = { showAddSourceDialog = true },
+                    onSyncAnkiDecks = {
+                        scope.launch {
+                            container.ankiDroidService.syncLinkedDecks(subjectId)
+                        }
+                    },
                     onOpenSource = { src ->
-                        if (src.type.equals("pdf", ignoreCase = true)) {
+                        if (src.type.equals("anki", ignoreCase = true)) {
+                            val deckId = src.filePath?.removePrefix("anki://deck/")?.toLongOrNull()
+                            val intent = if (deckId != null) {
+                                Intent(Intent.ACTION_VIEW).apply {
+                                    data = Uri.parse("anki://deck/$deckId")
+                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                }
+                            } else {
+                                context.packageManager.getLaunchIntentForPackage("com.ichi2.anki")
+                            }
+                            runCatching {
+                                if (intent != null) context.startActivity(intent)
+                            }.onFailure {
+                                val fallback = context.packageManager.getLaunchIntentForPackage("com.ichi2.anki")
+                                if (fallback != null) runCatching { context.startActivity(fallback) }
+                            }
+                        } else if (src.type.equals("pdf", ignoreCase = true)) {
                             onNavigateToPdf(src.id)
                         } else if (!src.url.isNullOrBlank()) {
                             val raw = src.url.trim()
@@ -293,6 +338,7 @@ fun SubjectDetailScreen(
     if (showAddSourceDialog) {
         AddSourceDialog(
             subjectId = currentSubj.id,
+            container = container,
             onSave = { src ->
                 scope.launch {
                     container.database.sourceDao().upsert(src)
@@ -342,11 +388,25 @@ fun SubjectDetailScreen(
             onDismiss = { showSkillSheet = false }
         )
     }
+
+    editingSession?.let { session ->
+        EditSessionDialog(
+            session = session,
+            onDismiss = { editingSession = null },
+            onSave = { newMins, newConf, newNotes ->
+                scope.launch {
+                    SessionEditHelper.updateSession(context, container, session, newMins, newConf, newNotes)
+                }
+                editingSession = null
+            }
+        )
+    }
 }
 
 @Composable
 fun TimelineTab(
     sessions: List<StudySessionEntity>,
+    onEditSession: (StudySessionEntity) -> Unit,
     onDeleteSession: (StudySessionEntity) -> Unit
 ) {
     val zone = ZoneId.systemDefault()
@@ -404,8 +464,13 @@ fun TimelineTab(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(text = dateStr, style = MaterialTheme.typography.labelMedium)
                             Spacer(modifier = Modifier.height(4.dp))
+                            val durationAndCards = if (session.endPage != null && (session.notes?.startsWith("AnkiDroid:") == true || session.endPage > 0)) {
+                                "${session.actualDurationMinutes} min • ${session.endPage} cards"
+                            } else {
+                                "${session.actualDurationMinutes} minutes studied"
+                            }
                             Text(
-                                text = "${session.actualDurationMinutes} minutes studied",
+                                text = durationAndCards,
                                 style = MaterialTheme.typography.titleMedium
                             )
                             session.notes?.let { n ->
@@ -413,8 +478,17 @@ fun TimelineTab(
                                 Text(text = n, style = MaterialTheme.typography.bodySmall)
                             }
                         }
-                        IconButton(onClick = { sessionToDelete = session }) {
-                            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = { onEditSession(session) }) {
+                                Icon(
+                                    imageVector = Icons.Default.Edit,
+                                    contentDescription = "Edit session",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            IconButton(onClick = { sessionToDelete = session }) {
+                                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+                            }
                         }
                     }
                 }
@@ -427,13 +501,27 @@ fun TimelineTab(
 fun SourcesTab(
     sources: List<SourceEntity>,
     onAddSourceClick: () -> Unit,
+    onSyncAnkiDecks: () -> Unit,
     onOpenSource: (SourceEntity) -> Unit
 ) {
+    val hasAnki = sources.any { it.type.equals("anki", ignoreCase = true) }
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Button(onClick = onAddSourceClick, modifier = Modifier.fillMaxWidth()) {
-            Icon(Icons.Default.Add, contentDescription = null)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Add Source")
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(onClick = onAddSourceClick, modifier = Modifier.weight(1f)) {
+                Icon(Icons.Default.Add, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Add Source")
+            }
+            if (hasAnki) {
+                OutlinedButton(onClick = onSyncAnkiDecks) {
+                    Icon(Icons.Default.Sync, contentDescription = null)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Sync Anki")
+                }
+            }
         }
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -457,6 +545,7 @@ fun SourcesTab(
                                 imageVector = when (src.type.lowercase()) {
                                     "pdf" -> Icons.Default.Description
                                     "videourl" -> Icons.Default.PlayCircle
+                                    "anki" -> Icons.Default.Sync
                                     else -> Icons.Default.Link
                                 },
                                 contentDescription = null,
@@ -466,7 +555,13 @@ fun SourcesTab(
                             Spacer(modifier = Modifier.width(16.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(text = src.title, style = MaterialTheme.typography.titleMedium)
-                                val subtext = if (src.currentPage != null) "Page ${src.currentPage}" else (src.url ?: src.filePath ?: "")
+                                val subtext = if (src.type.lowercase() == "anki") {
+                                    "Studied today: ${src.currentPage ?: 0} cards • Due: ${src.totalPages ?: 0}"
+                                } else if (src.currentPage != null) {
+                                    "Page ${src.currentPage}"
+                                } else {
+                                    src.url ?: src.filePath ?: ""
+                                }
                                 Text(text = subtext, style = MaterialTheme.typography.bodySmall, maxLines = 1)
                             }
                         }
@@ -585,6 +680,7 @@ fun TopicsTab(
 @Composable
 fun AddSourceDialog(
     subjectId: String,
+    container: AppContainer,
     onSave: (SourceEntity) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -592,6 +688,25 @@ fun AddSourceDialog(
     var title by remember { mutableStateOf("") }
     var type by remember { mutableStateOf("pdf") }
     var pathOrUrl by remember { mutableStateOf("") }
+    var ankiDecks by remember { mutableStateOf<List<AnkiDeck>>(emptyList()) }
+    var selectedAnkiDeck by remember { mutableStateOf<AnkiDeck?>(null) }
+    var hasAnkiPermission by remember { mutableStateOf(container.ankiDroidService.hasAnkiPermission()) }
+    val isAnkiInstalled = remember { container.ankiDroidService.isAnkiInstalled() }
+
+    val ankiPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        hasAnkiPermission = granted
+        if (granted) {
+            ankiDecks = container.ankiDroidService.getDecks()
+        }
+    }
+
+    LaunchedEffect(type) {
+        if (type == "anki" && hasAnkiPermission) {
+            ankiDecks = container.ankiDroidService.getDecks()
+        }
+    }
 
     val pdfPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -616,10 +731,14 @@ fun AddSourceDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
                     FilterChip(selected = type == "pdf", onClick = { type = "pdf" }, label = { Text("PDF") })
                     FilterChip(selected = type == "url", onClick = { type = "url" }, label = { Text("URL") })
                     FilterChip(selected = type == "videoUrl", onClick = { type = "videoUrl" }, label = { Text("Video") })
+                    FilterChip(selected = type == "anki", onClick = { type = "anki" }, label = { Text("Anki") })
                 }
                 if (type == "pdf") {
                     Spacer(modifier = Modifier.height(8.dp))
@@ -630,19 +749,90 @@ fun AddSourceDialog(
                         Text("Select PDF Document")
                     }
                 }
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = pathOrUrl,
-                    onValueChange = { pathOrUrl = it },
-                    label = { Text(if (type == "pdf") "File Path or URI" else "URL") },
-                    modifier = Modifier.fillMaxWidth()
-                )
+                if (type == "anki") {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    if (!isAnkiInstalled) {
+                        Text(
+                            text = "AnkiDroid is not installed on this device.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    } else if (!hasAnkiPermission) {
+                        Button(
+                            onClick = { ankiPermissionLauncher.launch("com.ichi2.anki.permission.READ_WRITE_DATABASE") },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Grant AnkiDroid Permission")
+                        }
+                    } else if (ankiDecks.isEmpty()) {
+                        Text(
+                            text = "No decks found in AnkiDroid.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        var deckDropdownExpanded by remember { mutableStateOf(false) }
+                        ExposedDropdownMenuBox(
+                            expanded = deckDropdownExpanded,
+                            onExpandedChange = { deckDropdownExpanded = !deckDropdownExpanded }
+                        ) {
+                            OutlinedTextField(
+                                value = selectedAnkiDeck?.deckName ?: "Choose an Anki deck...",
+                                onValueChange = {},
+                                readOnly = true,
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = deckDropdownExpanded) },
+                                modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth()
+                            )
+                            ExposedDropdownMenu(
+                                expanded = deckDropdownExpanded,
+                                onDismissRequest = { deckDropdownExpanded = false }
+                            ) {
+                                ankiDecks.forEach { deck ->
+                                    DropdownMenuItem(
+                                        text = { Text("${deck.deckName} (${deck.dueCount} due)") },
+                                        onClick = {
+                                            selectedAnkiDeck = deck
+                                            if (title.isBlank()) {
+                                                title = deck.deckName
+                                            }
+                                            deckDropdownExpanded = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = pathOrUrl,
+                        onValueChange = { pathOrUrl = it },
+                        label = { Text(if (type == "pdf") "File Path or URI" else "URL") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
         },
         confirmButton = {
             Button(
                 onClick = {
-                    if (title.isNotBlank()) {
+                    if (type == "anki") {
+                        val deck = selectedAnkiDeck
+                        if (deck != null) {
+                            val entity = SourceEntity(
+                                id = UUID.randomUUID().toString(),
+                                subjectId = subjectId,
+                                title = if (title.isNotBlank()) title.trim() else deck.deckName,
+                                type = "anki",
+                                filePath = "anki://deck/${deck.deckId}",
+                                url = null,
+                                totalPages = deck.dueCount,
+                                addedAt = System.currentTimeMillis(),
+                                updatedAt = System.currentTimeMillis()
+                            )
+                            onSave(entity)
+                        }
+                    } else if (title.isNotBlank()) {
                         val entity = SourceEntity(
                             id = UUID.randomUUID().toString(),
                             subjectId = subjectId,
@@ -656,7 +846,7 @@ fun AddSourceDialog(
                         onSave(entity)
                     }
                 },
-                enabled = title.isNotBlank()
+                enabled = if (type == "anki") selectedAnkiDeck != null else title.isNotBlank()
             ) {
                 Text("Add")
             }

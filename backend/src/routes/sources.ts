@@ -11,7 +11,7 @@ const sourceSchema = z.object({
   subjectId: z.string().uuid(),
   topicId: z.string().uuid().nullable().optional(),
   chapterId: z.string().uuid().nullable().optional(),
-  type: z.enum(['pdf', 'url', 'videoUrl']),
+  type: z.enum(['pdf', 'url', 'videoUrl', 'anki']),
   title: z.string().min(1).max(255),
   filePath: z.string().max(1000).nullable().optional(),
   url: z.string().max(2000).refine(

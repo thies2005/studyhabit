@@ -15,22 +15,29 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AcUnit
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import de.schuelken.studyhabit.core.service.SessionEditHelper
+import de.schuelken.studyhabit.ui.components.EditSessionDialog
+import kotlinx.coroutines.launch
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,7 +63,9 @@ fun HomeScreen(
     container: AppContainer,
     onNavigateToPomodoro: (String) -> Unit,
     onNavigateToFreeTimer: (String) -> Unit,
-    onNavigateToSubjectDetail: (String) -> Unit
+    onNavigateToSubjectDetail: (String) -> Unit,
+    openStartSheetImmediately: Boolean = false,
+    onConsumeOpenStartSheet: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val stats by container.database.userStatsDao().getUserStatsFlow().collectAsState(initial = UserStatsEntity())
@@ -100,6 +109,15 @@ fun HomeScreen(
     }.collectAsState(initial = emptyList())
 
     var showStartSheet by remember { mutableStateOf(false) }
+    var editingSession by remember { mutableStateOf<StudySessionEntity?>(null) }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(openStartSheetImmediately) {
+        if (openStartSheetImmediately) {
+            showStartSheet = true
+            onConsumeOpenStartSheet()
+        }
+    }
 
     // Calculate today's studied minutes
     val todayMinutes = todaySessions.sumOf { it.actualDurationMinutes }
@@ -321,8 +339,13 @@ fun HomeScreen(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(text = subjName, style = MaterialTheme.typography.titleMedium)
                                 Spacer(modifier = Modifier.height(2.dp))
+                                val subtitleText = if (session.endPage != null && session.notes?.startsWith("AnkiDroid:") == true) {
+                                    "$dateStr • ${session.actualDurationMinutes} min • ${session.endPage} cards"
+                                } else {
+                                    "$dateStr • ${session.actualDurationMinutes} min"
+                                }
                                 Text(
-                                    text = "$dateStr • ${session.actualDurationMinutes} min",
+                                    text = subtitleText,
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -335,27 +358,38 @@ fun HomeScreen(
                                     )
                                 }
                             }
-                            Column(horizontalAlignment = Alignment.End) {
-                                Text(
-                                    text = "+${session.xpEarned} XP",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                if (session.confidenceRating != null) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.semantics(mergeDescendants = true) {
-                                            contentDescription = "Confidence rating: ${session.confidenceRating} out of 5 stars"
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(
+                                        text = "+${session.xpEarned} XP",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    if (session.confidenceRating != null) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.semantics(mergeDescendants = true) {
+                                                contentDescription = "Confidence rating: ${session.confidenceRating} out of 5 stars"
+                                            }
+                                        ) {
+                                            Text(text = "${session.confidenceRating}", style = MaterialTheme.typography.labelSmall)
+                                            Icon(
+                                                imageVector = Icons.Default.Star,
+                                                contentDescription = null,
+                                                modifier = Modifier.width(14.dp),
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
                                         }
-                                    ) {
-                                        Text(text = "${session.confidenceRating}", style = MaterialTheme.typography.labelSmall)
-                                        Icon(
-                                            imageVector = Icons.Default.Star,
-                                            contentDescription = null,
-                                            modifier = Modifier.width(14.dp),
-                                            tint = MaterialTheme.colorScheme.primary
-                                        )
                                     }
+                                }
+                                IconButton(
+                                    onClick = { editingSession = session }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Edit,
+                                        contentDescription = "Edit session",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                 }
                             }
                         }
@@ -407,6 +441,19 @@ fun HomeScreen(
                 onNavigateToFreeTimer(subjId)
             },
             onDismiss = { showStartSheet = false }
+        )
+    }
+
+    editingSession?.let { session ->
+        EditSessionDialog(
+            session = session,
+            onDismiss = { editingSession = null },
+            onSave = { newMins, newConf, newNotes ->
+                scope.launch {
+                    SessionEditHelper.updateSession(context, container, session, newMins, newConf, newNotes)
+                }
+                editingSession = null
+            }
         )
     }
 }

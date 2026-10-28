@@ -16,10 +16,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -46,6 +48,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import de.schuelken.studyhabit.core.database.AchievementEntity
 import de.schuelken.studyhabit.core.database.StudySessionEntity
@@ -57,6 +60,7 @@ import de.schuelken.studyhabit.core.service.XpCalculator
 import de.schuelken.studyhabit.ui.achievements.AchievementsMetadata
 import de.schuelken.studyhabit.ui.components.AchievementUnlockBanner
 import de.schuelken.studyhabit.ui.components.LevelUpDialog
+import de.schuelken.studyhabit.ui.widget.StudyHabitWidgetProvider
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.ZoneId
@@ -87,17 +91,29 @@ fun SessionReviewSheet(
     } else {
         timerState.elapsedSeconds
     }
-    val actualMinutes = (studiedSeconds / 60).coerceAtLeast(1)
-    val plannedMinutes = (timerState.totalSeconds / 60).coerceAtLeast(actualMinutes)
+    val initialMinutes = (studiedSeconds / 60).coerceAtLeast(1)
+    var editableMinutes by remember { mutableIntStateOf(initialMinutes) }
+    var minutesText by remember { mutableStateOf(initialMinutes.toString()) }
+    val plannedMinutes = if (timerState.timerType == TimerType.FREE_TIMER) 0 else (timerState.totalSeconds / 60).coerceAtLeast(1)
 
-    // XP calculation
+    val effectivePomodoros = if (editableMinutes != initialMinutes) {
+        de.schuelken.studyhabit.core.service.SessionEditHelper.calculateEffectivePomodoros(
+            isFreeTimer = timerState.timerType == TimerType.FREE_TIMER,
+            plannedDurationMinutes = plannedMinutes,
+            actualMinutes = editableMinutes
+        )
+    } else {
+        timerState.pomodorosCompleted
+    }
+
+    // XP calculation updates live
     val xpEarned = XpCalculator.calculateSessionXp(
-        actualMinutes = actualMinutes,
+        actualMinutes = editableMinutes,
         confidence = confidenceRating,
         isPomodoro = timerState.timerType == TimerType.POMODORO,
-        pomodorosCompleted = timerState.pomodorosCompleted,
+        pomodorosCompleted = effectivePomodoros,
         plannedSeconds = timerState.totalSeconds,
-        studiedSeconds = studiedSeconds
+        studiedSeconds = editableMinutes * 60
     )
 
     ModalBottomSheet(
@@ -115,9 +131,49 @@ fun SessionReviewSheet(
             Text(text = "Session Complete!", style = MaterialTheme.typography.headlineMedium)
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "${timerState.subjectName} • $actualMinutes minutes studied",
+                text = "${timerState.subjectName} • $editableMinutes minutes studied",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Duration Adjustment
+            Text(text = "Study Duration (Minutes)", style = MaterialTheme.typography.titleSmall)
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val chipDeltas = listOf(-15, -5, -1, 1, 5)
+                chipDeltas.forEach { delta ->
+                    AssistChip(
+                        onClick = {
+                            val next = (editableMinutes + delta).coerceIn(1, 720)
+                            editableMinutes = next
+                            minutesText = next.toString()
+                        },
+                        label = { Text(if (delta > 0) "+${delta}m" else "${delta}m") },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedTextField(
+                value = minutesText,
+                onValueChange = { input ->
+                    val filtered = input.filter { it.isDigit() }
+                    minutesText = filtered
+                    filtered.toIntOrNull()?.let {
+                        editableMinutes = it.coerceIn(1, 720)
+                    }
+                },
+                label = { Text("Duration (minutes)") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Number
+                )
             )
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -197,10 +253,10 @@ fun SessionReviewSheet(
                             topicId = timerState.topicId,
                             chapterId = timerState.chapterId,
                             startedAt = timerState.startedAt,
-                            endedAt = System.currentTimeMillis(),
+                            endedAt = timerState.startedAt + editableMinutes * 60_000L,
                             plannedDurationMinutes = plannedMinutes,
-                            actualDurationMinutes = actualMinutes,
-                            pomodorosCompleted = timerState.pomodorosCompleted,
+                            actualDurationMinutes = editableMinutes,
+                            pomodorosCompleted = effectivePomodoros,
                             confidenceRating = confidenceRating,
                             notes = notes.trim().ifEmpty { null },
                             xpEarned = xpEarned,
@@ -243,7 +299,7 @@ fun SessionReviewSheet(
                         val totalAwardedXp = xpEarned + bonusXp
                         val newTotalXp = currentStats.totalXp + totalAwardedXp
                         val newLevel = XpCalculator.calculateLevel(newTotalXp)
-                        val newTotalMinutes = currentStats.totalStudyMinutes + actualMinutes
+                        val newTotalMinutes = currentStats.totalStudyMinutes + editableMinutes
 
                         val updatedStats = currentStats.copy(
                             totalXp = newTotalXp,
@@ -255,6 +311,9 @@ fun SessionReviewSheet(
 
                         // Check achievements
                         val newlyUnlocked = container.achievementEvaluator.checkAndUnlock()
+
+                        // Update widgets
+                        StudyHabitWidgetProvider.updateAllWidgets(container.context)
 
                         // Trigger sync in background (Cloud Folder Sync & Server Sync)
                         container.triggerDataChangedSync()
