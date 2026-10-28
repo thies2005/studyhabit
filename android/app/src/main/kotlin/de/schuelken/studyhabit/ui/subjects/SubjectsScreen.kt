@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -19,9 +20,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Card
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -62,8 +65,10 @@ fun SubjectsScreen(
 
     val scope = rememberCoroutineScope()
     var showCreateSheet by remember { mutableStateOf(false) }
+    var editingSubject by remember { mutableStateOf<SubjectEntity?>(null) }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         floatingActionButton = {
             FloatingActionButton(
                 onClick = {
@@ -145,6 +150,15 @@ fun SubjectsScreen(
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
+                                    IconButton(
+                                        onClick = { editingSubject = subject }
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Edit,
+                                            contentDescription = "Edit ${subject.name}",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
                                     Icon(
                                         imageVector = Icons.Default.ChevronRight,
                                         contentDescription = null,
@@ -180,6 +194,21 @@ fun SubjectsScreen(
                         }
                     },
                     onDismiss = { showCreateSheet = false }
+                )
+            }
+
+            editingSubject?.let { subj ->
+                CreateSubjectSheet(
+                    projectId = subj.projectId,
+                    existingSubject = subj,
+                    onSave = { updatedSubj ->
+                        scope.launch {
+                            container.database.subjectDao().upsert(updatedSubj)
+                            container.triggerDataChangedSync()
+                        }
+                        editingSubject = null
+                    },
+                    onDismiss = { editingSubject = null }
                 )
             }
         }

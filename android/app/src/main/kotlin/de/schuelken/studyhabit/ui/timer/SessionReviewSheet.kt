@@ -31,6 +31,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SheetValue
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -92,8 +93,10 @@ fun SessionReviewSheet(
         timerState.elapsedSeconds
     }
     val initialMinutes = (studiedSeconds / 60).coerceAtLeast(1)
+    val baselineMinutes = initialMinutes
     var editableMinutes by remember { mutableIntStateOf(initialMinutes) }
     var minutesText by remember { mutableStateOf(initialMinutes.toString()) }
+    var reduceByText by remember { mutableStateOf("") }
     val plannedMinutes = if (timerState.timerType == TimerType.FREE_TIMER) 0 else (timerState.totalSeconds / 60).coerceAtLeast(1)
 
     val effectivePomodoros = if (editableMinutes != initialMinutes) {
@@ -137,44 +140,64 @@ fun SessionReviewSheet(
             )
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Duration Adjustment
-            Text(text = "Study Duration (Minutes)", style = MaterialTheme.typography.titleSmall)
+            // Duration Adjustment Slider
+            Text(
+                text = "Study Duration: $editableMinutes min",
+                style = MaterialTheme.typography.titleSmall
+            )
+            Slider(
+                value = editableMinutes.toFloat(),
+                onValueChange = { value ->
+                    val newMins = value.toInt().coerceIn(1, 720)
+                    editableMinutes = newMins
+                    minutesText = newMins.toString()
+                    val diff = baselineMinutes - newMins
+                    reduceByText = if (diff > 0) diff.toString() else ""
+                },
+                valueRange = 1f..maxOf(baselineMinutes, editableMinutes, 120).coerceAtMost(720).toFloat(),
+                modifier = Modifier.fillMaxWidth()
+            )
             Spacer(modifier = Modifier.height(8.dp))
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                val chipDeltas = listOf(-15, -5, -1, 1, 5)
-                chipDeltas.forEach { delta ->
-                    AssistChip(
-                        onClick = {
-                            val next = (editableMinutes + delta).coerceIn(1, 720)
-                            editableMinutes = next
-                            minutesText = next.toString()
-                        },
-                        label = { Text(if (delta > 0) "+${delta}m" else "${delta}m") },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            OutlinedTextField(
-                value = minutesText,
-                onValueChange = { input ->
-                    val filtered = input.filter { it.isDigit() }
-                    minutesText = filtered
-                    filtered.toIntOrNull()?.let {
-                        editableMinutes = it.coerceIn(1, 720)
-                    }
-                },
-                label = { Text("Duration (minutes)") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Number
+                OutlinedTextField(
+                    value = minutesText,
+                    onValueChange = { input ->
+                        val filtered = input.filter { it.isDigit() }
+                        minutesText = filtered
+                        filtered.toIntOrNull()?.let {
+                            val clamped = it.coerceIn(1, 720)
+                            editableMinutes = clamped
+                            val diff = baselineMinutes - clamped
+                            reduceByText = if (diff > 0) diff.toString() else ""
+                        }
+                    },
+                    label = { Text("Actual Duration (min)") },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                 )
-            )
+
+                OutlinedTextField(
+                    value = reduceByText,
+                    onValueChange = { input ->
+                        val filtered = input.filter { it.isDigit() }
+                        reduceByText = filtered
+                        val reduction = filtered.toIntOrNull() ?: 0
+                        val newMins = (baselineMinutes - reduction).coerceIn(1, 720)
+                        editableMinutes = newMins
+                        minutesText = newMins.toString()
+                    },
+                    label = { Text("Reduce by (min)") },
+                    placeholder = { Text("e.g. 15") },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                )
+            }
             Spacer(modifier = Modifier.height(16.dp))
 
             // XP Earned Banner

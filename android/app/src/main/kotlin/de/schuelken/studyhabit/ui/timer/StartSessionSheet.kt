@@ -45,7 +45,7 @@ fun StartSessionSheet(
     subjects: List<SubjectEntity>,
     preselectedSubjectId: String? = null,
     onFetchHierarchy: suspend (String) -> Triple<List<TopicEntity>, List<ChapterEntity>, List<SourceEntity>>,
-    onStartPomodoro: (subjectId: String, subjectName: String, topicId: String?, chapterId: String?, sourceId: String?, durationMinutes: Int) -> Unit,
+    onStartPomodoro: (subjectId: String, subjectName: String, topicId: String?, chapterId: String?, sourceId: String?, durationMinutes: Int, breakDurationMinutes: Int?) -> Unit,
     onStartFreeTimer: (subjectId: String, subjectName: String, topicId: String?, chapterId: String?, sourceId: String?) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -132,8 +132,8 @@ fun StartSessionSheet(
             }
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Topic Selector (if available)
-            if (topics.isNotEmpty()) {
+            // Topic Selector (if available and hierarchy mode is not flat)
+            if (selectedSubject?.hierarchyMode != "flat" && topics.isNotEmpty()) {
                 Text(text = "Topic (Optional)", style = MaterialTheme.typography.titleMedium)
                 Spacer(modifier = Modifier.height(8.dp))
                 LazyRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -151,8 +151,8 @@ fun StartSessionSheet(
                 Spacer(modifier = Modifier.height(12.dp))
             }
 
-            // Chapter Selector (if available, filtered by topic)
-            if (filteredChapters.isNotEmpty()) {
+            // Chapter Selector (if available, filtered by topic, and hierarchy mode is threeLevel)
+            if (selectedSubject?.hierarchyMode == "threeLevel" && filteredChapters.isNotEmpty()) {
                 Text(text = "Chapter (Optional)", style = MaterialTheme.typography.titleMedium)
                 Spacer(modifier = Modifier.height(8.dp))
                 LazyRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -206,21 +206,24 @@ fun StartSessionSheet(
             Button(
                 onClick = {
                     if (selectedSubject != null) {
+                        val effectiveTopicId = if (selectedSubject.hierarchyMode != "flat") selectedTopicId else null
+                        val effectiveChapterId = if (selectedSubject.hierarchyMode == "threeLevel") selectedChapterId else null
                         if (timerType == TimerType.POMODORO) {
                             onStartPomodoro(
                                 selectedSubject.id,
                                 selectedSubject.name,
-                                selectedTopicId,
-                                selectedChapterId,
+                                effectiveTopicId,
+                                effectiveChapterId,
                                 selectedSourceId,
-                                durationMinutes
+                                durationMinutes,
+                                selectedSubject.defaultBreakMinutes
                             )
                         } else {
                             onStartFreeTimer(
                                 selectedSubject.id,
                                 selectedSubject.name,
-                                selectedTopicId,
-                                selectedChapterId,
+                                effectiveTopicId,
+                                effectiveChapterId,
                                 selectedSourceId
                             )
                         }

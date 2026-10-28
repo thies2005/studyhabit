@@ -99,6 +99,7 @@ class TimerForegroundService : Service() {
         const val EXTRA_CHAPTER_ID = "chapter_id"
         const val EXTRA_SOURCE_ID = "source_id"
         const val EXTRA_WORK_DURATION_MINUTES = "work_duration_minutes"
+        const val EXTRA_BREAK_DURATION_MINUTES = "break_duration_minutes"
 
         private val _timerState = MutableStateFlow(TimerState())
         val timerState: StateFlow<TimerState> = _timerState.asStateFlow()
@@ -150,7 +151,8 @@ class TimerForegroundService : Service() {
             topicId: String? = null,
             chapterId: String? = null,
             sourceId: String? = null,
-            durationMinutes: Int = 25
+            durationMinutes: Int = 25,
+            breakDurationMinutes: Int? = null
         ) {
             val intent = Intent(context, TimerForegroundService::class.java).apply {
                 action = ACTION_START_POMODORO
@@ -160,6 +162,9 @@ class TimerForegroundService : Service() {
                 putExtra(EXTRA_CHAPTER_ID, chapterId)
                 putExtra(EXTRA_SOURCE_ID, sourceId)
                 putExtra(EXTRA_WORK_DURATION_MINUTES, durationMinutes)
+                if (breakDurationMinutes != null) {
+                    putExtra(EXTRA_BREAK_DURATION_MINUTES, breakDurationMinutes)
+                }
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(intent)
@@ -217,6 +222,7 @@ class TimerForegroundService : Service() {
     private var baseElapsedRealtime: Long = 0L
     private var accumulatedElapsedSeconds: Int = 0
     private var accumulatedWorkSeconds: Int = 0
+    private var customBreakDurationMinutes: Int? = null
     private lateinit var preferences: AppPreferences
 
     override fun onCreate() {
@@ -236,7 +242,10 @@ class TimerForegroundService : Service() {
                 val chapterId = intent.getStringExtra(EXTRA_CHAPTER_ID)
                 val sourceId = intent.getStringExtra(EXTRA_SOURCE_ID)
                 val duration = intent.getIntExtra(EXTRA_WORK_DURATION_MINUTES, preferences.workDuration)
-                initPomodoro(subjectId, subjectName, topicId, chapterId, sourceId, duration)
+                val breakDuration = if (intent.hasExtra(EXTRA_BREAK_DURATION_MINUTES)) {
+                    intent.getIntExtra(EXTRA_BREAK_DURATION_MINUTES, preferences.shortBreakDuration)
+                } else null
+                initPomodoro(subjectId, subjectName, topicId, chapterId, sourceId, duration, breakDuration)
             }
             ACTION_START_FREE_TIMER -> {
                 val subjectId = intent.getStringExtra(EXTRA_SUBJECT_ID) ?: ""
@@ -261,8 +270,10 @@ class TimerForegroundService : Service() {
         topicId: String?,
         chapterId: String?,
         sourceId: String?,
-        durationMinutes: Int
+        durationMinutes: Int,
+        breakDurationMinutes: Int? = null
     ) {
+        customBreakDurationMinutes = breakDurationMinutes
         val totalSec = durationMinutes * 60
         accumulatedElapsedSeconds = 0
         accumulatedWorkSeconds = 0
@@ -388,7 +399,8 @@ class TimerForegroundService : Service() {
                 if (completed % preferences.longBreakEvery == 0) {
                     TimerPhase.LONG_BREAK to (preferences.longBreakDuration * 60)
                 } else {
-                    TimerPhase.SHORT_BREAK to (preferences.shortBreakDuration * 60)
+                    val breakMins = customBreakDurationMinutes ?: preferences.shortBreakDuration
+                    TimerPhase.SHORT_BREAK to (breakMins * 60)
                 }
             }
             TimerPhase.SHORT_BREAK, TimerPhase.LONG_BREAK -> {
@@ -453,6 +465,7 @@ class TimerForegroundService : Service() {
         tickerJob?.cancel()
         accumulatedElapsedSeconds = 0
         accumulatedWorkSeconds = 0
+        customBreakDurationMinutes = null
         val stopped = _timerState.value.copy(isRunning = false, isPaused = false)
         _timerState.value = stopped
         preferences.clearActiveTimers()
@@ -463,6 +476,7 @@ class TimerForegroundService : Service() {
 
     private fun stopTimer() {
         tickerJob?.cancel()
+        customBreakDurationMinutes = null
         val curr = _timerState.value
         val runningSec = if (curr.isRunning && !curr.isPaused) {
             ((SystemClock.elapsedRealtime() - baseElapsedRealtime) / 1000).toInt()

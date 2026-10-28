@@ -4,8 +4,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -132,6 +134,7 @@ fun HomeScreen(
     val levelProgress = XpCalculator.getLevelProgress(totalXp)
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = { showStartSheet = true },
@@ -145,11 +148,11 @@ fun HomeScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            contentPadding = PaddingValues(top = 4.dp, bottom = 88.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             if (timerState.isRunning && timerState.subjectId.isNotEmpty()) {
                 item {
-                    Spacer(modifier = Modifier.height(4.dp))
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -192,7 +195,6 @@ fun HomeScreen(
                 }
             }
             item {
-                Spacer(modifier = Modifier.height(8.dp))
                 // Streak & Level Overview Row
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -396,10 +398,6 @@ fun HomeScreen(
                     }
                 }
             }
-
-            item {
-                Spacer(modifier = Modifier.height(80.dp))
-            }
         }
     }
 
@@ -415,7 +413,7 @@ fun HomeScreen(
                 val sources = container.database.sourceDao().getSourcesForSubject(subjId)
                 Triple(topics, allChapters, sources)
             },
-            onStartPomodoro = { subjId, subjName, topId, chapId, srcId, duration ->
+            onStartPomodoro = { subjId, subjName, topId, chapId, srcId, duration, breakDuration ->
                 TimerForegroundService.startPomodoro(
                     context = context,
                     subjectId = subjId,
@@ -423,7 +421,8 @@ fun HomeScreen(
                     topicId = topId,
                     chapterId = chapId,
                     sourceId = srcId,
-                    durationMinutes = duration
+                    durationMinutes = duration,
+                    breakDurationMinutes = breakDuration
                 )
                 showStartSheet = false
                 onNavigateToPomodoro(subjId)

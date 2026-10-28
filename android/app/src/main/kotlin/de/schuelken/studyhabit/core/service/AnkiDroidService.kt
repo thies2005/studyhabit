@@ -28,6 +28,12 @@ data class AnkiDeckStudyStats(
     val dueCount: Int
 )
 
+data class AnkiDeckGroup(
+    val parentDeck: AnkiDeckInfo,
+    val subDecks: List<AnkiDeckInfo>,
+    val totalDueCount: Int
+)
+
 class AnkiDroidService(
     private val context: Context,
     private val database: AppDatabase,
@@ -39,6 +45,23 @@ class AnkiDroidService(
 
     companion object {
         const val READ_WRITE_PERMISSION = "com.ichi2.anki.permission.READ_WRITE_DATABASE"
+
+        fun groupDecksHierarchically(decks: List<AnkiDeckInfo>): List<AnkiDeckGroup> {
+            val validDecks = decks.filter { it.deckName.isNotBlank() }
+            val rootNames = validDecks.map { it.deckName.substringBefore("::").trim() }
+                .filter { it.isNotEmpty() }
+                .distinct()
+
+            return rootNames.map { rootName ->
+                val explicitParent = validDecks.firstOrNull { it.deckName.trim() == rootName }
+                val subDecks = validDecks.filter { it.deckName.startsWith("$rootName::") }.sortedBy { it.deckName }
+                val sumSubDue = subDecks.sumOf { it.dueCount }
+                val totalDue = maxOf(explicitParent?.dueCount ?: 0, sumSubDue)
+                val parentDeck = explicitParent?.copy(dueCount = totalDue)
+                    ?: AnkiDeckInfo(deckId = -rootName.hashCode().toLong(), deckName = rootName, dueCount = totalDue)
+                AnkiDeckGroup(parentDeck = parentDeck, subDecks = subDecks, totalDueCount = totalDue)
+            }
+        }
 
         fun calculateReviewMinutes(cardsCount: Int, reviewTimestampsSec: List<Long>): Int {
             if (cardsCount <= 0) return 0

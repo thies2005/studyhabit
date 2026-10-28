@@ -20,6 +20,7 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -45,8 +46,10 @@ fun EditSessionDialog(
     onDismiss: () -> Unit,
     onSave: (newMinutes: Int, newConfidence: Int?, newNotes: String?) -> Unit
 ) {
-    var minutes by remember { mutableIntStateOf(session.actualDurationMinutes.coerceIn(1, 720)) }
+    val baselineMinutes = remember { session.actualDurationMinutes.coerceIn(1, 720) }
+    var minutes by remember { mutableIntStateOf(baselineMinutes) }
     var minutesText by remember { mutableStateOf(minutes.toString()) }
+    var reduceByText by remember { mutableStateOf("") }
     var confidenceRating by remember { mutableStateOf(session.confidenceRating ?: 3) }
     var notes by remember { mutableStateOf(session.notes ?: "") }
 
@@ -60,48 +63,62 @@ fun EditSessionDialog(
                     .verticalScroll(rememberScrollState())
             ) {
                 Text(
-                    text = "Study Duration (Minutes)",
+                    text = "Study Duration: $minutes min",
                     style = MaterialTheme.typography.titleSmall
+                )
+                Slider(
+                    value = minutes.toFloat(),
+                    onValueChange = { value ->
+                        val newMins = value.toInt().coerceIn(1, 720)
+                        minutes = newMins
+                        minutesText = newMins.toString()
+                        val diff = baselineMinutes - newMins
+                        reduceByText = if (diff > 0) diff.toString() else ""
+                    },
+                    valueRange = 1f..maxOf(baselineMinutes, minutes, 120).coerceAtMost(720).toFloat(),
+                    modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    val chipDeltas = listOf(-15, -5, -1, 1, 5)
-                    chipDeltas.forEach { delta ->
-                        AssistChip(
-                            onClick = {
-                                val next = (minutes + delta).coerceIn(1, 720)
-                                minutes = next
-                                minutesText = next.toString()
-                            },
-                            label = { Text(if (delta > 0) "+${delta}m" else "${delta}m") },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                OutlinedTextField(
-                    value = minutesText,
-                    onValueChange = { input ->
-                        val filtered = input.filter { it.isDigit() }
-                        minutesText = filtered
-                        filtered.toIntOrNull()?.let {
-                            minutes = it.coerceIn(1, 720)
-                        }
-                    },
-                    label = { Text("Duration (minutes)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Number
+                    OutlinedTextField(
+                        value = minutesText,
+                        onValueChange = { input ->
+                            val filtered = input.filter { it.isDigit() }
+                            minutesText = filtered
+                            filtered.toIntOrNull()?.let {
+                                val clamped = it.coerceIn(1, 720)
+                                minutes = clamped
+                                val diff = baselineMinutes - clamped
+                                reduceByText = if (diff > 0) diff.toString() else ""
+                            }
+                        },
+                        label = { Text("Actual Duration (min)") },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                     )
-                )
+
+                    OutlinedTextField(
+                        value = reduceByText,
+                        onValueChange = { input ->
+                            val filtered = input.filter { it.isDigit() }
+                            reduceByText = filtered
+                            val reduction = filtered.toIntOrNull() ?: 0
+                            val newMins = (baselineMinutes - reduction).coerceIn(1, 720)
+                            minutes = newMins
+                            minutesText = newMins.toString()
+                        },
+                        label = { Text("Reduce by (min)") },
+                        placeholder = { Text("e.g. 15") },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(16.dp))
 

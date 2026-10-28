@@ -14,12 +14,15 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -54,12 +57,15 @@ import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.ui.text.font.FontWeight
+import de.schuelken.studyhabit.core.service.AnkiDroidService
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -119,6 +125,7 @@ fun SubjectDetailScreen(
     val tabs = listOf("Timeline", "Sources", "Topics")
 
     var showStartSheet by remember { mutableStateOf(false) }
+    var showEditSubjectSheet by remember { mutableStateOf(false) }
     var showAddSourceDialog by remember { mutableStateOf(false) }
     var showAddTopicDialog by remember { mutableStateOf(false) }
     var editingSession by remember { mutableStateOf<StudySessionEntity?>(null) }
@@ -155,6 +162,9 @@ fun SubjectDetailScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { showEditSubjectSheet = true }) {
+                        Icon(Icons.Default.Edit, contentDescription = "Edit Subject")
+                    }
                     IconButton(onClick = { showStartSheet = true }) {
                         Icon(Icons.Default.PlayArrow, contentDescription = "Start Focus")
                     }
@@ -171,13 +181,13 @@ fun SubjectDetailScreen(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
+                        .padding(12.dp),
                     horizontalArrangement = Arrangement.SpaceAround
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -282,6 +292,7 @@ fun SubjectDetailScreen(
                 2 -> TopicsTab(
                     container = container,
                     subjectId = currentSubj.id,
+                    hierarchyMode = currentSubj.hierarchyMode,
                     topics = topics,
                     skillLabels = skillLabels,
                     onAddTopicClick = { showAddTopicDialog = true },
@@ -289,7 +300,8 @@ fun SubjectDetailScreen(
                         skillSelectorTopicId = tId
                         skillSelectorChapterId = cId
                         showSkillSheet = true
-                    }
+                    },
+                    onEditHierarchyMode = { showEditSubjectSheet = true }
                 )
             }
         }
@@ -306,7 +318,7 @@ fun SubjectDetailScreen(
                 }
                 Triple(topics, allChapters, sources)
             },
-            onStartPomodoro = { subjId, subjName, topId, chapId, srcId, duration ->
+            onStartPomodoro = { subjId, subjName, topId, chapId, srcId, duration, breakDuration ->
                 TimerForegroundService.startPomodoro(
                     context = context,
                     subjectId = subjId,
@@ -314,7 +326,8 @@ fun SubjectDetailScreen(
                     topicId = topId,
                     chapterId = chapId,
                     sourceId = srcId,
-                    durationMinutes = duration
+                    durationMinutes = duration,
+                    breakDurationMinutes = breakDuration
                 )
                 showStartSheet = false
                 onNavigateToPomodoro(subjId)
@@ -386,6 +399,21 @@ fun SubjectDetailScreen(
                 }
             },
             onDismiss = { showSkillSheet = false }
+        )
+    }
+
+    if (showEditSubjectSheet) {
+        CreateSubjectSheet(
+            projectId = currentSubj.projectId,
+            existingSubject = currentSubj,
+            onSave = { updatedSubj ->
+                scope.launch {
+                    container.database.subjectDao().upsert(updatedSubj)
+                    container.triggerDataChangedSync()
+                }
+                showEditSubjectSheet = false
+            },
+            onDismiss = { showEditSubjectSheet = false }
         )
     }
 
@@ -576,13 +604,40 @@ fun SourcesTab(
 fun TopicsTab(
     container: AppContainer,
     subjectId: String,
+    hierarchyMode: String,
     topics: List<TopicEntity>,
     skillLabels: List<SkillLabelEntity>,
     onAddTopicClick: () -> Unit,
-    onSelectSkillLabel: (String, String?) -> Unit
+    onSelectSkillLabel: (String, String?) -> Unit,
+    onEditHierarchyMode: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
     var showAddChapterTopicId by remember { mutableStateOf<String?>(null) }
+
+    if (hierarchyMode == "flat") {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = "This subject is currently in Flat mode (no topics or chapters).",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(onClick = onEditHierarchyMode) {
+                    Text("Change Hierarchy Mode")
+                }
+            }
+        }
+        return
+    }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Button(onClick = onAddTopicClick, modifier = Modifier.fillMaxWidth()) {
@@ -617,15 +672,17 @@ fun TopicsTab(
                                     onClick = { onSelectSkillLabel(topic.id, null) },
                                     label = { Text(label.replaceFirstChar { it.uppercase() }) }
                                 )
-                                IconButton(onClick = { expanded = !expanded }) {
-                                    Icon(
-                                        if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                        contentDescription = if (expanded) "Collapse chapters for ${topic.name}" else "Expand chapters for ${topic.name}"
-                                    )
+                                if (hierarchyMode == "threeLevel") {
+                                    IconButton(onClick = { expanded = !expanded }) {
+                                        Icon(
+                                            if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                            contentDescription = if (expanded) "Collapse chapters for ${topic.name}" else "Expand chapters for ${topic.name}"
+                                        )
+                                    }
                                 }
                             }
 
-                            if (expanded) {
+                            if (hierarchyMode == "threeLevel" && expanded) {
                                 Spacer(modifier = Modifier.height(8.dp))
                                 chapters.forEach { chapter ->
                                     val chapLabel = skillLabels.firstOrNull { it.chapterId == chapter.id }?.label ?: "beginner"
@@ -690,6 +747,8 @@ fun AddSourceDialog(
     var pathOrUrl by remember { mutableStateOf("") }
     var ankiDecks by remember { mutableStateOf<List<AnkiDeck>>(emptyList()) }
     var selectedAnkiDeck by remember { mutableStateOf<AnkiDeck?>(null) }
+    val deckGroups = remember(ankiDecks) { AnkiDroidService.groupDecksHierarchically(ankiDecks) }
+    var expandedRootDecks by remember { mutableStateOf(setOf<String>()) }
     var hasAnkiPermission by remember { mutableStateOf(container.ankiDroidService.hasAnkiPermission()) }
     val isAnkiInstalled = remember { container.ankiDroidService.isAnkiInstalled() }
 
@@ -771,33 +830,124 @@ fun AddSourceDialog(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     } else {
-                        var deckDropdownExpanded by remember { mutableStateOf(false) }
-                        ExposedDropdownMenuBox(
-                            expanded = deckDropdownExpanded,
-                            onExpandedChange = { deckDropdownExpanded = !deckDropdownExpanded }
+                        Text("Select an Anki Deck or Sub-Deck:", style = MaterialTheme.typography.labelMedium)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 240.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                         ) {
-                            OutlinedTextField(
-                                value = selectedAnkiDeck?.deckName ?: "Choose an Anki deck...",
-                                onValueChange = {},
-                                readOnly = true,
-                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = deckDropdownExpanded) },
-                                modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth()
-                            )
-                            ExposedDropdownMenu(
-                                expanded = deckDropdownExpanded,
-                                onDismissRequest = { deckDropdownExpanded = false }
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .verticalScroll(rememberScrollState())
+                                    .padding(vertical = 4.dp)
                             ) {
-                                ankiDecks.forEach { deck ->
-                                    DropdownMenuItem(
-                                        text = { Text("${deck.deckName} (${deck.dueCount} due)") },
-                                        onClick = {
-                                            selectedAnkiDeck = deck
-                                            if (title.isBlank()) {
-                                                title = deck.deckName
+                                deckGroups.forEach { group ->
+                                    val isParentSelected = selectedAnkiDeck?.deckId == group.parentDeck.deckId
+                                    val isExpanded = group.parentDeck.deckName in expandedRootDecks
+                                    val hasSubDecks = group.subDecks.isNotEmpty()
+
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable {
+                                                selectedAnkiDeck = group.parentDeck
+                                                if (title.isBlank() || ankiDecks.any { it.deckName == title }) {
+                                                    title = group.parentDeck.deckName
+                                                }
                                             }
-                                            deckDropdownExpanded = false
+                                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        RadioButton(
+                                            selected = isParentSelected,
+                                            onClick = {
+                                                selectedAnkiDeck = group.parentDeck
+                                                if (title.isBlank() || ankiDecks.any { it.deckName == title }) {
+                                                    title = group.parentDeck.deckName
+                                                }
+                                            }
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = group.parentDeck.deckName,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = if (isParentSelected) FontWeight.Bold else FontWeight.Normal
+                                            )
+                                            val subtext = if (hasSubDecks) {
+                                                "${group.subDecks.size} sub-decks • ${group.totalDueCount} due"
+                                            } else {
+                                                "${group.totalDueCount} due"
+                                            }
+                                            Text(
+                                                text = subtext,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
                                         }
-                                    )
+                                        if (hasSubDecks) {
+                                            IconButton(
+                                                onClick = {
+                                                    expandedRootDecks = if (isExpanded) {
+                                                        expandedRootDecks - group.parentDeck.deckName
+                                                    } else {
+                                                        expandedRootDecks + group.parentDeck.deckName
+                                                    }
+                                                }
+                                            ) {
+                                                Icon(
+                                                    imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                                    contentDescription = if (isExpanded) "Collapse sub-decks" else "Expand sub-decks"
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    if (isExpanded && hasSubDecks) {
+                                        group.subDecks.forEach { subDeck ->
+                                            val isSubSelected = selectedAnkiDeck?.deckId == subDeck.deckId
+                                            val displayName = subDeck.deckName.removePrefix("${group.parentDeck.deckName}::")
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(start = 28.dp, end = 8.dp)
+                                                    .clickable {
+                                                        selectedAnkiDeck = subDeck
+                                                        if (title.isBlank() || ankiDecks.any { it.deckName == title }) {
+                                                            title = subDeck.deckName
+                                                        }
+                                                    }
+                                                    .padding(vertical = 4.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                RadioButton(
+                                                    selected = isSubSelected,
+                                                    onClick = {
+                                                        selectedAnkiDeck = subDeck
+                                                        if (title.isBlank() || ankiDecks.any { it.deckName == title }) {
+                                                            title = subDeck.deckName
+                                                        }
+                                                    }
+                                                )
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(
+                                                        text = displayName,
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        fontWeight = if (isSubSelected) FontWeight.Bold else FontWeight.Normal
+                                                    )
+                                                    Text(
+                                                        text = "${subDeck.dueCount} due",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }

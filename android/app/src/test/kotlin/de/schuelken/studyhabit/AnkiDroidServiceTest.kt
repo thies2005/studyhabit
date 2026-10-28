@@ -69,4 +69,66 @@ class AnkiDroidServiceTest {
         val timestamps = listOf(200L, 100L, 120L)
         assertEquals(1, AnkiDroidService.calculateReviewMinutes(3, timestamps))
     }
+
+    @Test
+    fun testGroupDecksHierarchicallyWithFlatDecks() {
+        val decks = listOf(
+            de.schuelken.studyhabit.core.service.AnkiDeckInfo(1L, "Biology", 10),
+            de.schuelken.studyhabit.core.service.AnkiDeckInfo(2L, "Chemistry", 5)
+        )
+        val groups = AnkiDroidService.groupDecksHierarchically(decks)
+        assertEquals(2, groups.size)
+        assertEquals("Biology", groups[0].parentDeck.deckName)
+        assertEquals(0, groups[0].subDecks.size)
+        assertEquals(10, groups[0].totalDueCount)
+
+        assertEquals("Chemistry", groups[1].parentDeck.deckName)
+        assertEquals(0, groups[1].subDecks.size)
+        assertEquals(5, groups[1].totalDueCount)
+    }
+
+    @Test
+    fun testGroupDecksHierarchicallyWithExplicitParentAndSubDecks() {
+        val decks = listOf(
+            de.schuelken.studyhabit.core.service.AnkiDeckInfo(1L, "Japanese", 5),
+            de.schuelken.studyhabit.core.service.AnkiDeckInfo(2L, "Japanese::Vocab", 12),
+            de.schuelken.studyhabit.core.service.AnkiDeckInfo(3L, "Japanese::Kanji", 8)
+        )
+        val groups = AnkiDroidService.groupDecksHierarchically(decks)
+        assertEquals(1, groups.size)
+        val group = groups[0]
+        assertEquals("Japanese", group.parentDeck.deckName)
+        assertEquals(2, group.subDecks.size)
+        assertEquals("Japanese::Kanji", group.subDecks[0].deckName)
+        assertEquals("Japanese::Vocab", group.subDecks[1].deckName)
+        // totalDueCount is maxOf(parent.dueCount, sum of subDue: 12 + 8 = 20) -> 20
+        assertEquals(20, group.totalDueCount)
+    }
+
+    @Test
+    fun testGroupDecksHierarchicallySynthesizesMissingParent() {
+        val decks = listOf(
+            de.schuelken.studyhabit.core.service.AnkiDeckInfo(2L, "Medicine::Pathology", 15),
+            de.schuelken.studyhabit.core.service.AnkiDeckInfo(3L, "Medicine::Anatomy", 10)
+        )
+        val groups = AnkiDroidService.groupDecksHierarchically(decks)
+        assertEquals(1, groups.size)
+        val group = groups[0]
+        assertEquals("Medicine", group.parentDeck.deckName)
+        assertEquals(2, group.subDecks.size)
+        assertEquals("Medicine::Anatomy", group.subDecks[0].deckName)
+        assertEquals("Medicine::Pathology", group.subDecks[1].deckName)
+        assertEquals(25, group.totalDueCount)
+    }
+
+    @Test
+    fun testGroupDecksHierarchicallyFiltersBlanks() {
+        val decks = listOf(
+            de.schuelken.studyhabit.core.service.AnkiDeckInfo(1L, "   ", 0),
+            de.schuelken.studyhabit.core.service.AnkiDeckInfo(2L, "Math", 3)
+        )
+        val groups = AnkiDroidService.groupDecksHierarchically(decks)
+        assertEquals(1, groups.size)
+        assertEquals("Math", groups[0].parentDeck.deckName)
+    }
 }

@@ -72,7 +72,9 @@ fun CreateSubjectSheet(
     var hierarchyMode by remember { mutableStateOf(existingSubject?.hierarchyMode ?: "flat") }
     var completenessMode by remember { mutableStateOf(existingSubject?.completenessMode ?: "none") }
     var defaultDurationMinutes by remember { mutableIntStateOf(existingSubject?.defaultDurationMinutes ?: 25) }
+    var defaultBreakMinutes by remember { mutableIntStateOf(existingSubject?.defaultBreakMinutes ?: 5) }
     var targetHours by remember { mutableStateOf(existingSubject?.targetHours?.toString() ?: "") }
+    var targetWeeklyHours by remember { mutableStateOf(existingSubject?.targetWeeklyHours?.toString() ?: "") }
 
     var hierarchyExpanded by remember { mutableStateOf(false) }
     var completenessExpanded by remember { mutableStateOf(false) }
@@ -146,9 +148,9 @@ fun CreateSubjectSheet(
             }
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Duration Slider
+            // Focus Duration Slider
             Text(
-                text = "Default Duration: $defaultDurationMinutes min",
+                text = "Default Focus Duration: $defaultDurationMinutes min",
                 style = MaterialTheme.typography.titleSmall
             )
             Slider(
@@ -156,6 +158,19 @@ fun CreateSubjectSheet(
                 onValueChange = { defaultDurationMinutes = it.toInt() },
                 valueRange = 5f..120f,
                 steps = 22
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Break Duration Slider
+            Text(
+                text = "Default Break Duration: $defaultBreakMinutes min",
+                style = MaterialTheme.typography.titleSmall
+            )
+            Slider(
+                value = defaultBreakMinutes.toFloat(),
+                onValueChange = { defaultBreakMinutes = it.toInt() },
+                valueRange = 1f..30f,
+                steps = 28
             )
             Spacer(modifier = Modifier.height(12.dp))
 
@@ -196,31 +211,61 @@ fun CreateSubjectSheet(
             }
             Spacer(modifier = Modifier.height(16.dp))
 
-            OutlinedTextField(
-                value = targetHours,
-                onValueChange = { targetHours = it.filter { ch -> ch.isDigit() } },
-                label = { Text("Target Hours (Optional)") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = targetHours,
+                    onValueChange = { targetHours = it.filter { ch -> ch.isDigit() } },
+                    label = { Text("Target Hours") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.weight(1f)
+                )
+                OutlinedTextField(
+                    value = targetWeeklyHours,
+                    onValueChange = { targetWeeklyHours = it.filter { ch -> ch.isDigit() } },
+                    label = { Text("Weekly Target") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.weight(1f)
+                )
+            }
             Spacer(modifier = Modifier.height(16.dp))
 
             Button(
                 onClick = {
                     if (name.isNotBlank()) {
-                        val entity = SubjectEntity(
-                            id = existingSubject?.id ?: UUID.randomUUID().toString(),
-                            projectId = projectId,
-                            name = name.trim(),
-                            description = description.trim().ifEmpty { null },
-                            colorValue = selectedColorArgb,
-                            hierarchyMode = hierarchyMode,
-                            completenessMode = completenessMode,
-                            defaultDurationMinutes = defaultDurationMinutes,
-                            targetHours = targetHours.toIntOrNull(),
-                            updatedAt = System.currentTimeMillis()
-                        )
+                        val entity = if (existingSubject != null) {
+                            existingSubject.copy(
+                                name = name.trim(),
+                                description = description.trim().ifEmpty { null },
+                                colorValue = selectedColorArgb,
+                                hierarchyMode = hierarchyMode,
+                                completenessMode = completenessMode,
+                                defaultDurationMinutes = defaultDurationMinutes,
+                                defaultBreakMinutes = defaultBreakMinutes,
+                                targetHours = targetHours.toIntOrNull(),
+                                targetWeeklyHours = targetWeeklyHours.toIntOrNull(),
+                                updatedAt = System.currentTimeMillis()
+                            )
+                        } else {
+                            SubjectEntity(
+                                id = UUID.randomUUID().toString(),
+                                projectId = projectId,
+                                name = name.trim(),
+                                description = description.trim().ifEmpty { null },
+                                colorValue = selectedColorArgb,
+                                hierarchyMode = hierarchyMode,
+                                completenessMode = completenessMode,
+                                defaultDurationMinutes = defaultDurationMinutes,
+                                defaultBreakMinutes = defaultBreakMinutes,
+                                targetHours = targetHours.toIntOrNull(),
+                                targetWeeklyHours = targetWeeklyHours.toIntOrNull(),
+                                updatedAt = System.currentTimeMillis()
+                            )
+                        }
                         onSave(entity)
                         onDismiss()
                     }
