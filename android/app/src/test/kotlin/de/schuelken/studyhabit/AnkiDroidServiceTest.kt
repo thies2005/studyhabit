@@ -131,4 +131,50 @@ class AnkiDroidServiceTest {
         assertEquals(1, groups.size)
         assertEquals("Math", groups[0].parentDeck.deckName)
     }
+
+    @Test
+    fun testBuildDeckTreeMultiLevelHierarchy() {
+        val decks = listOf(
+            de.schuelken.studyhabit.core.service.AnkiDeckInfo(1L, "Medizin", 0),
+            de.schuelken.studyhabit.core.service.AnkiDeckInfo(2L, "Medizin::Vorklinik::Anatomie::Kopf", 10),
+            de.schuelken.studyhabit.core.service.AnkiDeckInfo(3L, "Medizin::Vorklinik::Anatomie::Thorax", 20),
+            de.schuelken.studyhabit.core.service.AnkiDeckInfo(4L, "Medizin::Vorklinik::Physiologie", 15),
+            de.schuelken.studyhabit.core.service.AnkiDeckInfo(5L, "Medizin::Klinik::Innere", 8)
+        )
+        val tree = AnkiDroidService.buildDeckTree(decks)
+        assertEquals(1, tree.size)
+
+        val root = tree[0]
+        assertEquals("Medizin", root.shortName)
+        assertEquals("Medizin", root.fullPath)
+        assertEquals(53, root.totalDueCount)
+        // Root must ONLY have direct 1st-level children (Klinik, Vorklinik), NOT deeper descendants
+        assertEquals(2, root.children.size)
+        assertEquals("Klinik", root.children[0].shortName)
+        assertEquals("Vorklinik", root.children[1].shortName)
+
+        val klinik = root.children[0]
+        assertEquals("Medizin::Klinik", klinik.fullPath)
+        assertEquals(8, klinik.totalDueCount)
+        assertEquals(1, klinik.children.size)
+        assertEquals("Innere", klinik.children[0].shortName)
+        assertEquals("Medizin::Klinik::Innere", klinik.children[0].fullPath)
+
+        val vorklinik = root.children[1]
+        assertEquals("Medizin::Vorklinik", vorklinik.fullPath)
+        assertEquals(45, vorklinik.totalDueCount)
+        // Vorklinik must ONLY have direct 2nd-level children (Anatomie, Physiologie), NOT Kopf/Thorax
+        assertEquals(2, vorklinik.children.size)
+        assertEquals("Anatomie", vorklinik.children[0].shortName)
+        assertEquals("Physiologie", vorklinik.children[1].shortName)
+
+        val anatomie = vorklinik.children[0]
+        assertEquals("Medizin::Vorklinik::Anatomie", anatomie.fullPath)
+        assertEquals(30, anatomie.totalDueCount)
+        assertEquals(2, anatomie.children.size)
+        assertEquals("Kopf", anatomie.children[0].shortName)
+        assertEquals(10, anatomie.children[0].totalDueCount)
+        assertEquals("Thorax", anatomie.children[1].shortName)
+        assertEquals(20, anatomie.children[1].totalDueCount)
+    }
 }

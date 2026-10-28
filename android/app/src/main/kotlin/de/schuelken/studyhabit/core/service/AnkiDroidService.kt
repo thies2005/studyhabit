@@ -34,6 +34,14 @@ data class AnkiDeckGroup(
     val totalDueCount: Int
 )
 
+data class AnkiDeckNode(
+    val fullPath: String,
+    val shortName: String,
+    val deck: AnkiDeckInfo,
+    val children: List<AnkiDeckNode>,
+    val totalDueCount: Int
+)
+
 class AnkiDroidService(
     private val context: Context,
     private val database: AppDatabase,
@@ -45,6 +53,54 @@ class AnkiDroidService(
 
     companion object {
         const val READ_WRITE_PERMISSION = "com.ichi2.anki.permission.READ_WRITE_DATABASE"
+
+        fun buildDeckTree(decks: List<AnkiDeckInfo>): List<AnkiDeckNode> {
+            val validDecks = decks.filter { it.deckName.isNotBlank() }
+            if (validDecks.isEmpty()) return emptyList()
+
+            val explicitByPath = mutableMapOf<String, AnkiDeckInfo>()
+            val rootPaths = linkedSetOf<String>()
+            val childrenByParent = mutableMapOf<String, LinkedHashSet<String>>()
+
+            for (deck in validDecks) {
+                val segments = deck.deckName.split("::").map { it.trim() }.filter { it.isNotEmpty() }
+                if (segments.isEmpty()) continue
+                val normPath = segments.joinToString("::")
+                explicitByPath[normPath] = deck.copy(deckName = normPath)
+                rootPaths.add(segments[0])
+                for (i in 1 until segments.size) {
+                    val parentPath = segments.take(i).joinToString("::")
+                    val childPath = segments.take(i + 1).joinToString("::")
+                    childrenByParent.getOrPut(parentPath) { linkedSetOf() }.add(childPath)
+                }
+            }
+
+            fun buildNode(path: String): AnkiDeckNode {
+                val shortName = path.substringAfterLast("::")
+                val childPaths = childrenByParent[path]
+                    ?.sortedBy { it.substringAfterLast("::").lowercase() }
+                    ?: emptyList()
+                val childNodes = childPaths.map { buildNode(it) }
+                val explicit = explicitByPath[path]
+                val childrenDueSum = childNodes.sumOf { it.totalDueCount }
+                val totalDue = maxOf(explicit?.dueCount ?: 0, childrenDueSum)
+                val deckInfo = explicit?.copy(dueCount = totalDue)
+                    ?: AnkiDeckInfo(
+                        deckId = -path.hashCode().toLong(),
+                        deckName = path,
+                        dueCount = totalDue
+                    )
+                return AnkiDeckNode(
+                    fullPath = path,
+                    shortName = shortName,
+                    deck = deckInfo,
+                    children = childNodes,
+                    totalDueCount = totalDue
+                )
+            }
+
+            return rootPaths.map { buildNode(it) }
+        }
 
         fun groupDecksHierarchically(decks: List<AnkiDeckInfo>): List<AnkiDeckGroup> {
             val validDecks = decks.filter { it.deckName.isNotBlank() }
@@ -201,14 +257,23 @@ class AnkiDroidService(
         var syncedCount = 0
 
         for (source in ankiSources) {
-            val deckId = source.filePath?.removePrefix("anki://deck/")?.toLongOrNull()
-            val matchedDeck = if (deckId != null) {
-                decks.firstOrNull { it.deckId == deckId } ?: decks.firstOrNull { it.deckName == source.title }
+            val rawPath = source.filePath?.removePrefix("anki://deck/")
+            val deckId = rawPath?.substringBefore("?")?.toLongOrNull()
+            val encodedName = rawPath?.substringAfter("?name=", "")
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { Uri.decode(it) }
+            val matchedDeck = when {
+                deckId != null && deckId > 0 -> decks.firstOrNull { it.deckId == deckId }
+                encodedName != null -> decks.firstOrNull { it.deckName == encodedName }
+                else -> null
+            } ?: decks.firstOrNull { it.deckName == (encodedName ?: source.title) }
+            val resolvedDeckName = matchedDeck?.deckName ?: encodedName ?: source.title
+            val subDecksDue = decks.filter { it.deckName.startsWith("$resolvedDeckName::") }.sumOf { it.dueCount }
+            val dueCount = if (decks.isNotEmpty()) {
+                maxOf(matchedDeck?.dueCount ?: 0, subDecksDue)
             } else {
-                decks.firstOrNull { it.deckName == source.title }
+                source.totalPages ?: 0
             }
-            val resolvedDeckName = matchedDeck?.deckName ?: source.title
-            val dueCount = matchedDeck?.dueCount ?: source.totalPages ?: 0
             val stats = getTodayDeckStudyStats(resolvedDeckName, dueCount)
 
             // Update source page progress

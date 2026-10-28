@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.runtime.LaunchedEffect
 import de.schuelken.studyhabit.core.service.AnkiDeck
+import de.schuelken.studyhabit.core.service.AnkiDeckNode
 import de.schuelken.studyhabit.core.service.SessionEditHelper
 import de.schuelken.studyhabit.ui.components.EditSessionDialog
 import de.schuelken.studyhabit.ui.widget.StudyHabitWidgetProvider
@@ -258,8 +259,11 @@ fun SubjectDetailScreen(
                     },
                     onOpenSource = { src ->
                         if (src.type.equals("anki", ignoreCase = true)) {
-                            val deckId = src.filePath?.removePrefix("anki://deck/")?.toLongOrNull()
-                            val intent = if (deckId != null) {
+                            val deckId = src.filePath
+                                ?.removePrefix("anki://deck/")
+                                ?.substringBefore("?")
+                                ?.toLongOrNull()
+                            val intent = if (deckId != null && deckId > 0) {
                                 Intent(Intent.ACTION_VIEW).apply {
                                     data = Uri.parse("anki://deck/$deckId")
                                     flags = Intent.FLAG_ACTIVITY_NEW_TASK
@@ -743,12 +747,13 @@ fun AddSourceDialog(
 ) {
     val context = LocalContext.current
     var title by remember { mutableStateOf("") }
+    var autoFilledTitle by remember { mutableStateOf("") }
     var type by remember { mutableStateOf("pdf") }
     var pathOrUrl by remember { mutableStateOf("") }
     var ankiDecks by remember { mutableStateOf<List<AnkiDeck>>(emptyList()) }
     var selectedAnkiDeck by remember { mutableStateOf<AnkiDeck?>(null) }
-    val deckGroups = remember(ankiDecks) { AnkiDroidService.groupDecksHierarchically(ankiDecks) }
-    var expandedRootDecks by remember { mutableStateOf(setOf<String>()) }
+    val deckTree = remember(ankiDecks) { AnkiDroidService.buildDeckTree(ankiDecks) }
+    var expandedPaths by remember { mutableStateOf(setOf<String>()) }
     var hasAnkiPermission by remember { mutableStateOf(container.ankiDroidService.hasAnkiPermission()) }
     val isAnkiInstalled = remember { container.ankiDroidService.isAnkiInstalled() }
 
@@ -823,7 +828,7 @@ fun AddSourceDialog(
                         ) {
                             Text("Grant AnkiDroid Permission")
                         }
-                    } else if (ankiDecks.isEmpty()) {
+                    } else if (deckTree.isEmpty()) {
                         Text(
                             text = "No decks found in AnkiDroid.",
                             style = MaterialTheme.typography.bodySmall,
@@ -835,7 +840,7 @@ fun AddSourceDialog(
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .heightIn(max = 240.dp),
+                                .heightIn(max = 300.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                         ) {
                             Column(
@@ -844,110 +849,27 @@ fun AddSourceDialog(
                                     .verticalScroll(rememberScrollState())
                                     .padding(vertical = 4.dp)
                             ) {
-                                deckGroups.forEach { group ->
-                                    val isParentSelected = selectedAnkiDeck?.deckId == group.parentDeck.deckId
-                                    val isExpanded = group.parentDeck.deckName in expandedRootDecks
-                                    val hasSubDecks = group.subDecks.isNotEmpty()
-
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable {
-                                                selectedAnkiDeck = group.parentDeck
-                                                if (title.isBlank() || ankiDecks.any { it.deckName == title }) {
-                                                    title = group.parentDeck.deckName
-                                                }
+                                deckTree.forEach { rootNode ->
+                                    AnkiDeckTreeNodeRow(
+                                        node = rootNode,
+                                        depth = 0,
+                                        selectedDeckName = selectedAnkiDeck?.deckName,
+                                        expandedPaths = expandedPaths,
+                                        onSelectDeck = { deck ->
+                                            selectedAnkiDeck = deck
+                                            if (title.isBlank() || title == autoFilledTitle) {
+                                                title = deck.deckName
+                                                autoFilledTitle = deck.deckName
                                             }
-                                            .padding(horizontal = 8.dp, vertical = 6.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        RadioButton(
-                                            selected = isParentSelected,
-                                            onClick = {
-                                                selectedAnkiDeck = group.parentDeck
-                                                if (title.isBlank() || ankiDecks.any { it.deckName == title }) {
-                                                    title = group.parentDeck.deckName
-                                                }
-                                            }
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = group.parentDeck.deckName,
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                fontWeight = if (isParentSelected) FontWeight.Bold else FontWeight.Normal
-                                            )
-                                            val subtext = if (hasSubDecks) {
-                                                "${group.subDecks.size} sub-decks • ${group.totalDueCount} due"
+                                        },
+                                        onToggleExpand = { path ->
+                                            expandedPaths = if (path in expandedPaths) {
+                                                expandedPaths - path
                                             } else {
-                                                "${group.totalDueCount} due"
-                                            }
-                                            Text(
-                                                text = subtext,
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                        if (hasSubDecks) {
-                                            IconButton(
-                                                onClick = {
-                                                    expandedRootDecks = if (isExpanded) {
-                                                        expandedRootDecks - group.parentDeck.deckName
-                                                    } else {
-                                                        expandedRootDecks + group.parentDeck.deckName
-                                                    }
-                                                }
-                                            ) {
-                                                Icon(
-                                                    imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                                    contentDescription = if (isExpanded) "Collapse sub-decks" else "Expand sub-decks"
-                                                )
+                                                expandedPaths + path
                                             }
                                         }
-                                    }
-
-                                    if (isExpanded && hasSubDecks) {
-                                        group.subDecks.forEach { subDeck ->
-                                            val isSubSelected = selectedAnkiDeck?.deckId == subDeck.deckId
-                                            val displayName = subDeck.deckName.removePrefix("${group.parentDeck.deckName}::")
-                                            Row(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .padding(start = 28.dp, end = 8.dp)
-                                                    .clickable {
-                                                        selectedAnkiDeck = subDeck
-                                                        if (title.isBlank() || ankiDecks.any { it.deckName == title }) {
-                                                            title = subDeck.deckName
-                                                        }
-                                                    }
-                                                    .padding(vertical = 4.dp),
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                RadioButton(
-                                                    selected = isSubSelected,
-                                                    onClick = {
-                                                        selectedAnkiDeck = subDeck
-                                                        if (title.isBlank() || ankiDecks.any { it.deckName == title }) {
-                                                            title = subDeck.deckName
-                                                        }
-                                                    }
-                                                )
-                                                Spacer(modifier = Modifier.width(4.dp))
-                                                Column(modifier = Modifier.weight(1f)) {
-                                                    Text(
-                                                        text = displayName,
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        fontWeight = if (isSubSelected) FontWeight.Bold else FontWeight.Normal
-                                                    )
-                                                    Text(
-                                                        text = "${subDeck.dueCount} due",
-                                                        style = MaterialTheme.typography.labelSmall,
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
+                                    )
                                 }
                             }
                         }
@@ -974,7 +896,7 @@ fun AddSourceDialog(
                                 subjectId = subjectId,
                                 title = if (title.isNotBlank()) title.trim() else deck.deckName,
                                 type = "anki",
-                                filePath = "anki://deck/${deck.deckId}",
+                                filePath = "anki://deck/${deck.deckId}?name=${Uri.encode(deck.deckName)}",
                                 url = null,
                                 totalPages = deck.dueCount,
                                 addedAt = System.currentTimeMillis(),
@@ -1005,6 +927,75 @@ fun AddSourceDialog(
             Button(onClick = onDismiss) { Text("Cancel") }
         }
     )
+}
+
+@Composable
+private fun AnkiDeckTreeNodeRow(
+    node: AnkiDeckNode,
+    depth: Int,
+    selectedDeckName: String?,
+    expandedPaths: Set<String>,
+    onSelectDeck: (AnkiDeck) -> Unit,
+    onToggleExpand: (String) -> Unit
+) {
+    val isSelected = selectedDeckName == node.deck.deckName
+    val hasChildren = node.children.isNotEmpty()
+    val isExpanded = node.fullPath in expandedPaths
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = (depth * 16).dp, end = 4.dp)
+            .clickable { onSelectDeck(node.deck) }
+            .padding(horizontal = 4.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        RadioButton(
+            selected = isSelected,
+            onClick = { onSelectDeck(node.deck) }
+        )
+        Spacer(modifier = Modifier.width(2.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = if (depth > 0) "↳ ${node.shortName}" else node.shortName,
+                style = if (depth == 0) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodySmall,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+            )
+            val subtext = if (hasChildren) {
+                "${node.children.size} sub-deck${if (node.children.size == 1) "" else "s"} • ${node.totalDueCount} due"
+            } else {
+                "${node.totalDueCount} due"
+            }
+            Text(
+                text = subtext,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        if (hasChildren) {
+            IconButton(
+                onClick = { onToggleExpand(node.fullPath) }
+            ) {
+                Icon(
+                    imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = if (isExpanded) "Collapse ${node.shortName}" else "Expand ${node.shortName}"
+                )
+            }
+        }
+    }
+
+    if (isExpanded && hasChildren) {
+        node.children.forEach { childNode ->
+            AnkiDeckTreeNodeRow(
+                node = childNode,
+                depth = depth + 1,
+                selectedDeckName = selectedDeckName,
+                expandedPaths = expandedPaths,
+                onSelectDeck = onSelectDeck,
+                onToggleExpand = onToggleExpand
+            )
+        }
+    }
 }
 
 @Composable
