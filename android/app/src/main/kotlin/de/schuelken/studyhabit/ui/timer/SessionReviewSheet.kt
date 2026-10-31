@@ -35,6 +35,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
+import de.schuelken.studyhabit.core.service.StudyDurationInput
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -88,7 +89,7 @@ fun SessionReviewSheet(
     var showDiscardConfirmDialog by remember { mutableStateOf(false) }
 
     val studiedSeconds = if (timerState.timerType == TimerType.POMODORO) {
-        timerState.totalWorkSeconds.coerceAtLeast(timerState.elapsedSeconds)
+        timerState.totalWorkSeconds
     } else {
         timerState.elapsedSeconds
     }
@@ -97,7 +98,9 @@ fun SessionReviewSheet(
     var editableMinutes by remember { mutableIntStateOf(initialMinutes) }
     var minutesText by remember { mutableStateOf(initialMinutes.toString()) }
     var reduceByText by remember { mutableStateOf("") }
-    val plannedMinutes = if (timerState.timerType == TimerType.FREE_TIMER) 0 else (timerState.totalSeconds / 60).coerceAtLeast(1)
+    val durationValid = StudyDurationInput.minutes(minutesText) != null
+    val reductionValid = StudyDurationInput.reduction(reduceByText, baselineMinutes) != null
+    val plannedMinutes = if (timerState.timerType == TimerType.FREE_TIMER) 0 else (timerState.plannedWorkSeconds / 60).coerceAtLeast(1)
 
     val effectivePomodoros = if (editableMinutes != initialMinutes) {
         de.schuelken.studyhabit.core.service.SessionEditHelper.calculateEffectivePomodoros(
@@ -115,7 +118,7 @@ fun SessionReviewSheet(
         confidence = confidenceRating,
         isPomodoro = timerState.timerType == TimerType.POMODORO,
         pomodorosCompleted = effectivePomodoros,
-        plannedSeconds = timerState.totalSeconds,
+        plannedSeconds = timerState.plannedWorkSeconds,
         studiedSeconds = editableMinutes * 60
     )
 
@@ -134,7 +137,7 @@ fun SessionReviewSheet(
             Text(text = "Session Complete!", style = MaterialTheme.typography.headlineMedium)
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "${timerState.subjectName} • $editableMinutes minutes studied",
+                text = "${timerState.subjectName} • $editableMinutes ${if (editableMinutes == 1) "minute" else "minutes"} studied",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary
             )
@@ -168,7 +171,7 @@ fun SessionReviewSheet(
                     onValueChange = { input ->
                         val filtered = input.filter { it.isDigit() }
                         minutesText = filtered
-                        filtered.toIntOrNull()?.let {
+                        StudyDurationInput.minutes(filtered)?.let {
                             val clamped = it.coerceIn(1, 720)
                             editableMinutes = clamped
                             val diff = baselineMinutes - clamped
@@ -176,6 +179,8 @@ fun SessionReviewSheet(
                         }
                     },
                     label = { Text("Actual Duration (min)") },
+                    isError = !durationValid,
+                    supportingText = { if (!durationValid) Text("Enter 1–720 minutes.") },
                     modifier = Modifier.weight(1f),
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
@@ -186,12 +191,15 @@ fun SessionReviewSheet(
                     onValueChange = { input ->
                         val filtered = input.filter { it.isDigit() }
                         reduceByText = filtered
-                        val reduction = filtered.toIntOrNull() ?: 0
-                        val newMins = (baselineMinutes - reduction).coerceIn(1, 720)
-                        editableMinutes = newMins
-                        minutesText = newMins.toString()
+                        StudyDurationInput.reduction(filtered, baselineMinutes)?.let { reduction ->
+                            val newMins = baselineMinutes - reduction
+                            editableMinutes = newMins
+                            minutesText = newMins.toString()
+                        }
                     },
                     label = { Text("Reduce by (min)") },
+                    isError = !reductionValid,
+                    supportingText = { if (!reductionValid) Text("Enter 0–${baselineMinutes - 1} minutes.") },
                     placeholder = { Text("e.g. 15") },
                     modifier = Modifier.weight(1f),
                     singleLine = true,
@@ -268,6 +276,7 @@ fun SessionReviewSheet(
 
             // Save and Finish Button
             Button(
+                enabled = durationValid && reductionValid,
                 onClick = {
                     scope.launch {
                         val sessionEntity = StudySessionEntity(

@@ -31,7 +31,7 @@ class AchievementEvaluator(
         val allSources = sourceDao.getAllSources()
         val allSkillLabels = skillLabelDao.getAllSkillLabels()
 
-        val pdfSources = allSources.filter { it.type.equals("pdf", ignoreCase = true) }
+        val pdfSources = allSources.filter { it.type.equals("pdf", ignoreCase = true) && !it.filePath.isNullOrBlank() }
         val advancedSkillRows = allSkillLabels.filter {
             it.label.equals("advanced", ignoreCase = true) || it.label.equals("expert", ignoreCase = true)
         }

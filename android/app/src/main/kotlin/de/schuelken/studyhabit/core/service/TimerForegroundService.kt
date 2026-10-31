@@ -59,6 +59,8 @@ data class TimerPersistedState(
     val startedAt: Long,
     val sessionId: String,
     val totalWorkSeconds: Int = 0,
+    val workDurationSeconds: Int = 0,
+    val shortBreakSeconds: Int = 0,
 )
 
 data class TimerState(
@@ -80,7 +82,14 @@ data class TimerState(
     val startedAt: Long = 0L,
     val sessionId: String = "",
     val totalWorkSeconds: Int = 0,
-)
+    val workDurationSeconds: Int = 0,
+    val shortBreakSeconds: Int = 0,
+) {
+    val plannedWorkSeconds: Int
+        get() = workDurationSeconds.takeIf { it > 0 }
+            ?: totalSeconds.takeIf { phase == TimerPhase.WORK && it > 0 }
+            ?: 25 * 60
+}
 
 class TimerForegroundService : Service() {
 
@@ -139,6 +148,10 @@ class TimerForegroundService : Service() {
                     startedAt = persisted.startedAt,
                     sessionId = persisted.sessionId,
                     totalWorkSeconds = persisted.totalWorkSeconds,
+                    workDurationSeconds = persisted.workDurationSeconds.takeIf { it > 0 }
+                        ?: if (persisted.phase == TimerPhase.WORK.value) persisted.totalSeconds else preferences.workDuration * 60,
+                    shortBreakSeconds = persisted.shortBreakSeconds.takeIf { it > 0 }
+                        ?: preferences.shortBreakDuration * 60,
                 )
                 _timerState.value = restoredState
             }
@@ -222,13 +235,18 @@ class TimerForegroundService : Service() {
     private var baseElapsedRealtime: Long = 0L
     private var accumulatedElapsedSeconds: Int = 0
     private var accumulatedWorkSeconds: Int = 0
-    private var customBreakDurationMinutes: Int? = null
     private lateinit var preferences: AppPreferences
 
     override fun onCreate() {
         super.onCreate()
         preferences = (application as StudyHabitApplication).container.preferences
         NotificationHelper.createNotificationChannels(this)
+        // A restored session is paused. Hydrate once, before any service action.
+        restoreIfNeeded(this)
+        val restored = _timerState.value
+        accumulatedElapsedSeconds = restored.elapsedSeconds
+        accumulatedWorkSeconds = TimerAccounting.priorWorkSeconds(restored)
+        baseElapsedRealtime = SystemClock.elapsedRealtime()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -273,8 +291,7 @@ class TimerForegroundService : Service() {
         durationMinutes: Int,
         breakDurationMinutes: Int? = null
     ) {
-        customBreakDurationMinutes = breakDurationMinutes
-        val totalSec = durationMinutes * 60
+        val totalSec = durationMinutes.coerceIn(5, 120) * 60
         accumulatedElapsedSeconds = 0
         accumulatedWorkSeconds = 0
         baseElapsedRealtime = SystemClock.elapsedRealtime()
@@ -290,6 +307,8 @@ class TimerForegroundService : Service() {
             chapterId = chapterId,
             sourceId = sourceId,
             totalSeconds = totalSec,
+            workDurationSeconds = totalSec,
+            shortBreakSeconds = (breakDurationMinutes ?: preferences.shortBreakDuration).coerceIn(1, 30) * 60,
             remainingSeconds = totalSec,
             elapsedSeconds = 0,
             overtimeSeconds = 0,
@@ -348,7 +367,9 @@ class TimerForegroundService : Service() {
         if (!_timerState.value.isRunning || _timerState.value.isPaused) return
         val currentRunningSec = ((SystemClock.elapsedRealtime() - baseElapsedRealtime) / 1000).toInt()
         accumulatedElapsedSeconds += currentRunningSec
-        val updated = _timerState.value.copy(isPaused = true)
+        val updated = TimerAccounting.snapshot(
+            _timerState.value, accumulatedElapsedSeconds, accumulatedWorkSeconds
+        ).copy(isPaused = true)
         _timerState.value = updated
         persistState(updated)
         tickerJob?.cancel()
@@ -358,16 +379,6 @@ class TimerForegroundService : Service() {
 
     private fun resumeTimer() {
         if (!_timerState.value.isRunning || !_timerState.value.isPaused) return
-        if (accumulatedElapsedSeconds == 0 && _timerState.value.elapsedSeconds > 0) {
-            accumulatedElapsedSeconds = _timerState.value.elapsedSeconds
-        }
-        if (accumulatedWorkSeconds == 0 && _timerState.value.totalWorkSeconds > 0) {
-            accumulatedWorkSeconds = if (_timerState.value.phase == TimerPhase.WORK) {
-                (_timerState.value.totalWorkSeconds - _timerState.value.elapsedSeconds).coerceAtLeast(0)
-            } else {
-                _timerState.value.totalWorkSeconds
-            }
-        }
         baseElapsedRealtime = SystemClock.elapsedRealtime()
         val updated = _timerState.value.copy(isPaused = false)
         _timerState.value = updated
@@ -385,53 +396,23 @@ class TimerForegroundService : Service() {
         val runningSec = if (curr.isPaused) 0 else ((SystemClock.elapsedRealtime() - baseElapsedRealtime) / 1000).toInt()
         val totalElapsed = accumulatedElapsedSeconds + runningSec
 
-        if (curr.phase == TimerPhase.WORK) {
-            val completedWork = totalElapsed.coerceAtLeast(curr.totalSeconds)
-            accumulatedWorkSeconds += completedWork
-        }
-
+        val measured = TimerAccounting.snapshot(curr, totalElapsed, accumulatedWorkSeconds)
+        val updated = TimerAccounting.advance(
+            measured,
+            longBreakSeconds = preferences.longBreakDuration * 60,
+            longBreakEvery = preferences.longBreakEvery,
+            autoStartBreaks = preferences.autoStartBreaks,
+            autoStartWork = preferences.autoStartWork
+        )
+        accumulatedWorkSeconds = updated.totalWorkSeconds
         accumulatedElapsedSeconds = 0
         baseElapsedRealtime = SystemClock.elapsedRealtime()
-
-        val (nextPhase, nextDuration) = when (curr.phase) {
-            TimerPhase.WORK -> {
-                val completed = curr.pomodorosCompleted + 1
-                if (completed % preferences.longBreakEvery == 0) {
-                    TimerPhase.LONG_BREAK to (preferences.longBreakDuration * 60)
-                } else {
-                    val breakMins = customBreakDurationMinutes ?: preferences.shortBreakDuration
-                    TimerPhase.SHORT_BREAK to (breakMins * 60)
-                }
-            }
-            TimerPhase.SHORT_BREAK, TimerPhase.LONG_BREAK -> {
-                TimerPhase.WORK to (preferences.workDuration * 60)
-            }
-            TimerPhase.IDLE -> TimerPhase.WORK to (preferences.workDuration * 60)
-        }
-
-        val shouldPause = if (curr.phase == TimerPhase.WORK) {
-            !preferences.autoStartBreaks
-        } else {
-            !preferences.autoStartWork
-        }
-
-        val updated = curr.copy(
-            phase = nextPhase,
-            totalSeconds = nextDuration,
-            remainingSeconds = nextDuration,
-            elapsedSeconds = 0,
-            overtimeSeconds = 0,
-            isOvertime = false,
-            pomodorosCompleted = if (curr.phase == TimerPhase.WORK) curr.pomodorosCompleted + 1 else curr.pomodorosCompleted,
-            totalWorkSeconds = accumulatedWorkSeconds,
-            isPaused = shouldPause,
-        )
         _timerState.value = updated
         persistState(updated)
         updateNotification(updated)
         StudyHabitWidgetProvider.updateAllWidgets(this)
 
-        if (shouldPause) {
+        if (updated.isPaused) {
             tickerJob?.cancel()
         } else if (tickerJob?.isActive != true) {
             startTicker()
@@ -465,7 +446,6 @@ class TimerForegroundService : Service() {
         tickerJob?.cancel()
         accumulatedElapsedSeconds = 0
         accumulatedWorkSeconds = 0
-        customBreakDurationMinutes = null
         val stopped = _timerState.value.copy(isRunning = false, isPaused = false)
         _timerState.value = stopped
         preferences.clearActiveTimers()
@@ -476,7 +456,6 @@ class TimerForegroundService : Service() {
 
     private fun stopTimer() {
         tickerJob?.cancel()
-        customBreakDurationMinutes = null
         val curr = _timerState.value
         val runningSec = if (curr.isRunning && !curr.isPaused) {
             ((SystemClock.elapsedRealtime() - baseElapsedRealtime) / 1000).toInt()
@@ -494,19 +473,19 @@ class TimerForegroundService : Service() {
         StudyHabitWidgetProvider.updateAllWidgets(this)
 
         serviceScope.launch {
-            if ((accumulatedWorkSeconds >= 60 || accumulatedElapsedSeconds >= 60 || finalWorkSeconds >= 60 || finalElapsedSeconds >= 60) && curr.subjectId.isNotBlank()) {
+            if (finalWorkSeconds >= 60 && curr.subjectId.isNotBlank()) {
                 val db = AppDatabase.getInstance(applicationContext)
                 val existing = db.sessionDao().getSessionById(curr.sessionId)
                 if (existing == null) {
-                    val studySec = if (finalWorkSeconds >= 60) finalWorkSeconds else finalElapsedSeconds
+                    val studySec = finalWorkSeconds
                     val actualMinutes = maxOf(1, studySec / 60)
-                    val plannedMinutes = if (curr.timerType == TimerType.FREE_TIMER) 0 else (curr.totalSeconds / 60)
+                    val plannedMinutes = if (curr.timerType == TimerType.FREE_TIMER) 0 else (curr.plannedWorkSeconds / 60)
                     val xpEarned = XpCalculator.calculateSessionXp(
                         actualMinutes = actualMinutes,
                         confidence = 3,
                         isPomodoro = curr.timerType == TimerType.POMODORO,
                         pomodorosCompleted = curr.pomodorosCompleted,
-                        plannedSeconds = curr.totalSeconds,
+                        plannedSeconds = curr.plannedWorkSeconds,
                         studiedSeconds = studySec
                     )
                     val app = applicationContext as? StudyHabitApplication
@@ -643,6 +622,8 @@ class TimerForegroundService : Service() {
                 startedAt = state.startedAt,
                 sessionId = state.sessionId,
                 totalWorkSeconds = state.totalWorkSeconds,
+                workDurationSeconds = state.workDurationSeconds,
+                shortBreakSeconds = state.shortBreakSeconds,
             )
         )
         preferences.activeTimerType = state.timerType.value
@@ -656,7 +637,7 @@ class TimerForegroundService : Service() {
     private fun startForegroundWithNotification(state: TimerState) {
         val notification = buildNotification(state)
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 startForeground(
                     NotificationHelper.TIMER_NOTIFICATION_ID,
                     notification,

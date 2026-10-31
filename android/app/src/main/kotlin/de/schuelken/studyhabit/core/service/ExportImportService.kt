@@ -15,6 +15,7 @@ import de.schuelken.studyhabit.core.database.TopicEntity
 import de.schuelken.studyhabit.core.database.UserStatsEntity
 import de.schuelken.studyhabit.core.model.ImportMode
 import de.schuelken.studyhabit.core.preferences.AppPreferences
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -64,11 +65,7 @@ class ExportImportService(
     private val database: AppDatabase,
     private val preferences: AppPreferences,
 ) {
-    val json = Json {
-        ignoreUnknownKeys = true
-        prettyPrint = true
-        encodeDefaults = true
-    }
+    val json = BackupCodec.json
 
     suspend fun buildExportDocument(includeDeleted: Boolean = false): ExportDocument {
         val projects = if (includeDeleted) database.projectDao().getModifiedSince(-1L) else database.projectDao().getAllProjects()
@@ -147,9 +144,10 @@ class ExportImportService(
         var subjectCount = 0
         var sessionCount = 0
         var sourceCount = 0
+        var dataCommitted = false
 
         try {
-            val doc = json.decodeFromString<ExportDocument>(jsonString)
+            val doc = BackupCodec.decode(jsonString)
 
             database.withTransaction {
                 if (mode == ImportMode.REPLACE) {
@@ -202,18 +200,27 @@ class ExportImportService(
 
                 database.userStatsDao().upsert(doc.userStats)
 
-                doc.settings?.let { settings ->
-                    preferences.applySettingsMap(settings)
-                }
-
-                val allProjects = database.projectDao().getAllProjects()
-                val currentActive = preferences.activeProjectId.value
-                if (currentActive == null || allProjects.none { it.id == currentActive }) {
-                    preferences.setActiveProjectId(allProjects.firstOrNull()?.id)
-                }
             }
+
+            dataCommitted = true
+            doc.settings?.let { settings -> preferences.applySettingsMap(settings) }
+            val allProjects = database.projectDao().getAllProjects()
+                val currentActive = preferences.activeProjectId.value
+            if (currentActive == null || allProjects.none { it.id == currentActive }) {
+                preferences.setActiveProjectId(allProjects.firstOrNull()?.id)
+            }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
-            errors.add(e.message ?: "Unknown import error")
+            if (dataCommitted) {
+                errors.add("Study data was imported ($subjectCount subjects, $sessionCount sessions), but settings could not be fully restored: ${e.message}")
+            } else {
+                errors.add(e.message ?: "Unknown import error")
+                projectCount = 0
+                subjectCount = 0
+                sessionCount = 0
+                sourceCount = 0
+            }
         }
 
         return ImportResult(

@@ -57,7 +57,7 @@ fun DiagnosticLogsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Diagnostic Logs") },
+                title = { Text("App Diagnostics") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")

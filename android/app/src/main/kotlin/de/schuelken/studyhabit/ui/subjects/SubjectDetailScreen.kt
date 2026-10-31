@@ -94,6 +94,11 @@ import de.schuelken.studyhabit.core.service.TimerForegroundService
 import de.schuelken.studyhabit.core.service.XpCalculator
 import de.schuelken.studyhabit.ui.timer.StartSessionSheet
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CancellationException
+import de.schuelken.studyhabit.core.service.SourceValidation
+import de.schuelken.studyhabit.core.service.PdfSourceAccess
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -746,6 +751,9 @@ fun AddSourceDialog(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var saving by remember { mutableStateOf(false) }
+    var sourceError by remember { mutableStateOf<String?>(null) }
     var title by remember { mutableStateOf("") }
     var autoFilledTitle by remember { mutableStateOf("") }
     var type by remember { mutableStateOf("pdf") }
@@ -787,7 +795,8 @@ fun AddSourceDialog(
         onDismissRequest = onDismiss,
         title = { Text("Add Source") },
         text = {
-            Column {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                sourceError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
@@ -878,7 +887,9 @@ fun AddSourceDialog(
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
                         value = pathOrUrl,
-                        onValueChange = { pathOrUrl = it },
+                        onValueChange = { pathOrUrl = it; sourceError = null },
+                        isError = pathOrUrl.isNotBlank() && type != "pdf" && !SourceValidation.isWebUrl(pathOrUrl),
+                        supportingText = { if (type != "pdf") Text("Use a complete http:// or https:// URL.") },
                         label = { Text(if (type == "pdf") "File Path or URI" else "URL") },
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -915,10 +926,21 @@ fun AddSourceDialog(
                             addedAt = System.currentTimeMillis(),
                             updatedAt = System.currentTimeMillis()
                         )
-                        onSave(entity)
+                        scope.launch {
+                            saving = true
+                            try {
+                                if (type == "pdf") withContext(Dispatchers.IO) { PdfSourceAccess.validate(context, pathOrUrl) }
+                                onSave(entity)
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                sourceError = e.message ?: "Could not open this PDF. Choose another document."
+                            } finally { saving = false }
+                        }
                     }
                 },
-                enabled = if (type == "anki") selectedAnkiDeck != null else title.isNotBlank()
+                enabled = !saving && if (type == "anki") selectedAnkiDeck != null else
+                    title.isNotBlank() && pathOrUrl.isNotBlank() && (type == "pdf" || SourceValidation.isWebUrl(pathOrUrl))
             ) {
                 Text("Add")
             }

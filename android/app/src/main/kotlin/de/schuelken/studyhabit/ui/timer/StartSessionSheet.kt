@@ -50,6 +50,7 @@ fun StartSessionSheet(
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val startWithNotifications = rememberNotificationAwareStart()
 
     var selectedSubjectId by remember {
         mutableStateOf(preselectedSubjectId ?: subjects.firstOrNull()?.id ?: "")
@@ -205,6 +206,7 @@ fun StartSessionSheet(
             // Start Button
             Button(
                 onClick = {
+                    startWithNotifications {
                     if (selectedSubject != null) {
                         val effectiveTopicId = if (selectedSubject.hierarchyMode != "flat") selectedTopicId else null
                         val effectiveChapterId = if (selectedSubject.hierarchyMode == "threeLevel") selectedChapterId else null
@@ -228,6 +230,7 @@ fun StartSessionSheet(
                             )
                         }
                         onDismiss()
+                    }
                     }
                 },
                 enabled = selectedSubject != null,

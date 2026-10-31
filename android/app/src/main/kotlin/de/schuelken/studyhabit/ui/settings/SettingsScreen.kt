@@ -77,7 +77,11 @@ import de.schuelken.studyhabit.core.model.ImportMode
 import de.schuelken.studyhabit.core.model.SyncStatus
 import de.schuelken.studyhabit.core.model.ThemeMode
 import de.schuelken.studyhabit.core.theme.AppThemeTokens
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import de.schuelken.studyhabit.core.service.BackupCodec
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -114,6 +118,28 @@ fun SettingsScreen(
 
     var importPendingJson by remember { mutableStateOf<String?>(null) }
     var importStatusMessage by remember { mutableStateOf<String?>(null) }
+    var backupBusy by remember { mutableStateOf(false) }
+
+    val saveBackupLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri != null) scope.launch {
+            backupBusy = true
+            try {
+                withContext(Dispatchers.IO) {
+                    val file = container.exportImportService.exportToJson()
+                    val stream = context.contentResolver.openOutputStream(uri, "wt")
+                        ?: error("Could not open the chosen location.")
+                    stream.use { output -> file.inputStream().use { it.copyTo(output) } }
+                }
+                importStatusMessage = "Backup saved successfully."
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                importStatusMessage = "Backup was not saved: ${e.message}"
+            } finally { backupBusy = false }
+        }
+    }
 
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -121,11 +147,19 @@ fun SettingsScreen(
         uri?.let {
             scope.launch {
                 try {
-                    val jsonStr = context.contentResolver.openInputStream(it)?.bufferedReader()?.use { r -> r.readText() }
+                    backupBusy = true
+                    val jsonStr = withContext(Dispatchers.IO) {
+                        val text = context.contentResolver.openInputStream(it)?.bufferedReader()?.use { r -> r.readText() }
+                            ?: error("Could not open the chosen file.")
+                        BackupCodec.decode(text)
+                        text
+                    }
                     importPendingJson = jsonStr
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
-                    importStatusMessage = "Failed to read file: ${e.message}"
-                }
+                    importStatusMessage = "Backup could not be imported: ${e.message}"
+                } finally { backupBusy = false }
             }
         }
     }
@@ -245,7 +279,7 @@ fun SettingsScreen(
                         ) {
                             Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                             Spacer(modifier = Modifier.width(12.dp))
-                            Text(text = "Diagnostic Logs", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                            Text(text = "App Diagnostics", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                             Icon(Icons.Default.ChevronRight, contentDescription = null)
                         }
                     }
@@ -379,7 +413,7 @@ fun SettingsScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(text = "Continuous Focus (Overtime tracking)", style = MaterialTheme.typography.titleSmall)
+                            Text(text = "Continuous Focus (Overtime tracking)", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
                             Switch(
                                 checked = continuousFocus,
                                 onCheckedChange = {
@@ -395,7 +429,7 @@ fun SettingsScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(text = "Vibration Alerts", style = MaterialTheme.typography.titleSmall)
+                            Text(text = "Vibration Alerts", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
                             Switch(
                                 checked = vibration,
                                 onCheckedChange = {
@@ -416,10 +450,17 @@ fun SettingsScreen(
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Button(
+                            onClick = { saveBackupLauncher.launch("studyhabit-backup.json") },
+                            enabled = !backupBusy,
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("Save Backup JSON") }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        OutlinedButton(
                             onClick = {
                                 scope.launch {
+                                    backupBusy = true
                                     try {
-                                        val file = container.exportImportService.exportToJson()
+                                        val file = withContext(Dispatchers.IO) { container.exportImportService.exportToJson() }
                                         val uri = FileProvider.getUriForFile(
                                             context,
                                             "${context.packageName}.fileprovider",
@@ -431,21 +472,25 @@ fun SettingsScreen(
                                             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                         }
                                         context.startActivity(Intent.createChooser(sendIntent, "Export StudyHabit Backup"))
+                                    } catch (e: CancellationException) {
+                                        throw e
                                     } catch (e: Exception) {
-                                        importStatusMessage = "Export failed: ${e.message}"
-                                    }
+                                        importStatusMessage = "Sharing failed: ${e.message}. Use Save Backup JSON instead."
+                                    } finally { backupBusy = false }
                                 }
                             },
+                            enabled = !backupBusy,
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Icon(Icons.Default.Download, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Export Backup JSON")
+                            Text("Share Backup JSON")
                         }
                         Spacer(modifier = Modifier.height(12.dp))
 
                         OutlinedButton(
                             onClick = { filePickerLauncher.launch("application/json") },
+                            enabled = !backupBusy,
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Icon(Icons.Default.Upload, contentDescription = null)
@@ -482,9 +527,14 @@ fun SettingsScreen(
                             val json = importPendingJson!!
                             importPendingJson = null
                             scope.launch {
-                                val res = container.exportImportService.importFromJson(json, ImportMode.REPLACE)
-                                importStatusMessage = "Replaced data: ${res.subjectCount} subjects, ${res.sessionCount} sessions."
-                                container.triggerDataChangedSync()
+                                backupBusy = true
+                                try {
+                                    val res = withContext(Dispatchers.IO) { container.exportImportService.importFromJson(json, ImportMode.REPLACE) }
+                                    importStatusMessage = if (res.errors.isEmpty()) {
+                                        container.triggerDataChangedSync()
+                                        "Replaced data: ${res.subjectCount} subjects, ${res.sessionCount} sessions."
+                                    } else "Import failed: ${res.errors.joinToString()}"
+                                } finally { backupBusy = false }
                             }
                         },
                         colors = ButtonDefaults.outlinedButtonColors(
@@ -498,9 +548,14 @@ fun SettingsScreen(
                             val json = importPendingJson!!
                             importPendingJson = null
                             scope.launch {
-                                val res = container.exportImportService.importFromJson(json, ImportMode.MERGE)
-                                importStatusMessage = "Imported ${res.subjectCount} subjects and ${res.sessionCount} sessions."
-                                container.triggerDataChangedSync()
+                                backupBusy = true
+                                try {
+                                    val res = withContext(Dispatchers.IO) { container.exportImportService.importFromJson(json, ImportMode.MERGE) }
+                                    importStatusMessage = if (res.errors.isEmpty()) {
+                                        container.triggerDataChangedSync()
+                                        "Imported ${res.subjectCount} subjects and ${res.sessionCount} sessions."
+                                    } else "Import failed: ${res.errors.joinToString()}"
+                                } finally { backupBusy = false }
                             }
                         }
                     ) {

@@ -23,6 +23,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import de.schuelken.studyhabit.core.service.StudyDurationInput
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -50,6 +51,8 @@ fun EditSessionDialog(
     var minutes by remember { mutableIntStateOf(baselineMinutes) }
     var minutesText by remember { mutableStateOf(minutes.toString()) }
     var reduceByText by remember { mutableStateOf("") }
+    val durationValid = StudyDurationInput.minutes(minutesText) != null
+    val reductionValid = StudyDurationInput.reduction(reduceByText, baselineMinutes) != null
     var confidenceRating by remember { mutableStateOf(session.confidenceRating ?: 3) }
     var notes by remember { mutableStateOf(session.notes ?: "") }
 
@@ -89,7 +92,7 @@ fun EditSessionDialog(
                         onValueChange = { input ->
                             val filtered = input.filter { it.isDigit() }
                             minutesText = filtered
-                            filtered.toIntOrNull()?.let {
+                            StudyDurationInput.minutes(filtered)?.let {
                                 val clamped = it.coerceIn(1, 720)
                                 minutes = clamped
                                 val diff = baselineMinutes - clamped
@@ -97,6 +100,8 @@ fun EditSessionDialog(
                             }
                         },
                         label = { Text("Actual Duration (min)") },
+                    isError = !durationValid,
+                    supportingText = { if (!durationValid) Text("Enter 1–720 minutes.") },
                         modifier = Modifier.weight(1f),
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
@@ -107,12 +112,15 @@ fun EditSessionDialog(
                         onValueChange = { input ->
                             val filtered = input.filter { it.isDigit() }
                             reduceByText = filtered
-                            val reduction = filtered.toIntOrNull() ?: 0
-                            val newMins = (baselineMinutes - reduction).coerceIn(1, 720)
-                            minutes = newMins
-                            minutesText = newMins.toString()
+                            StudyDurationInput.reduction(filtered, baselineMinutes)?.let { reduction ->
+                                val newMins = baselineMinutes - reduction
+                                minutes = newMins
+                                minutesText = newMins.toString()
+                            }
                         },
                         label = { Text("Reduce by (min)") },
+                    isError = !reductionValid,
+                    supportingText = { if (!reductionValid) Text("Enter 0–${baselineMinutes - 1} minutes.") },
                         placeholder = { Text("e.g. 15") },
                         modifier = Modifier.weight(1f),
                         singleLine = true,
@@ -169,6 +177,7 @@ fun EditSessionDialog(
         },
         confirmButton = {
             TextButton(
+                enabled = durationValid && reductionValid,
                 onClick = {
                     val finalMinutes = minutes.coerceIn(1, 720)
                     onSave(finalMinutes, confidenceRating, notes.trim().ifEmpty { null })

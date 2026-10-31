@@ -80,14 +80,8 @@ fun PomodoroScreen(
     val primaryColor = MaterialTheme.colorScheme.primary
     val trackColor = MaterialTheme.colorScheme.surfaceVariant
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .systemBarsPadding()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.SpaceBetween
-    ) {
+    FocusTimerLayout(
+        header = {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = timerState.subjectName.ifEmpty { "Focus Session" },
@@ -107,11 +101,12 @@ fun PomodoroScreen(
                 color = if (timerState.isOvertime) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary
             )
         }
-
+        },
+        timer = { dialSize ->
         // Circular Timer Canvas
         Box(
             contentAlignment = Alignment.Center,
-            modifier = Modifier.size(280.dp)
+            modifier = Modifier.size(dialSize)
         ) {
             val progressPercent = (progress * 100).toInt()
             val phaseText = when {
@@ -123,7 +118,7 @@ fun PomodoroScreen(
             }
             Canvas(
                 modifier = Modifier
-                    .size(260.dp)
+                    .size(dialSize - 20.dp)
                     .semantics {
                         contentDescription = if (timerState.isOvertime) {
                             "Overtime focus: ${timerState.overtimeSeconds / 60} minutes ${timerState.overtimeSeconds % 60} seconds"
@@ -180,7 +175,8 @@ fun PomodoroScreen(
                 }
             }
         }
-
+        },
+        controls = {
         // Controls
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -234,7 +230,8 @@ fun PomodoroScreen(
                 )
             }
         }
-    }
+        }
+    )
 
     if (showReviewSheet) {
         SessionReviewSheet(

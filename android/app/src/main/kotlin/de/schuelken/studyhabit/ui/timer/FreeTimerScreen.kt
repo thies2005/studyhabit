@@ -54,14 +54,8 @@ fun FreeTimerScreen(
     val primaryColor = MaterialTheme.colorScheme.primary
     val trackColor = MaterialTheme.colorScheme.surfaceVariant
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .systemBarsPadding()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.SpaceBetween
-    ) {
+    FocusTimerLayout(
+        header = {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = timerState.subjectName.ifEmpty { "Free Focus Session" },
@@ -74,11 +68,12 @@ fun FreeTimerScreen(
                 color = MaterialTheme.colorScheme.primary
             )
         }
-
+        },
+        timer = { dialSize ->
         // Circular Timer Canvas
         Box(
             contentAlignment = Alignment.Center,
-            modifier = Modifier.size(280.dp)
+            modifier = Modifier.size(dialSize)
         ) {
             val h = elapsed / 3600
             val m = (elapsed % 3600) / 60
@@ -87,7 +82,7 @@ fun FreeTimerScreen(
 
             Canvas(
                 modifier = Modifier
-                    .size(260.dp)
+                    .size(dialSize - 20.dp)
                     .semantics {
                         contentDescription = "Timer elapsed: $formattedTime"
                     }
@@ -127,7 +122,8 @@ fun FreeTimerScreen(
                 )
             }
         }
-
+        },
+        controls = {
         // Controls
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -167,7 +163,8 @@ fun FreeTimerScreen(
                 )
             }
         }
-    }
+        }
+    )
 
     if (showReviewSheet) {
         SessionReviewSheet(

@@ -65,7 +65,7 @@ fun BatteryOptimizationScreen(onNavigateBack: () -> Unit) {
         )
         else -> listOf(
             "1. Open device Settings > Apps > StudyHabit > Battery.",
-            "2. Select 'Unrestricted' so background focus timers and alarms are never delayed or killed by Doze mode."
+            "2. Select 'Unrestricted' to reduce background restrictions. Device settings and system power management can still affect timers and alerts."
         )
     }
 

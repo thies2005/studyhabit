@@ -244,7 +244,8 @@ class AchievementEvaluatorTest {
                 id = "src_1",
                 subjectId = "sub_1",
                 type = "pdf",
-                title = "Calculus Book"
+                title = "Calculus Book",
+                filePath = "content://documents/calculus.pdf"
             )
         )
 

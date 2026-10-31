@@ -75,34 +75,7 @@ fun AppTheme(
             } else {
                 AppThemeTokens.presetSeeds.getOrElse(seedColorIndex) { AppThemeTokens.presetSeeds[0] }
             }
-            val dynamicOnPrimary = if (seed.luminance() > 0.45f) Color(0xFF0F1416) else Color.White
-            if (darkTheme) {
-                darkColorScheme(
-                    primary = seed,
-                    primaryContainer = seed.copy(alpha = 0.4f),
-                    onPrimary = dynamicOnPrimary,
-                    background = Color(0xFF0F1416),
-                    surface = Color(0xFF111416),
-                    surfaceVariant = Color(0xFF192023),
-                    onBackground = Color(0xFFE1E3E4),
-                    onSurface = Color(0xFFE1E3E4),
-                    onSurfaceVariant = Color(0xFFBFC8CA),
-                    outline = Color(0xFF899295),
-                )
-            } else {
-                lightColorScheme(
-                    primary = seed,
-                    primaryContainer = seed.copy(alpha = 0.2f),
-                    onPrimary = dynamicOnPrimary,
-                    background = Color(0xFFF5FAFB),
-                    surface = Color(0xFFEFF4F6),
-                    surfaceVariant = Color(0xFFE3EAEB),
-                    onBackground = Color(0xFF171C1E),
-                    onSurface = Color(0xFF171C1E),
-                    onSurfaceVariant = Color(0xFF3F484B),
-                    outline = Color(0xFF6F797B),
-                )
-            }
+            seedColorScheme(seed, darkTheme)
         }
     }
 

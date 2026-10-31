@@ -34,6 +34,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import de.schuelken.studyhabit.core.database.ProjectEntity
 import de.schuelken.studyhabit.core.model.SyncStatus
 
@@ -69,13 +73,17 @@ fun AppShellScaffold(
                 CenterAlignedTopAppBar(
                     title = {
                         OutlinedButton(
-                            onClick = { showProjectSwitcher = true }
+                            onClick = { showProjectSwitcher = true },
+                            modifier = Modifier.semantics { contentDescription = "Switch Project: ${activeProject?.name ?: "All Projects"}" }
                         ) {
-                            Text(text = activeProject?.icon ?: "📚")
+                            Text(text = activeProject?.icon ?: "📚", maxLines = 1)
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = activeProject?.name ?: "All Projects",
-                                style = MaterialTheme.typography.titleMedium
+                                style = MaterialTheme.typography.titleMedium,
+                                modifier = Modifier.weight(1f, fill = false),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Icon(
@@ -112,7 +120,11 @@ fun AppShellScaffold(
                                     BottomNavDestination.ACHIEVEMENTS -> Icon(Icons.Default.EmojiEvents, contentDescription = null)
                                 }
                             },
-                            label = { Text(dest.title) }
+                            label = {
+                                Text(dest.title, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
+                            },
+                            alwaysShowLabel = LocalDensity.current.fontScale < 1.3f || selected,
+                            modifier = Modifier.semantics { contentDescription = dest.title }
                         )
                     }
                 }

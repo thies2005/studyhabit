@@ -1,6 +1,11 @@
 package de.schuelken.studyhabit.ui.settings
 
 import android.content.Intent
+import android.content.pm.ApplicationInfo
+import de.schuelken.studyhabit.core.service.BlockerPresets
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.material3.OutlinedButton
 import android.graphics.drawable.Drawable
 import android.provider.Settings
 import androidx.compose.foundation.Image
@@ -62,10 +67,12 @@ import kotlinx.coroutines.withContext
 data class InstalledAppItem(
     val packageName: String,
     val appName: String,
-    val icon: Drawable?
+    val icon: Drawable?,
+    val isSocial: Boolean = false,
+    val isGame: Boolean = false
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun AppBlockerScreen(
     container: AppContainer,
@@ -111,12 +118,14 @@ fun AppBlockerScreen(
             val apps = activities
                 .mapNotNull { it.activityInfo?.applicationInfo }
                 .distinctBy { it.packageName }
-                .filter { it.packageName != context.packageName }
+                .filter { it.packageName !in setOf(context.packageName, "com.android.settings", "com.android.systemui") }
                 .map { appInfo ->
                     InstalledAppItem(
                         packageName = appInfo.packageName,
                         appName = appInfo.loadLabel(pm).toString(),
-                        icon = runCatching { appInfo.loadIcon(pm) }.getOrNull()
+                        icon = runCatching { appInfo.loadIcon(pm) }.getOrNull(),
+                        isSocial = BlockerPresets.isSocial(appInfo.packageName, appInfo.category == ApplicationInfo.CATEGORY_SOCIAL),
+                        isGame = appInfo.category == ApplicationInfo.CATEGORY_GAME || (appInfo.flags and ApplicationInfo.FLAG_IS_GAME) != 0
                     )
                 }
                 .sortedBy { it.appName.lowercase() }
@@ -299,6 +308,21 @@ fun AppBlockerScreen(
                         style = MaterialTheme.typography.titleMedium
                     )
                     Spacer(modifier = Modifier.height(8.dp))
+                    Text("Presets add installed apps to your selection. Adjust individual apps afterward.", style = MaterialTheme.typography.bodySmall)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("All Apps" to installedApps, "Social Media" to installedApps.filter { it.isSocial }, "Games" to installedApps.filter { it.isGame }).forEach { (label, matches) ->
+                            OutlinedButton(enabled = !isLoadingApps && matches.isNotEmpty(), onClick = {
+                                val selection = BlockerPresets.select(blockedPackages, matches.map { it.packageName }.toSet())
+                                blockedPackages = selection
+                                container.preferences.blockedAppPackages = selection
+                            }) { Text("$label (${matches.size})") }
+                        }
+                        OutlinedButton(enabled = blockedPackages.isNotEmpty(), onClick = {
+                            blockedPackages = emptySet()
+                            container.preferences.blockedAppPackages = emptySet()
+                        }) { Text("Clear Selection") }
+                    }
+                    Text("Social presets use Android categories and known social apps; games use Android’s game category. Some apps need manual selection. Android Settings, your launcher and keyboards remain accessible.", style = MaterialTheme.typography.bodySmall)
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },

@@ -1,5 +1,15 @@
 package de.schuelken.studyhabit.ui.timer
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.content.Intent
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.material3.Button
+import de.schuelken.studyhabit.core.service.PdfSourceAccess
+import kotlinx.coroutines.CancellationException
+import androidx.compose.runtime.rememberCoroutineScope
 import android.graphics.Bitmap
 import android.graphics.pdf.PdfRenderer
 import android.net.Uri
@@ -63,6 +73,8 @@ fun PdfViewerScreen(
     onNavigateBack: () -> Unit
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var reloadKey by remember { mutableIntStateOf(0) }
     var source by remember { mutableStateOf<SourceEntity?>(null) }
     var pdfRenderer by remember { mutableStateOf<PdfRenderer?>(null) }
     var fileDescriptor by remember { mutableStateOf<ParcelFileDescriptor?>(null) }
@@ -90,7 +102,39 @@ fun PdfViewerScreen(
         offset = Offset.Zero
     }
 
-    LaunchedEffect(sourceId) {
+    val relinkLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) scope.launch {
+            isLoading = true
+            try {
+                withContext(Dispatchers.IO) {
+                    PdfSourceAccess.validate(context, uri.toString())
+                    context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    val existing = container.database.sourceDao().getSourceById(sourceId)
+                        ?: error("This source no longer exists.")
+                    container.database.sourceDao().upsert(existing.copy(
+                        filePath = uri.toString(), currentPage = 0, progressPercent = 0.0,
+                        updatedAt = System.currentTimeMillis()
+                    ))
+                }
+                container.triggerDataChangedSync()
+                reloadKey++
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                errorMessage = e.message ?: "Could not relink this PDF."
+            } finally { isLoading = false }
+        }
+    }
+
+    LaunchedEffect(sourceId, reloadKey) {
+        isLoading = true
+        errorMessage = null
+        runCatching { pdfRenderer?.close() }
+        runCatching { fileDescriptor?.close() }
+        pdfRenderer = null
+        fileDescriptor = null
+        currentBitmap = null
+        pageCount = 0
         val s = container.database.sourceDao().getSourceById(sourceId)
         source = s
         if (s == null || s.filePath.isNullOrBlank()) {
@@ -101,30 +145,7 @@ fun PdfViewerScreen(
 
         withContext(Dispatchers.IO) {
             try {
-                val pathOrUri = s.filePath.trim()
-                val pfd = if (pathOrUri.startsWith("content://")) {
-                    context.contentResolver.openFileDescriptor(Uri.parse(pathOrUri), "r")
-                } else {
-                    val file = File(pathOrUri).canonicalFile
-                    val dataDir = File(context.applicationInfo.dataDir).canonicalFile
-                    if (file.path.startsWith(dataDir.path)) {
-                        errorMessage = "Access to internal app files is prohibited."
-                        isLoading = false
-                        return@withContext
-                    }
-                    if (!file.exists()) {
-                        errorMessage = "PDF file does not exist on device."
-                        isLoading = false
-                        return@withContext
-                    }
-                    ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
-                }
-
-                if (pfd == null) {
-                    errorMessage = "Could not open PDF file."
-                    isLoading = false
-                    return@withContext
-                }
+                val pfd = PdfSourceAccess.open(context, s.filePath)
 
                 fileDescriptor = pfd
                 val renderer = PdfRenderer(pfd)
@@ -145,20 +166,20 @@ fun PdfViewerScreen(
         if (currentPage in 1..pageCount) {
             withContext(Dispatchers.IO) {
                 try {
-                    val page = renderer.openPage(currentPage - 1)
+                    renderer.openPage(currentPage - 1).use { page ->
                     val scaleFactor = 2
                     val bitmap = Bitmap.createBitmap(page.width * scaleFactor, page.height * scaleFactor, Bitmap.Config.ARGB_8888)
                     page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                    page.close()
                     currentBitmap = bitmap
+                    }
                 } catch (e: Throwable) {
                     // Fallback to 1x scale if memory allocation fails
                     try {
-                        val page = renderer.openPage(currentPage - 1)
+                        renderer.openPage(currentPage - 1).use { page ->
                         val bitmap = Bitmap.createBitmap(page.width, page.height, Bitmap.Config.ARGB_8888)
                         page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                        page.close()
                         currentBitmap = bitmap
+                        }
                     } catch (e2: Throwable) {
                         errorMessage = "Failed to render page: ${e2.message}"
                     }
@@ -263,7 +284,15 @@ fun PdfViewerScreen(
         ) {
             when {
                 isLoading -> CircularProgressIndicator()
-                errorMessage != null -> Text(text = errorMessage ?: "", color = MaterialTheme.colorScheme.onSurface)
+                errorMessage != null -> Column(
+                    Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(text = errorMessage ?: "", color = MaterialTheme.colorScheme.onSurface)
+                    Spacer(Modifier.height(16.dp))
+                    if (source != null) Button(onClick = { relinkLauncher.launch(arrayOf("application/pdf")) }) {
+                        Text("Choose PDF Again")
+                    }
+                }
                 currentBitmap != null -> {
                     Image(
                         bitmap = currentBitmap!!.asImageBitmap(),

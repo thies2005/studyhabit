@@ -4,6 +4,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -44,7 +47,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import de.schuelken.studyhabit.core.database.StudySessionEntity
@@ -60,6 +66,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun HomeScreen(
     container: AppContainer,
@@ -70,6 +77,7 @@ fun HomeScreen(
     onConsumeOpenStartSheet: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    val largeText = LocalDensity.current.fontScale >= 1.3f
     val stats by container.database.userStatsDao().getUserStatsFlow().collectAsState(initial = UserStatsEntity())
     val timerState by TimerForegroundService.timerState.collectAsState()
 
@@ -136,11 +144,12 @@ fun HomeScreen(
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = { showStartSheet = true },
-                icon = { Icon(Icons.Default.PlayArrow, contentDescription = null) },
-                text = { Text("Start Focus") }
-            )
+            if (!largeText) StartFocusButton { showStartSheet = true }
+        },
+        bottomBar = {
+            if (largeText) Box(Modifier.fillMaxWidth().padding(12.dp), contentAlignment = Alignment.Center) {
+                StartFocusButton { showStartSheet = true }
+            }
         }
     ) { padding ->
         LazyColumn(
@@ -217,7 +226,7 @@ fun HomeScreen(
                             }
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "${stats?.currentStreak ?: 0} days",
+                                text = "${stats?.currentStreak ?: 0} ${if (stats?.currentStreak == 1) "day" else "days"}",
                                 style = MaterialTheme.typography.headlineMedium
                             )
                             if ((stats?.freezeTokens ?: 0) > 0) {
@@ -274,10 +283,10 @@ fun HomeScreen(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Row(
+                        FlowRow(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Text(text = "Today's Study Goal", style = MaterialTheme.typography.titleMedium)
                             Text(
@@ -331,14 +340,12 @@ fun HomeScreen(
                             .fillMaxWidth()
                             .clickable { onNavigateToSubjectDetail(session.subjectId) }
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
+                            Column(modifier = if (largeText) Modifier.fillMaxWidth() else Modifier.weight(1f)) {
                                 Text(text = subjName, style = MaterialTheme.typography.titleMedium)
                                 Spacer(modifier = Modifier.height(2.dp))
                                 val subtitleText = if (session.endPage != null && session.notes?.startsWith("AnkiDroid:") == true) {
@@ -455,4 +462,17 @@ fun HomeScreen(
             }
         )
     }
+}
+
+@Composable
+private fun StartFocusButton(onClick: () -> Unit) {
+    ExtendedFloatingActionButton(
+        onClick = onClick,
+        modifier = Modifier.semantics {
+            contentDescription = "Start Focus"
+            role = Role.Button
+        },
+        icon = { Icon(Icons.Default.PlayArrow, contentDescription = null) },
+        text = { Text("Start Focus") }
+    )
 }
