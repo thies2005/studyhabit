@@ -1,0 +1,15 @@
+10-31 13:20:30.351  3033  3054 E SyncEngine: java.net.ConnectException: Failed to connect to /10.0.2.2:3001
+10-31 13:20:30.571  3033  3059 W HWUI    : Failed to initialize 101010-2 format, error = EGL_SUCCESS
+10-31 13:20:31.086  3033  3033 I Choreographer: Skipped 51 frames!  The application may be doing too much work on its main thread.
+10-31 13:21:47.828  3033  3055 E SyncEngine: java.net.ConnectException: Failed to connect to /10.0.2.2:3001
+10-31 13:22:39.312  3033  3055 E SyncEngine: java.net.ConnectException: Failed to connect to /10.0.2.2:3001
+10-31 13:23:50.491  3033  3729 E SyncEngine: java.net.ConnectException: Failed to connect to /10.0.2.2:3001
+10-31 13:24:46.952  3033  3055 E SyncEngine: java.net.ConnectException: Failed to connect to /10.0.2.2:3001
+10-31 13:25:17.941  3033  3053 E SyncEngine: java.net.ConnectException: Failed to connect to /10.0.2.2:3001
+10-31 13:25:35.433  3033  3055 E SyncEngine: java.net.ConnectException: Failed to connect to /10.0.2.2:3001
+10-31 13:25:40.433  3033  3055 E SyncEngine: java.net.ConnectException: Failed to connect to /10.0.2.2:3001
+10-31 13:25:56.438  3033  3054 E SyncEngine: java.net.ConnectException: Failed to connect to /10.0.2.2:3001
+10-31 13:27:19.400  3033  3053 E SyncEngine: java.net.ConnectException: Failed to connect to /10.0.2.2:3001
+10-31 13:30:02.433  3033  3054 E SyncEngine: java.net.ConnectException: Failed to connect to /10.0.2.2:3001
+10-31 13:31:02.500  3033  3055 E SyncEngine: java.net.ConnectException: Failed to connect to /10.0.2.2:3001
+10-31 13:31:38.551  3033  3054 E SyncEngine: java.net.ConnectException: Failed to connect to /10.0.2.2:3001

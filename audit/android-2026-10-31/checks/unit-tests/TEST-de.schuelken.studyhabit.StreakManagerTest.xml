@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="de.schuelken.studyhabit.StreakManagerTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-31T11:19:50.031Z" hostname="ubuntu" time="0.036">
+  <properties/>
+  <testcase name="testTwoDayGapWithoutFreezeTokenResetsStreak" classname="de.schuelken.studyhabit.StreakManagerTest" time="0.027"/>
+  <testcase name="testConsecutiveDayIncrementsStreak" classname="de.schuelken.studyhabit.StreakManagerTest" time="0.001"/>
+  <testcase name="testFirstStudyDayStartsStreakAtOne" classname="de.schuelken.studyhabit.StreakManagerTest" time="0.001"/>
+  <testcase name="testEvaluateCurrentStreakKillsDeadStreak" classname="de.schuelken.studyhabit.StreakManagerTest" time="0.002"/>
+  <testcase name="testSameDayStudyDoesNotIncrementStreak" classname="de.schuelken.studyhabit.StreakManagerTest" time="0.001"/>
+  <testcase name="testTwoDayGapConsumesFreezeToken" classname="de.schuelken.studyhabit.StreakManagerTest" time="0.002"/>
+  <testcase name="testTenStreakAwardsFreezeToken" classname="de.schuelken.studyhabit.StreakManagerTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

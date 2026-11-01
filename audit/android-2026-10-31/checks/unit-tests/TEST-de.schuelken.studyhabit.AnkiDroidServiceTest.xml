@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="de.schuelken.studyhabit.AnkiDroidServiceTest" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-10-31T11:19:49.997Z" hostname="ubuntu" time="0.02">
+  <properties/>
+  <testcase name="testGroupDecksHierarchicallyWithExplicitParentAndSubDecks" classname="de.schuelken.studyhabit.AnkiDroidServiceTest" time="0.017"/>
+  <testcase name="testGroupDecksHierarchicallyWithFlatDecks" classname="de.schuelken.studyhabit.AnkiDroidServiceTest" time="0.0"/>
+  <testcase name="testTimestampsBurstingWithin60Seconds" classname="de.schuelken.studyhabit.AnkiDroidServiceTest" time="0.001"/>
+  <testcase name="testGroupDecksHierarchicallySynthesizesMissingParent" classname="de.schuelken.studyhabit.AnkiDroidServiceTest" time="0.0"/>
+  <testcase name="testTimestampsWithLongGapsClampedToBurstStarts" classname="de.schuelken.studyhabit.AnkiDroidServiceTest" time="0.0"/>
+  <testcase name="testUnsortedTimestampsAreSortedCorrectly" classname="de.schuelken.studyhabit.AnkiDroidServiceTest" time="0.0"/>
+  <testcase name="testEmptyTimestampsUsesCardCountEstimation" classname="de.schuelken.studyhabit.AnkiDroidServiceTest" time="0.0"/>
+  <testcase name="testGroupDecksHierarchicallyFiltersBlanks" classname="de.schuelken.studyhabit.AnkiDroidServiceTest" time="0.0"/>
+  <testcase name="testZeroCardsReturnsZeroMinutes" classname="de.schuelken.studyhabit.AnkiDroidServiceTest" time="0.0"/>
+  <testcase name="testBuildDeckTreeMultiLevelHierarchy" classname="de.schuelken.studyhabit.AnkiDroidServiceTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

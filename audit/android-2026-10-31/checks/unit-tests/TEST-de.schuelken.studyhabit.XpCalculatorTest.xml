@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="de.schuelken.studyhabit.XpCalculatorTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-31T11:19:50.104Z" hostname="ubuntu" time="0.001">
+  <properties/>
+  <testcase name="testXpForReasons" classname="de.schuelken.studyhabit.XpCalculatorTest" time="0.0"/>
+  <testcase name="testLevelCalculation" classname="de.schuelken.studyhabit.XpCalculatorTest" time="0.0"/>
+  <testcase name="testLevelThresholds" classname="de.schuelken.studyhabit.XpCalculatorTest" time="0.0"/>
+  <testcase name="testLevelProgress" classname="de.schuelken.studyhabit.XpCalculatorTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

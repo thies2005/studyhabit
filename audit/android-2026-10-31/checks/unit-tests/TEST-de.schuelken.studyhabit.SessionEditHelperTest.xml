@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="de.schuelken.studyhabit.SessionEditHelperTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-31T11:19:50.020Z" hostname="ubuntu" time="0.005">
+  <properties/>
+  <testcase name="testPomodoroEffectiveCountMultiplePomodoros" classname="de.schuelken.studyhabit.SessionEditHelperTest" time="0.001"/>
+  <testcase name="testXpRecalculationOnTrimmingSession" classname="de.schuelken.studyhabit.SessionEditHelperTest" time="0.002"/>
+  <testcase name="testFreeTimerXpRecalculation" classname="de.schuelken.studyhabit.SessionEditHelperTest" time="0.0"/>
+  <testcase name="testPomodoroEffectiveCountAboveEightyPercentThreshold" classname="de.schuelken.studyhabit.SessionEditHelperTest" time="0.0"/>
+  <testcase name="testXpRecalculationOnExpandingSession" classname="de.schuelken.studyhabit.SessionEditHelperTest" time="0.0"/>
+  <testcase name="testFreeTimerAlwaysZeroEffectivePomodoros" classname="de.schuelken.studyhabit.SessionEditHelperTest" time="0.001"/>
+  <testcase name="testMinutesClamping" classname="de.schuelken.studyhabit.SessionEditHelperTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,23 @@
+{
+  "audit_date": "2026-10-31",
+  "app_version": "2.0.11 (83)",
+  "commit": "742a759",
+  "package": "de.schuelken.studyhabit.debug",
+  "device": "emulator-5554",
+  "android_api": 35,
+  "apk_sha256": "040ec296ac6b8a04757d47509c144b7e7ea48ecc409f05dd8f7e656563cf5ce2",
+  "unit_tests": 48,
+  "unit_test_failures": 0,
+  "unit_test_errors": 0,
+  "lint": {
+    "Warning": 37,
+    "Information": 1
+  },
+  "screenshots": 36,
+  "confirmed_findings": 11,
+  "priority_counts": {
+    "P1": 2,
+    "P2": 9
+  },
+  "crash_log_bytes": 0
+}
