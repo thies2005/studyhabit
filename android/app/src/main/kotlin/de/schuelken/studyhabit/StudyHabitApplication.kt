@@ -23,6 +23,7 @@ class StudyHabitApplication : Application() {
         container = AppContainer(this)
         NotificationHelper.createNotificationChannels(this)
         TimerForegroundService.restoreIfNeeded(this)
+        container.scheduleFolderSync()
 
         appScope.launch {
             container.database.sessionDao().cleanupOrphanedSessions(
@@ -34,14 +35,17 @@ class StudyHabitApplication : Application() {
         ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStart(owner: LifecycleOwner) {
                 appScope.launch {
-                    container.ankiDroidService.syncLinkedDecks()
                     if (container.preferences.folderSyncEnabled.value &&
                         !container.preferences.folderSyncUri.value.isNullOrBlank()
                     ) {
-                        container.folderSyncService.syncWithFolder()
-                        container.streakManager.evaluateCurrentStreak()
-                        container.achievementEvaluator.checkAndUnlock()
+                        if (container.folderSyncService.syncWithFolder()) {
+                            container.streakManager.evaluateCurrentStreak()
+                            container.achievementEvaluator.checkAndUnlock()
+                        }
                     }
+                }
+                appScope.launch {
+                    container.ankiDroidService.syncLinkedDecks()
                     if (!container.tokenStorage.getToken().isNullOrBlank() &&
                         container.preferences.serverUrl.value.isNotBlank()
                     ) {

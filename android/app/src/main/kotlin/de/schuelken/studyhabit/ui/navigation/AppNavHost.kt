@@ -16,7 +16,6 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.navArgument
 import de.schuelken.studyhabit.core.database.ProjectEntity
 import de.schuelken.studyhabit.core.di.AppContainer
-import de.schuelken.studyhabit.core.model.SyncStatus
 import de.schuelken.studyhabit.core.model.TimerType
 import de.schuelken.studyhabit.core.service.TimerForegroundService
 import de.schuelken.studyhabit.ui.achievements.AchievementsScreen
@@ -55,15 +54,9 @@ fun AppNavHost(
 
     val serverSyncStatus by container.syncEngine.syncStatus.collectAsState()
     val folderSyncStatus by container.folderSyncService.syncStatus.collectAsState()
-    val syncStatus = when {
-        serverSyncStatus == SyncStatus.SYNCING || folderSyncStatus == SyncStatus.SYNCING ->
-            SyncStatus.SYNCING
-        serverSyncStatus == SyncStatus.ERROR || folderSyncStatus == SyncStatus.ERROR ->
-            SyncStatus.ERROR
-        serverSyncStatus == SyncStatus.SYNCED || folderSyncStatus == SyncStatus.SYNCED ->
-            SyncStatus.SYNCED
-        else -> SyncStatus.IDLE
-    }
+    val folderSyncEnabled by container.preferences.folderSyncEnabled.collectAsState()
+    val folderSyncUri by container.preferences.folderSyncUri.collectAsState()
+    val syncStatus = if (folderSyncEnabled && !folderSyncUri.isNullOrBlank()) folderSyncStatus else serverSyncStatus
 
     val timerState by TimerForegroundService.timerState.collectAsState()
 
@@ -117,11 +110,10 @@ fun AppNavHost(
             scope.launch {
                 val hasServer = !container.tokenStorage.getToken().isNullOrBlank() && container.preferences.serverUrl.value.isNotBlank()
                 val hasFolder = container.preferences.folderSyncEnabled.value && !container.preferences.folderSyncUri.value.isNullOrBlank()
-                if (!hasServer && !hasFolder) {
-                    navController.navigate("sync_settings")
-                } else {
-                    if (hasFolder) container.folderSyncService.syncWithFolder()
-                    if (hasServer) container.syncEngine.syncNow()
+                when {
+                    hasFolder -> container.folderSyncService.syncWithFolder()
+                    hasServer -> container.syncEngine.syncNow()
+                    else -> navController.navigate("sync_settings")
                 }
             }
         },

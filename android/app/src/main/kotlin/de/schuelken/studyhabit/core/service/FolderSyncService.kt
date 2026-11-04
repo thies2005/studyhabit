@@ -4,16 +4,20 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.util.Log
-import androidx.documentfile.provider.DocumentFile
 import androidx.room.withTransaction
 import de.schuelken.studyhabit.core.database.AppDatabase
+import de.schuelken.studyhabit.core.database.UserStatsEntity
 import de.schuelken.studyhabit.core.model.SyncStatus
 import de.schuelken.studyhabit.core.preferences.AppPreferences
+import de.schuelken.studyhabit.ui.widget.StudyHabitWidgetProvider
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -22,7 +26,11 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import java.io.FileNotFoundException
 import java.io.IOException
+import java.util.UUID
 
 class FolderSyncService(
     private val context: Context,
@@ -35,454 +43,382 @@ class FolderSyncService(
         private const val TAG = "FolderSyncService"
         const val SYNC_FILE_NAME = "studyhabit_sync.json"
         const val BAK_FILE_NAME = "studyhabit_sync.bak.json"
+        private const val URI_FLAGS = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
     }
 
     private val _syncStatus = MutableStateFlow(SyncStatus.IDLE)
     val syncStatus: StateFlow<SyncStatus> = _syncStatus.asStateFlow()
-
+    private val _manualFileSummary = MutableStateFlow<String?>(null)
+    val manualFileSummary: StateFlow<String?> = _manualFileSummary.asStateFlow()
     private val syncMutex = Mutex()
     private var debounceJob: Job? = null
 
+    @Synchronized
     fun scheduleDebouncedSync(delayMs: Long = 3_000L) {
-        if (!preferences.folderSyncEnabled.value || preferences.folderSyncUri.value.isNullOrBlank()) return
+        if (selectedFolder() == null) return
         debounceJob?.cancel()
         debounceJob = scope.launch {
             delay(delayMs)
-            syncWithFolder()
+            // A later change can cancel the debounce timer, never an active publication.
+            scope.launch { syncWithFolder() }
         }
     }
 
-    fun bindSyncFolder(uri: Uri) {
+    suspend fun bindSyncFolder(uri: Uri): Boolean = syncMutex.withLock {
+        withContext(Dispatchers.IO) {
+            val previous = preferences.folderSyncUri.value
+            val hadAccess = hasAccess(uri)
+            try {
+                context.contentResolver.takePersistableUriPermission(uri, URI_FLAGS)
+                if (!hasAccess(uri)) throw SecurityException("The provider did not grant lasting read and write access")
+                FolderSyncDocuments(context.contentResolver, uri).requireWritableFolder()
+                currentCoroutineContext().ensureActive()
+            } catch (e: CancellationException) {
+                if (!hadAccess) releaseFolderAccess(uri)
+                throw e
+            } catch (e: Exception) {
+                if (!hadAccess) releaseFolderAccess(uri)
+                Log.w(TAG, "Could not keep folder access", e)
+                setError("Folder selection failed: ${e.message ?: "Folder unavailable"}. Choose a writable folder.")
+                return@withContext false
+            }
+            if (previous != uri.toString()) {
+                preferences.setFolderLastSyncedAt(0)
+                previous?.let { releaseFolderAccess(Uri.parse(it)) }
+            }
+            preferences.setFolderSyncUri(uri.toString())
+            preferences.setFolderSyncEnabled(true)
+            scope.launch { syncWithFolder() }
+            true
+        }
+    }
+
+    private fun releaseFolderAccess(uri: Uri) {
         try {
-            val takeFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-            context.contentResolver.takePersistableUriPermission(uri, takeFlags)
-        } catch (e: SecurityException) {
-            Log.e(TAG, "Failed to take persistable URI permission for $uri", e)
-            preferences.setFolderLastSummary("Folder permission error: ${e.localizedMessage}")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to take persistable URI permission for $uri", e)
-        }
-        preferences.setFolderSyncUri(uri.toString())
-        preferences.setFolderSyncEnabled(true)
-        scope.launch {
-            syncWithFolder()
+            context.contentResolver.releasePersistableUriPermission(uri, URI_FLAGS)
+        } catch (_: SecurityException) {
+            // The provider may already have revoked this grant.
         }
     }
 
-    suspend fun syncWithFolder(): Boolean {
-        if (!preferences.folderSyncEnabled.value) {
-            return false
-        }
-        val treeUriStr = preferences.folderSyncUri.value
-        if (treeUriStr.isNullOrBlank()) {
-            return false
-        }
+    private fun selectedFolder(): String? =
+        preferences.folderSyncUri.value?.takeIf { it.isNotBlank() && preferences.folderSyncEnabled.value }
 
-        return syncMutex.withLock {
+    private fun hasAccess(uri: Uri): Boolean = context.contentResolver.persistedUriPermissions.any {
+        it.uri == uri && it.isReadPermission && it.isWritePermission
+    }
+
+    private fun writerId(): String {
+        // This state is local to the install and excluded from sync/export (app backup is disabled).
+        val install = context.getSharedPreferences("folder_sync_install", Context.MODE_PRIVATE)
+        install.getString("writer_id", null)?.let { return it }
+        val id = UUID.randomUUID().toString()
+        if (!install.edit().putString("writer_id", id).commit()) throw IOException("Could not save the sync device identity")
+        return id
+    }
+
+    private data class ReadResult(val snapshots: List<ExportDocument>, val incomplete: Int, val hasPublication: Boolean)
+
+    private fun readSnapshots(folder: FolderSyncDocuments): ReadResult {
+        val entries = folder.list()
+        val snapshots = mutableListOf<ExportDocument>()
+        var incomplete = 0
+        // All complete publications participate. A later upload can never hide another writer's work.
+        entries.filter { FolderSyncProtocol.isPublication(it.name) }.forEach { entry ->
+            try {
+                val contents = folder.read(entry.uri)
+                snapshots.add(FolderSyncProtocol.portable(FolderSyncProtocol.decode(contents)))
+            } catch (_: FileNotFoundException) {
+                incomplete++
+            } catch (_: IllegalArgumentException) {
+                incomplete++
+            }
+        }
+        val legacy = entries.filter { it.name == SYNC_FILE_NAME }
+        val backups = entries.filter { it.name == BAK_FILE_NAME }
+        fun readLegacy(entries: List<FolderSyncDocuments.Entry>): List<ExportDocument> = entries.mapNotNull {
+            try {
+                FolderSyncProtocol.portable(BackupCodec.decode(folder.read(it.uri)))
+            } catch (_: FileNotFoundException) {
+                null
+            } catch (_: IllegalArgumentException) {
+                null
+            }
+        }
+        val old = readLegacy(legacy).ifEmpty { readLegacy(backups) }
+        if (old.isEmpty() && (legacy.isNotEmpty() || backups.isNotEmpty())) {
+            if (snapshots.isEmpty()) {
+                throw IOException("The old sync file and backup could not be read. Existing files were preserved.")
+            }
+            incomplete++
+        }
+        val hasPublication = snapshots.isNotEmpty()
+        snapshots.addAll(old)
+        return ReadResult(snapshots, incomplete, hasPublication)
+    }
+
+    suspend fun syncWithFolder(): Boolean = syncMutex.withLock {
+        val selected = selectedFolder() ?: return@withLock false
+        withContext(Dispatchers.IO) {
+            _syncStatus.value = SyncStatus.SYNCING
+            try {
+                val uri = Uri.parse(selected)
+                if (!hasAccess(uri)) throw IOException("Folder access was lost. Select the folder again.")
+                val folder = FolderSyncDocuments(context.contentResolver, uri)
+                val remote = readSnapshots(folder)
+                currentCoroutineContext().ensureActive()
+                if (selectedFolder() != selected) {
+                    _syncStatus.value = SyncStatus.IDLE
+                    return@withContext false
+                }
+                val result = mergeAndSnapshot(remote.snapshots)
+                if (result.pulled > 0) StudyHabitWidgetProvider.updateAllWidgets(context)
+                if (selectedFolder() != selected) {
+                    _syncStatus.value = SyncStatus.IDLE
+                    return@withContext false
+                }
+                val shouldPublish = result.pushed > 0 || !remote.hasPublication
+                if (shouldPublish) {
+                    currentCoroutineContext().ensureActive()
+                    val contents = FolderSyncProtocol.encode(FolderSyncProtocol.portable(result.document))
+                    folder.publish(FolderSyncProtocol.fileName(writerId(), UUID.randomUUID().toString()), contents)
+                }
+                if (selectedFolder() != selected) {
+                    _syncStatus.value = SyncStatus.IDLE
+                    return@withContext false
+                }
+                val changed = shouldPublish || result.pulled > 0
+                val summary = if (changed) {
+                    "Folder checked: ${if (shouldPublish) "${result.pushed} changes published" else "no upload"} • ${result.pulled} changes merged"
+                } else {
+                    "Up to date with files available on this device"
+                }
+                setSuccess(summary + if (remote.incomplete > 0) " • ${remote.incomplete} incomplete files skipped" else "")
+                true
+            } catch (e: CancellationException) {
+                _syncStatus.value = SyncStatus.IDLE
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "Folder sync failed", e)
+                if (selectedFolder() == selected) {
+                    setError("Folder sync failed: ${e.message ?: "Folder unavailable"}")
+                } else {
+                    _syncStatus.value = SyncStatus.IDLE
+                }
+                false
+            }
+        }
+    }
+
+    suspend fun saveToDocumentUri(uri: Uri): Boolean = runManual("Save file") {
+        val document = database.withTransaction { exportImportService.buildExportDocument(includeDeleted = true) }
+        writeManualDocument(uri, exportImportService.json.encodeToString(document))
+        "Saved a copy to the selected document"
+    }
+
+    suspend fun mergeFromDocumentUri(uri: Uri): Boolean = runManual("Merge file") {
+        val document = readManualDocument(uri)
+        val result = mergeAndSnapshot(listOf(document))
+        if (result.pulled > 0) StudyHabitWidgetProvider.updateAllWidgets(context)
+        "${result.pulled} changes merged from the selected document"
+    }
+
+    private fun readManualDocument(uri: Uri): ExportDocument {
+        val contents = context.contentResolver.openInputStream(uri)?.use {
+            it.bufferedReader(Charsets.UTF_8).readText()
+        } ?: throw IOException("Could not open the selected document")
+        return FolderSyncProtocol.portable(BackupCodec.decode(contents))
+    }
+
+    private fun writeManualDocument(uri: Uri, contents: String) {
+        context.contentResolver.openOutputStream(uri, "wt")?.use { it.write(contents.toByteArray(Charsets.UTF_8)) }
+            ?: throw IOException("Could not open the selected document for writing")
+    }
+
+    private suspend fun runManual(label: String, action: suspend () -> String): Boolean =
+        syncMutex.withLock {
             withContext(Dispatchers.IO) {
-                _syncStatus.value = SyncStatus.SYNCING
+                _manualFileSummary.value = "$label…"
                 try {
-                    val treeUri = Uri.parse(treeUriStr)
-                    val rootFolder = DocumentFile.fromTreeUri(context, treeUri)
-                    if (rootFolder == null || !rootFolder.exists() || !rootFolder.canWrite()) {
-                        throw IOException("Cannot access or write to selected sync folder")
-                    }
-
-                    val syncFile = rootFolder.findFile(SYNC_FILE_NAME)
-                    var pushedCount = 0
-                    var pulledCount = 0
-
-                    if (syncFile != null && syncFile.exists() && syncFile.length() > 0) {
-                        // Read existing file
-                        val existingJson = context.contentResolver.openInputStream(syncFile.uri)?.use { inputStream ->
-                            inputStream.bufferedReader(Charsets.UTF_8).readText()
-                        } ?: throw IOException("Could not read from $SYNC_FILE_NAME")
-
-                        val remoteDoc = try {
-                            val parsed = exportImportService.json.decodeFromString<ExportDocument>(existingJson)
-                            // Backup previous content to studyhabit_sync.bak.json ONLY after successful decode
-                            try {
-                                val bakFile = rootFolder.findFile(BAK_FILE_NAME)
-                                    ?: rootFolder.createFile("application/json", BAK_FILE_NAME)
-                                if (bakFile != null) {
-                                    writeJsonSafely(bakFile.uri, existingJson)
-                                }
-                            } catch (backupEx: Exception) {
-                                Log.w(TAG, "Failed to create backup $BAK_FILE_NAME", backupEx)
-                            }
-                            parsed
-                        } catch (decodeEx: Exception) {
-                            Log.w(TAG, "Failed to parse $SYNC_FILE_NAME, attempting fallback recovery from $BAK_FILE_NAME", decodeEx)
-                            val bakFile = rootFolder.findFile(BAK_FILE_NAME)
-                            if (bakFile != null && bakFile.exists() && bakFile.length() > 0) {
-                                val bakJson = context.contentResolver.openInputStream(bakFile.uri)?.use { inputStream ->
-                                    inputStream.bufferedReader(Charsets.UTF_8).readText()
-                                } ?: throw decodeEx
-                                exportImportService.json.decodeFromString<ExportDocument>(bakJson)
-                            } else {
-                                throw decodeEx
-                            }
-                        }
-
-                        // Parse and perform bidirectional LWW merge
-                        val counts = performLwwMerge(remoteDoc)
-                        pushedCount = counts.first
-                        pulledCount = counts.second
-
-                        // Build merged document and write back to studyhabit_sync.json
-                        val mergedDoc = exportImportService.buildExportDocument(includeDeleted = true)
-                        val mergedJson = exportImportService.json.encodeToString(mergedDoc)
-                        writeJsonSafely(syncFile.uri, mergedJson)
-                    } else {
-                        // No existing sync file - push entire local database
-                        val initialDoc = exportImportService.buildExportDocument(includeDeleted = true)
-                        val initialJson = exportImportService.json.encodeToString(initialDoc)
-
-                        val targetFile = syncFile ?: rootFolder.createFile("application/json", SYNC_FILE_NAME)
-                            ?: throw IOException("Could not create $SYNC_FILE_NAME in synced folder")
-
-                        writeJsonSafely(targetFile.uri, initialJson)
-
-                        pushedCount = countExportDocumentEntities(initialDoc)
-                        pulledCount = 0
-                    }
-
-                    val now = System.currentTimeMillis()
-                    preferences.setFolderLastSyncedAt(now)
-                    val summary = if (pushedCount == 0 && pulledCount == 0) {
-                        "✓ Already up to date with synced folder"
-                    } else {
-                        "Synced with folder: ↑ $pushedCount pushed • ↓ $pulledCount pulled"
-                    }
-                    preferences.setFolderLastSummary(summary)
-                    _syncStatus.value = SyncStatus.SYNCED
+                    _manualFileSummary.value = action()
                     true
+                } catch (e: CancellationException) {
+                    _manualFileSummary.value = null
+                    throw e
                 } catch (e: Exception) {
-                    Log.e(TAG, "syncWithFolder failed", e)
-                    preferences.setFolderLastSummary("Folder sync failed: ${e.message}")
-                    _syncStatus.value = SyncStatus.ERROR
+                    Log.w(TAG, "$label failed", e)
+                    _manualFileSummary.value = "$label failed: ${e.message ?: "Document unavailable"}"
                     false
                 }
             }
         }
+
+    private fun setSuccess(summary: String) {
+        preferences.setFolderLastSyncedAt(System.currentTimeMillis())
+        preferences.setFolderLastSummary(summary)
+        _syncStatus.value = SyncStatus.SYNCED
     }
 
-    suspend fun saveToDocumentUri(uri: Uri): Boolean {
-        return syncMutex.withLock {
-            withContext(Dispatchers.IO) {
-                try {
-                    _syncStatus.value = SyncStatus.SYNCING
-                    val exportDoc = exportImportService.buildExportDocument(includeDeleted = true)
-                    val jsonString = exportImportService.json.encodeToString(exportDoc)
-                    writeJsonSafely(uri, jsonString)
-                    preferences.setFolderLastSyncedAt(System.currentTimeMillis())
-                    preferences.setFolderLastSummary("Saved sync file successfully")
-                    _syncStatus.value = SyncStatus.SYNCED
-                    true
-                } catch (e: Exception) {
-                    Log.e(TAG, "saveToDocumentUri failed", e)
-                    _syncStatus.value = SyncStatus.ERROR
-                    false
+    private fun setError(summary: String) {
+        preferences.setFolderLastSummary(summary)
+        _syncStatus.value = SyncStatus.ERROR
+    }
+
+    private data class Result(val pushed: Int, val pulled: Int, val document: ExportDocument)
+    private data class Settings(val values: Map<String, JsonElement>?, val updatedAt: Long) {
+        fun stableContent(): String = JsonObject(values.orEmpty().toSortedMap()).toString()
+    }
+
+    private suspend fun mergeAndSnapshot(remote: List<ExportDocument>): Result {
+        var appliedSettings: Settings? = null
+        var selectedProject: String? = null
+        val result = database.withTransaction {
+            var pushedCount = 0
+            var pulledCount = 0
+            fun count(counts: Pair<Int, Int>) {
+                pushedCount += counts.first
+                pulledCount += counts.second
+            }
+            val localStats = database.userStatsDao().getUserStats()
+            val localSessions = database.sessionDao().getAllSessions()
+
+            count(mergeEntities(
+                remote.flatMap { doc -> doc.projects.map { it.project } },
+                database.projectDao().getModifiedSince(-1L), { it.id }, { it.updatedAt }, { it.isDeleted },
+                stable = { exportImportService.json.encodeToString(it.copy(lastOpenedAt = 0)) },
+            ) { incoming, local ->
+                database.projectDao().upsert(incoming.copy(lastOpenedAt = local?.lastOpenedAt ?: 0))
+            })
+
+            val remoteSubjects = remote.flatMap { doc -> doc.projects.flatMap { it.subjects } }
+            count(mergeEntities(
+                remoteSubjects.map { it.subject },
+                database.subjectDao().getModifiedSince(-1L), { it.id }, { it.updatedAt }, { it.isDeleted },
+                stable = { exportImportService.json.encodeToString(it.copy(xpTotal = 0)) },
+            ) { incoming, _ -> database.subjectDao().upsert(incoming) })
+            count(mergeEntities(
+                remoteSubjects.flatMap { it.topics },
+                database.topicDao().getModifiedSince(-1L), { it.id }, { it.updatedAt }, { it.isDeleted },
+            ) { incoming, _ -> database.topicDao().upsert(incoming) })
+            count(mergeEntities(
+                remoteSubjects.flatMap { it.chapters },
+                database.chapterDao().getModifiedSince(-1L), { it.id }, { it.updatedAt }, { it.isDeleted },
+            ) { incoming, _ -> database.chapterDao().upsert(incoming) })
+            count(mergeEntities(
+                remoteSubjects.flatMap { it.sessions },
+                database.sessionDao().getModifiedSince(-1L), { it.id }, { it.updatedAt }, { it.isDeleted },
+            ) { incoming, _ -> database.sessionDao().upsert(incoming) })
+            count(mergeEntities(
+                remoteSubjects.flatMap { it.sources },
+                database.sourceDao().getModifiedSince(-1L), { it.id }, { it.updatedAt }, { it.isDeleted },
+                stable = { source ->
+                    exportImportService.json.encodeToString(if (source.type == "pdf") source.copy(filePath = null) else source)
+                },
+            ) { incoming, local ->
+                val source = if (incoming.type == "pdf") {
+                    incoming.copy(filePath = local?.takeIf { it.type == "pdf" }?.filePath)
+                } else incoming
+                database.sourceDao().upsert(source)
+            })
+            count(mergeEntities(
+                remoteSubjects.flatMap { it.skillLabels },
+                database.skillLabelDao().getModifiedSince(-1L), { it.id }, { it.updatedAt }, { it.isDeleted },
+            ) { incoming, _ -> database.skillLabelDao().upsert(incoming) })
+            count(mergeEntities(
+                remoteSubjects.flatMap { it.milestones },
+                database.milestoneDao().getModifiedSince(-1L), { it.id }, { it.updatedAt }, { it.isDeleted },
+            ) { incoming, _ -> database.milestoneDao().upsert(incoming) })
+            count(mergeEntities(
+                remote.flatMap { it.achievements },
+                database.achievementDao().getAllAchievements(), { it.key }, { it.updatedAt }, { false },
+            ) { incoming, _ -> database.achievementDao().upsert(incoming) })
+
+            val mergedSessions = database.sessionDao().getAllSessions()
+            val subjectXp = mergedSessions.groupBy { it.subjectId }.mapValues { (_, sessions) ->
+                sessions.sumOf { it.xpEarned.toLong() }.coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
+            }
+            for (subject in database.subjectDao().getAllSubjects()) {
+                val xp = subjectXp[subject.id] ?: 0
+                if (subject.xpTotal != xp) database.subjectDao().upsert(subject.copy(xpTotal = xp))
+            }
+
+            val remoteStats = remote.map { it.userStats }.maxWithOrNull(::compareStats)
+            val localBonus = localStats?.let { FolderSyncProtocol.bonusXp(it, localSessions) } ?: 0
+            val remoteBonus = remote.maxOfOrNull { FolderSyncProtocol.bonusXp(it.userStats, FolderSyncProtocol.sessions(it)) } ?: 0
+            val remoteLongest = remote.maxOfOrNull { it.userStats.longestStreak } ?: 0
+            val base = when {
+                localStats == null -> remoteStats ?: UserStatsEntity(updatedAt = 0)
+                remoteStats == null -> localStats
+                compareStats(localStats, remoteStats) >= 0 -> localStats
+                else -> remoteStats
+            }
+            val stats = FolderSyncProtocol.reconcileStats(
+                base, mergedSessions, maxOf(localBonus, remoteBonus), maxOf(localStats?.longestStreak ?: 0, remoteLongest)
+            )
+            if (localStats != null && (remoteStats == null || compareStats(localStats, remoteStats) > 0 ||
+                    localBonus > remoteBonus || localStats.longestStreak > remoteLongest)
+            ) pushedCount++
+            if (stats != localStats && (localStats != null || remoteStats != null || mergedSessions.isNotEmpty())) {
+                database.userStatsDao().upsert(stats)
+                pulledCount++
+            }
+
+            val snapshot = exportImportService.buildExportDocument(includeDeleted = true)
+            val localSettings = Settings(snapshot.settings, snapshot.settingsUpdatedAt)
+            val remoteSettings = remote.filter { it.settings != null }
+                .map { Settings(it.settings, it.settingsUpdatedAt) }
+                .maxWithOrNull(::compareSettings)
+            val settings = if (remoteSettings != null && (localSettings.values == null ||
+                    compareSettings(remoteSettings, localSettings) > 0)
+            ) {
+                appliedSettings = remoteSettings
+                pulledCount++
+                remoteSettings
+            } else {
+                if (localSettings.values != null && (remoteSettings == null || compareSettings(localSettings, remoteSettings) > 0)) {
+                    pushedCount++
                 }
+                localSettings
             }
+
+            val projects = database.projectDao().getAllProjects()
+            val current = preferences.activeProjectId.value
+            if (projects.none { it.id == current }) selectedProject = projects.firstOrNull()?.id
+
+            Result(pushedCount, pulledCount, snapshot.copy(
+                userStats = stats,
+                settings = settings.values,
+                settingsUpdatedAt = settings.updatedAt,
+            ))
         }
+        // Preferences cannot be rolled back by Room, so apply them only after commit.
+        appliedSettings?.let {
+            preferences.applySettingsMap(it.values.orEmpty())
+            preferences.settingsUpdatedAt = it.updatedAt
+        }
+        selectedProject?.let { preferences.setActiveProjectId(it) }
+        return result
     }
 
-    suspend fun mergeFromDocumentUri(uri: Uri): Boolean {
-        return syncMutex.withLock {
-            withContext(Dispatchers.IO) {
-                try {
-                    _syncStatus.value = SyncStatus.SYNCING
-                    val jsonString = context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                        inputStream.bufferedReader(Charsets.UTF_8).readText()
-                    } ?: throw IOException("Could not open input stream for URI: $uri")
-
-                    val remoteDoc = exportImportService.json.decodeFromString<ExportDocument>(jsonString)
-                    val (pushedCount, pulledCount) = performLwwMerge(remoteDoc)
-
-                    preferences.setFolderLastSyncedAt(System.currentTimeMillis())
-                    val summary = if (pushedCount == 0 && pulledCount == 0) {
-                        "✓ Already up to date with synced folder"
-                    } else {
-                        "Synced with folder: ↑ $pushedCount pushed • ↓ $pulledCount pulled"
-                    }
-                    preferences.setFolderLastSummary(summary)
-                    _syncStatus.value = SyncStatus.SYNCED
-                    true
-                } catch (e: Exception) {
-                    Log.e(TAG, "mergeFromDocumentUri failed", e)
-                    preferences.setFolderLastSummary("Folder sync failed: ${e.message}")
-                    _syncStatus.value = SyncStatus.ERROR
-                    false
-                }
-            }
-        }
-    }
-
-    suspend fun syncWithSingleFileUri(uri: Uri): Boolean {
-        return syncMutex.withLock {
-            withContext(Dispatchers.IO) {
-                try {
-                    _syncStatus.value = SyncStatus.SYNCING
-                    val jsonString = context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                        inputStream.bufferedReader(Charsets.UTF_8).readText()
-                    } ?: throw IOException("Could not open input stream for URI: $uri")
-
-                    val remoteDoc = exportImportService.json.decodeFromString<ExportDocument>(jsonString)
-                    val (pushedCount, pulledCount) = performLwwMerge(remoteDoc)
-
-                    val mergedDoc = exportImportService.buildExportDocument(includeDeleted = true)
-                    val mergedJson = exportImportService.json.encodeToString(mergedDoc)
-                    writeJsonSafely(uri, mergedJson)
-
-                    preferences.setFolderLastSyncedAt(System.currentTimeMillis())
-                    val summary = if (pushedCount == 0 && pulledCount == 0) {
-                        "✓ Already up to date with synced folder"
-                    } else {
-                        "Synced with folder: ↑ $pushedCount pushed • ↓ $pulledCount pulled"
-                    }
-                    preferences.setFolderLastSummary(summary)
-                    _syncStatus.value = SyncStatus.SYNCED
-                    true
-                } catch (e: Exception) {
-                    Log.e(TAG, "syncWithSingleFileUri failed", e)
-                    preferences.setFolderLastSummary("Folder sync failed: ${e.message}")
-                    _syncStatus.value = SyncStatus.ERROR
-                    false
-                }
-            }
-        }
-    }
-
-    private fun writeJsonSafely(uri: Uri, jsonContent: String) {
-        val bytes = jsonContent.toByteArray(Charsets.UTF_8)
-        val pfd = runCatching { context.contentResolver.openFileDescriptor(uri, "rw") }.getOrNull()
-        if (pfd != null) {
-            pfd.use { descriptor ->
-                java.io.FileOutputStream(descriptor.fileDescriptor).use { fos ->
-                    fos.channel.truncate(0L)
-                    fos.write(bytes)
-                    fos.flush()
-                    runCatching { descriptor.fileDescriptor.sync() }
-                }
-            }
-            return
-        }
-        (context.contentResolver.openOutputStream(uri, "wt")
-            ?: context.contentResolver.openOutputStream(uri))?.use { os ->
-            os.write(bytes)
-            os.flush()
-        } ?: throw IOException("Could not write to $uri")
-    }
-
-    private suspend fun performLwwMerge(remoteDoc: ExportDocument): Pair<Int, Int> = database.withTransaction {
-        var pushedCount = 0
-        var pulledCount = 0
-
-        // 1. Projects
-        val remoteProjects = remoteDoc.projects.map { it.project }
-        val (pushedProj, pulledProj) = mergeEntities(
-            remoteList = remoteProjects,
-            localMap = database.projectDao().getModifiedSince(-1L).associateBy { it.id },
-            getId = { it.id },
-            getUpdatedAt = { it.updatedAt },
-            upsert = { database.projectDao().upsert(it) }
-        )
-        pushedCount += pushedProj
-        pulledCount += pulledProj
-
-        // 2. Subjects
-        val remoteSubjects = remoteDoc.projects.flatMap { it.subjects.map { s -> s.subject } }
-        val (pushedSubj, pulledSubj) = mergeEntities(
-            remoteList = remoteSubjects,
-            localMap = database.subjectDao().getModifiedSince(-1L).associateBy { it.id },
-            getId = { it.id },
-            getUpdatedAt = { it.updatedAt },
-            upsert = { database.subjectDao().upsert(it) }
-        )
-        pushedCount += pushedSubj
-        pulledCount += pulledSubj
-
-        // 3. Topics
-        val remoteTopics = remoteDoc.projects.flatMap { it.subjects.flatMap { s -> s.topics } }
-        val (pushedTopics, pulledTopics) = mergeEntities(
-            remoteList = remoteTopics,
-            localMap = database.topicDao().getModifiedSince(-1L).associateBy { it.id },
-            getId = { it.id },
-            getUpdatedAt = { it.updatedAt },
-            upsert = { database.topicDao().upsert(it) }
-        )
-        pushedCount += pushedTopics
-        pulledCount += pulledTopics
-
-        // 4. Chapters
-        val remoteChapters = remoteDoc.projects.flatMap { it.subjects.flatMap { s -> s.chapters } }
-        val (pushedChapters, pulledChapters) = mergeEntities(
-            remoteList = remoteChapters,
-            localMap = database.chapterDao().getModifiedSince(-1L).associateBy { it.id },
-            getId = { it.id },
-            getUpdatedAt = { it.updatedAt },
-            upsert = { database.chapterDao().upsert(it) }
-        )
-        pushedCount += pushedChapters
-        pulledCount += pulledChapters
-
-        // 5. Sessions
-        val remoteSessions = remoteDoc.projects.flatMap { it.subjects.flatMap { s -> s.sessions } }
-        val (pushedSessions, pulledSessions) = mergeEntities(
-            remoteList = remoteSessions,
-            localMap = database.sessionDao().getModifiedSince(-1L).associateBy { it.id },
-            getId = { it.id },
-            getUpdatedAt = { it.updatedAt },
-            upsert = { database.sessionDao().upsert(it) }
-        )
-        pushedCount += pushedSessions
-        pulledCount += pulledSessions
-
-        // 6. Sources
-        val remoteSources = remoteDoc.projects.flatMap { it.subjects.flatMap { s -> s.sources } }
-        val (pushedSources, pulledSources) = mergeEntities(
-            remoteList = remoteSources,
-            localMap = database.sourceDao().getModifiedSince(-1L).associateBy { it.id },
-            getId = { it.id },
-            getUpdatedAt = { it.updatedAt },
-            upsert = { database.sourceDao().upsert(it) }
-        )
-        pushedCount += pushedSources
-        pulledCount += pulledSources
-
-        // 7. Skill Labels
-        val remoteSkillLabels = remoteDoc.projects.flatMap { it.subjects.flatMap { s -> s.skillLabels } }
-        val (pushedSkillLabels, pulledSkillLabels) = mergeEntities(
-            remoteList = remoteSkillLabels,
-            localMap = database.skillLabelDao().getModifiedSince(-1L).associateBy { it.id },
-            getId = { it.id },
-            getUpdatedAt = { it.updatedAt },
-            upsert = { database.skillLabelDao().upsert(it) }
-        )
-        pushedCount += pushedSkillLabels
-        pulledCount += pulledSkillLabels
-
-        // 8. Milestones
-        val remoteMilestones = remoteDoc.projects.flatMap { it.subjects.flatMap { s -> s.milestones } }
-        val (pushedMilestones, pulledMilestones) = mergeEntities(
-            remoteList = remoteMilestones,
-            localMap = database.milestoneDao().getModifiedSince(-1L).associateBy { it.id },
-            getId = { it.id },
-            getUpdatedAt = { it.updatedAt },
-            upsert = { database.milestoneDao().upsert(it) }
-        )
-        pushedCount += pushedMilestones
-        pulledCount += pulledMilestones
-
-        // 9. Achievements
-        val (pushedAchievements, pulledAchievements) = mergeEntities(
-            remoteList = remoteDoc.achievements,
-            localMap = database.achievementDao().getAllAchievements().associateBy { it.key },
-            getId = { it.key },
-            getUpdatedAt = { it.updatedAt },
-            upsert = { database.achievementDao().upsert(it) }
-        )
-        pushedCount += pushedAchievements
-        pulledCount += pulledAchievements
-
-        // Reconcile each subject's xpTotal against its non-deleted sessions
-        val allSessions = database.sessionDao().getAllSessions()
-        val xpBySubject = allSessions.groupBy { it.subjectId }.mapValues { (_, list) -> list.sumOf { it.xpEarned } }
-        for (subj in database.subjectDao().getAllSubjects()) {
-            val sessionXp = xpBySubject[subj.id] ?: 0
-            if (sessionXp > subj.xpTotal) {
-                database.subjectDao().upsert(subj.copy(xpTotal = sessionXp, updatedAt = maxOf(subj.updatedAt, System.currentTimeMillis())))
-            }
+    private fun compareStats(left: UserStatsEntity, right: UserStatsEntity): Int =
+        FolderSyncProtocol.compare(left, right, { it.updatedAt }, { false }) {
+            exportImportService.json.encodeToString(it.copy(totalXp = 0, totalStudyMinutes = 0, currentLevel = 0, longestStreak = 0))
         }
 
-        // Reconcile UserStatsEntity from merged non-deleted sessions and monotonic maxima
-        val remoteStats = remoteDoc.userStats
-        val localStats = database.userStatsDao().getUserStats()
-        val totalSessionMinutes = allSessions.sumOf { it.actualDurationMinutes }
-        val totalSessionXp = allSessions.sumOf { it.xpEarned }
-        val mergedTotalMinutes = maxOf(localStats?.totalStudyMinutes ?: 0, remoteStats.totalStudyMinutes, totalSessionMinutes)
-        val mergedTotalXp = maxOf(localStats?.totalXp ?: 0, remoteStats.totalXp, totalSessionXp)
-        val mergedLevel = XpCalculator.calculateLevel(mergedTotalXp)
-        val mergedLongestStreak = maxOf(localStats?.longestStreak ?: 0, remoteStats.longestStreak)
-        val newerStats = if (localStats == null || remoteStats.updatedAt >= localStats.updatedAt) remoteStats else localStats
-        val reconciledStats = newerStats.copy(
-            totalXp = mergedTotalXp,
-            currentLevel = mergedLevel,
-            totalStudyMinutes = mergedTotalMinutes,
-            longestStreak = maxOf(mergedLongestStreak, newerStats.currentStreak),
-            updatedAt = maxOf(localStats?.updatedAt ?: 0L, remoteStats.updatedAt)
-        )
-        if (localStats == null || reconciledStats != localStats) {
-            database.userStatsDao().upsert(reconciledStats)
-            if (localStats == null || remoteStats.updatedAt > localStats.updatedAt) pulledCount++ else pushedCount++
-        }
+    private fun compareSettings(left: Settings, right: Settings): Int =
+        FolderSyncProtocol.compare(left, right, { it.updatedAt }, { false }, Settings::stableContent)
 
-        // Only apply remoteDoc.settings if remoteDoc.settings != null && (remoteDoc.settingsUpdatedAt > preferences.settingsUpdatedAt || preferences.settingsUpdatedAt == 0L)
-        if (remoteDoc.settings != null && (remoteDoc.settingsUpdatedAt > preferences.settingsUpdatedAt || preferences.settingsUpdatedAt == 0L)) {
-            preferences.applySettingsMap(remoteDoc.settings)
-            if (remoteDoc.settingsUpdatedAt > 0L) {
-                preferences.settingsUpdatedAt = remoteDoc.settingsUpdatedAt
-            }
-            pulledCount++
-        }
-
-        // Validate activeProjectId so a secondary device automatically selects the synced project if its current activeProjectId is null or missing
-        val allProjects = database.projectDao().getAllProjects()
-        val currentActive = preferences.activeProjectId.value
-        if (currentActive == null || allProjects.none { it.id == currentActive }) {
-            preferences.setActiveProjectId(allProjects.firstOrNull()?.id)
-        }
-
-        Pair(pushedCount, pulledCount)
-    }
-
-    private suspend fun <T> mergeEntities(
-        remoteList: List<T>,
-        localMap: Map<String, T>,
-        getId: (T) -> String,
-        getUpdatedAt: (T) -> Long,
-        upsert: suspend (T) -> Unit,
+    private suspend inline fun <reified T> mergeEntities(
+        remote: List<T>,
+        local: List<T>,
+        noinline id: (T) -> String,
+        noinline updatedAt: (T) -> Long,
+        noinline deleted: (T) -> Boolean,
+        noinline stable: (T) -> String = { exportImportService.json.encodeToString(it) },
+        upsert: (incoming: T, local: T?) -> Unit,
     ): Pair<Int, Int> {
-        var pulled = 0
-        var pushed = 0
-        val remoteMap = remoteList.associateBy(getId)
-
-        for (remote in remoteList) {
-            val id = getId(remote)
-            val local = localMap[id]
-            if (local == null || getUpdatedAt(remote) > getUpdatedAt(local)) {
-                upsert(remote)
-                pulled++
-            } else if (getUpdatedAt(local) > getUpdatedAt(remote)) {
-                pushed++
-            }
-        }
-
-        for ((id, _) in localMap) {
-            if (!remoteMap.containsKey(id)) {
-                pushed++
-            }
-        }
-
-        return Pair(pushed, pulled)
-    }
-
-    private fun countExportDocumentEntities(doc: ExportDocument): Int {
-        var count = doc.projects.size
-        for (project in doc.projects) {
-            count += project.subjects.size
-            for (subject in project.subjects) {
-                count += subject.topics.size
-                count += subject.chapters.size
-                count += subject.sessions.size
-                count += subject.sources.size
-                count += subject.skillLabels.size
-                count += subject.milestones.size
-            }
-        }
-        count += doc.achievements.size
-        count += 1 // userStats
-        return count
+        val plan = FolderSyncProtocol.planRows(remote, local, id, updatedAt, deleted, stable)
+        for ((incoming, previous) in plan.updates) upsert(incoming, previous)
+        return plan.pushed to plan.updates.size
     }
 }

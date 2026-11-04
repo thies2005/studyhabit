@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.runtime.LaunchedEffect
+import androidx.room.withTransaction
 import de.schuelken.studyhabit.core.service.AnkiDeck
 import de.schuelken.studyhabit.core.service.AnkiDeckNode
 import de.schuelken.studyhabit.core.service.SessionEditHelper
@@ -234,21 +235,27 @@ fun SubjectDetailScreen(
                     onEditSession = { session -> editingSession = session },
                     onDeleteSession = { session ->
                         scope.launch {
-                            container.database.sessionDao().softDelete(session.id)
-                            container.database.subjectDao().updateXp(currentSubj.id, -session.xpEarned)
-                            val stats = container.database.userStatsDao().getUserStats()
-                            if (stats != null) {
-                                val newXp = (stats.totalXp - session.xpEarned).coerceAtLeast(0)
-                                val newMins = (stats.totalStudyMinutes - session.actualDurationMinutes).coerceAtLeast(0)
-                                container.database.userStatsDao().upsert(
-                                    stats.copy(
-                                        totalXp = newXp,
-                                        currentLevel = XpCalculator.calculateLevel(newXp),
-                                        totalStudyMinutes = newMins,
-                                        updatedAt = System.currentTimeMillis()
+                            val deleted = container.database.withTransaction {
+                                val current = container.database.sessionDao().getSessionById(session.id)
+                                    ?: return@withTransaction false
+                                container.database.sessionDao().softDelete(current.id)
+                                container.database.subjectDao().updateXp(currentSubj.id, -current.xpEarned)
+                                val stats = container.database.userStatsDao().getUserStats()
+                                if (stats != null) {
+                                    val newXp = (stats.totalXp - current.xpEarned).coerceAtLeast(0)
+                                    val newMins = (stats.totalStudyMinutes - current.actualDurationMinutes).coerceAtLeast(0)
+                                    container.database.userStatsDao().upsert(
+                                        stats.copy(
+                                            totalXp = newXp,
+                                            currentLevel = XpCalculator.calculateLevel(newXp),
+                                            totalStudyMinutes = newMins,
+                                            updatedAt = System.currentTimeMillis()
+                                        )
                                     )
-                                )
+                                }
+                                true
                             }
+                            if (!deleted) return@launch
                             StudyHabitWidgetProvider.updateAllWidgets(context)
                             container.triggerDataChangedSync()
                         }

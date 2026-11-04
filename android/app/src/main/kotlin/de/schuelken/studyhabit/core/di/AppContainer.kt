@@ -11,6 +11,7 @@ import de.schuelken.studyhabit.core.service.AchievementEvaluator
 import de.schuelken.studyhabit.core.service.AnkiDroidService
 import de.schuelken.studyhabit.core.service.ExportImportService
 import de.schuelken.studyhabit.core.service.FolderSyncService
+import de.schuelken.studyhabit.core.service.FolderSyncWorker
 import de.schuelken.studyhabit.core.service.ReminderScheduler
 import de.schuelken.studyhabit.core.service.StreakManager
 import de.schuelken.studyhabit.core.service.SyncEngine
@@ -176,12 +177,19 @@ class AppContainer(val context: Context) {
         triggerDataChangedSync()
     }
 
+    fun scheduleFolderSync() {
+        if (!preferences.folderSyncEnabled.value || preferences.folderSyncUri.value.isNullOrBlank()) return
+        FolderSyncWorker.ensureScheduled(context)
+        FolderSyncWorker.requestSoon(context)
+    }
+
     fun triggerDataChangedSync() {
         if (!tokenStorage.getToken().isNullOrBlank() && preferences.serverUrl.value.isNotBlank()) {
             syncEngine.scheduleDebouncedSync()
         }
         if (preferences.folderSyncEnabled.value && !preferences.folderSyncUri.value.isNullOrBlank()) {
             folderSyncService.scheduleDebouncedSync()
+            FolderSyncWorker.requestSoon(context)
         }
     }
 }

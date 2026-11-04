@@ -31,6 +31,8 @@ class FakeSessionDao : SessionDao {
 
     override suspend fun getAllSessions(): List<StudySessionEntity> = sessions
 
+    override suspend fun hasRecord(id: String): Boolean = sessions.any { it.id == id }
+
     override suspend fun getSessionById(id: String): StudySessionEntity? =
         sessions.firstOrNull { it.id == id }
 

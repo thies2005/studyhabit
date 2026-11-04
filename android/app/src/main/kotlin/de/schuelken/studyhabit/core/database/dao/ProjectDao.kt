@@ -31,7 +31,7 @@ interface ProjectDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(projects: List<ProjectEntity>)
 
-    @Query("UPDATE projects SET last_opened_at = :time, updated_at = :time WHERE id = :id")
+    @Query("UPDATE projects SET last_opened_at = :time WHERE id = :id")
     suspend fun updateLastOpened(id: String, time: Long)
 
     @Query("UPDATE projects SET name = :name, icon = :icon, updated_at = :updatedAt WHERE id = :id")

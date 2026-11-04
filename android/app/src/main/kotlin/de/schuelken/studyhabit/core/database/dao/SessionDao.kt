@@ -24,6 +24,9 @@ interface SessionDao {
     @Query("SELECT * FROM study_sessions WHERE id = :id AND is_deleted = 0 LIMIT 1")
     suspend fun getSessionById(id: String): StudySessionEntity?
 
+    @Query("SELECT EXISTS(SELECT 1 FROM study_sessions WHERE id = :id)")
+    suspend fun hasRecord(id: String): Boolean
+
     @Query("SELECT * FROM study_sessions WHERE is_deleted = 0 ORDER BY started_at DESC LIMIT :limit")
     fun getRecentSessionsFlow(limit: Int = 10): Flow<List<StudySessionEntity>>
 

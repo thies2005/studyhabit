@@ -13,6 +13,7 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import androidx.core.app.NotificationCompat
+import androidx.room.withTransaction
 import de.schuelken.studyhabit.MainActivity
 import de.schuelken.studyhabit.R
 import de.schuelken.studyhabit.StudyHabitApplication
@@ -457,7 +458,8 @@ class TimerForegroundService : Service() {
     private fun stopTimer() {
         tickerJob?.cancel()
         val curr = _timerState.value
-        val runningSec = if (curr.isRunning && !curr.isPaused) {
+        if (!curr.isRunning) return
+        val runningSec = if (!curr.isPaused) {
             ((SystemClock.elapsedRealtime() - baseElapsedRealtime) / 1000).toInt()
         } else 0
         val finalElapsedSeconds = accumulatedElapsedSeconds + runningSec
@@ -475,8 +477,9 @@ class TimerForegroundService : Service() {
         serviceScope.launch {
             if (finalWorkSeconds >= 60 && curr.subjectId.isNotBlank()) {
                 val db = AppDatabase.getInstance(applicationContext)
-                val existing = db.sessionDao().getSessionById(curr.sessionId)
-                if (existing == null) {
+                val app = applicationContext as? StudyHabitApplication
+                val saved = db.withTransaction {
+                    if (db.sessionDao().hasRecord(curr.sessionId)) return@withTransaction false
                     val studySec = finalWorkSeconds
                     val actualMinutes = maxOf(1, studySec / 60)
                     val plannedMinutes = if (curr.timerType == TimerType.FREE_TIMER) 0 else (curr.plannedWorkSeconds / 60)
@@ -488,7 +491,6 @@ class TimerForegroundService : Service() {
                         plannedSeconds = curr.plannedWorkSeconds,
                         studiedSeconds = studySec
                     )
-                    val app = applicationContext as? StudyHabitApplication
                     val session = StudySessionEntity(
                         id = curr.sessionId.ifEmpty { UUID.randomUUID().toString() },
                         subjectId = curr.subjectId,
@@ -528,6 +530,9 @@ class TimerForegroundService : Service() {
                             updatedAt = System.currentTimeMillis()
                         )
                     )
+                    true
+                }
+                if (saved) {
                     app?.container?.triggerDataChangedSync()
                     StudyHabitWidgetProvider.updateAllWidgets(applicationContext)
                 }

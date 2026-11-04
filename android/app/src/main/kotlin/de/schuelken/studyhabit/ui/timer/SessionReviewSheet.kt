@@ -35,6 +35,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.room.withTransaction
 import de.schuelken.studyhabit.core.service.StudyDurationInput
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -296,50 +297,61 @@ fun SessionReviewSheet(
                             isFreeTimer = timerState.timerType == TimerType.FREE_TIMER,
                             updatedAt = System.currentTimeMillis()
                         )
-                        container.database.sessionDao().upsert(sessionEntity)
+                        val levels = container.database.withTransaction {
+                            if (container.database.sessionDao().hasRecord(sessionEntity.id)) {
+                                return@withTransaction null
+                            }
+                            container.database.sessionDao().upsert(sessionEntity)
 
-                        // Update Subject XP
-                        container.database.subjectDao().updateXp(timerState.subjectId, xpEarned)
+                            // Update Subject XP
+                            container.database.subjectDao().updateXp(timerState.subjectId, xpEarned)
 
-                        // Record study day and calculate streak bonus XP
-                        var bonusXp = 0
-                        container.streakManager.recordStudyDay { reason ->
-                            bonusXp += XpCalculator.xpForReason(reason)
+                            // Record study day and calculate streak bonus XP
+                            var bonusXp = 0
+                            container.streakManager.recordStudyDay { reason ->
+                                bonusXp += XpCalculator.xpForReason(reason)
+                            }
+
+                            // Daily goal check
+                            val zone = ZoneId.systemDefault()
+                            val today = LocalDate.now(zone)
+                            val todayStr = today.toString()
+                            val todayStartMs = today.atStartOfDay(zone).toInstant().toEpochMilli()
+
+                            val allSessions = container.database.sessionDao().getAllSessions()
+                            val todayMinutes = allSessions
+                                .filter { it.startedAt >= todayStartMs && !it.isDeleted }
+                                .sumOf { it.actualDurationMinutes }
+
+                            val goalMinutes = container.preferences.getWeekdayGoalMinutes(today.dayOfWeek.value)
+                            if (todayMinutes >= goalMinutes && container.preferences.lastDailyGoalAwardDate != todayStr) {
+                                bonusXp += XpCalculator.XP_DAILY_GOAL
+                                container.preferences.lastDailyGoalAwardDate = todayStr
+                            }
+
+                            // Update User Stats
+                            val currentStats = container.database.userStatsDao().getUserStats()
+                                ?: de.schuelken.studyhabit.core.database.UserStatsEntity()
+                            val oldLevel = currentStats.currentLevel
+                            val totalAwardedXp = xpEarned + bonusXp
+                            val newTotalXp = currentStats.totalXp + totalAwardedXp
+                            val newLevel = XpCalculator.calculateLevel(newTotalXp)
+                            val newTotalMinutes = currentStats.totalStudyMinutes + editableMinutes
+
+                            val updatedStats = currentStats.copy(
+                                totalXp = newTotalXp,
+                                currentLevel = newLevel,
+                                totalStudyMinutes = newTotalMinutes,
+                                updatedAt = System.currentTimeMillis()
+                            )
+                            container.database.userStatsDao().upsert(updatedStats)
+                            oldLevel to newLevel
                         }
-
-                        // Daily goal check
-                        val zone = ZoneId.systemDefault()
-                        val today = LocalDate.now(zone)
-                        val todayStr = today.toString()
-                        val todayStartMs = today.atStartOfDay(zone).toInstant().toEpochMilli()
-
-                        val allSessions = container.database.sessionDao().getAllSessions()
-                        val todayMinutes = allSessions
-                            .filter { it.startedAt >= todayStartMs && !it.isDeleted }
-                            .sumOf { it.actualDurationMinutes }
-
-                        val goalMinutes = container.preferences.getWeekdayGoalMinutes(today.dayOfWeek.value)
-                        if (todayMinutes >= goalMinutes && container.preferences.lastDailyGoalAwardDate != todayStr) {
-                            bonusXp += XpCalculator.XP_DAILY_GOAL
-                            container.preferences.lastDailyGoalAwardDate = todayStr
+                        if (levels == null) {
+                            onFinished()
+                            return@launch
                         }
-
-                        // Update User Stats
-                        val currentStats = container.database.userStatsDao().getUserStats()
-                            ?: de.schuelken.studyhabit.core.database.UserStatsEntity()
-                        val oldLevel = currentStats.currentLevel
-                        val totalAwardedXp = xpEarned + bonusXp
-                        val newTotalXp = currentStats.totalXp + totalAwardedXp
-                        val newLevel = XpCalculator.calculateLevel(newTotalXp)
-                        val newTotalMinutes = currentStats.totalStudyMinutes + editableMinutes
-
-                        val updatedStats = currentStats.copy(
-                            totalXp = newTotalXp,
-                            currentLevel = newLevel,
-                            totalStudyMinutes = newTotalMinutes,
-                            updatedAt = System.currentTimeMillis()
-                        )
-                        container.database.userStatsDao().upsert(updatedStats)
+                        val (oldLevel, newLevel) = levels
 
                         // Check achievements
                         val newlyUnlocked = container.achievementEvaluator.checkAndUnlock()

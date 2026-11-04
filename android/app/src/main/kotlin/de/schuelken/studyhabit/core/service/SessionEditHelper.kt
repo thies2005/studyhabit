@@ -45,21 +45,22 @@ object SessionEditHelper {
         newNotes: String?
     ) {
         val clampedMinutes = newMinutes.coerceIn(1, 720)
-        val effectivePomodoros = calculateEffectivePomodoros(
-            isFreeTimer = session.isFreeTimer,
-            plannedDurationMinutes = session.plannedDurationMinutes,
-            actualMinutes = clampedMinutes
-        )
+        val updated = container.database.withTransaction {
+            // A folder pull may have changed or deleted the session while its dialog was open.
+            val current = container.database.sessionDao().getSessionById(session.id)
+                ?: return@withTransaction false
+            val effectivePomodoros = calculateEffectivePomodoros(
+                isFreeTimer = current.isFreeTimer,
+                plannedDurationMinutes = current.plannedDurationMinutes,
+                actualMinutes = clampedMinutes
+            )
+            val newXp = calculateSessionXp(current, clampedMinutes, newConfidence)
+            val xpDelta = newXp - current.xpEarned
+            val minutesDelta = clampedMinutes - current.actualDurationMinutes
 
-        val newXp = calculateSessionXp(session, clampedMinutes, newConfidence)
-
-        container.database.withTransaction {
-            val xpDelta = newXp - session.xpEarned
-            val minutesDelta = clampedMinutes - session.actualDurationMinutes
-
-            val updatedSession = session.copy(
+            val updatedSession = current.copy(
                 actualDurationMinutes = clampedMinutes,
-                endedAt = session.startedAt + clampedMinutes * 60_000L,
+                endedAt = current.startedAt + clampedMinutes * 60_000L,
                 pomodorosCompleted = effectivePomodoros,
                 confidenceRating = newConfidence,
                 notes = newNotes?.trim()?.ifEmpty { null },
@@ -68,7 +69,7 @@ object SessionEditHelper {
             )
             container.database.sessionDao().upsert(updatedSession)
 
-            container.database.subjectDao().updateXp(session.subjectId, xpDelta)
+            container.database.subjectDao().updateXp(current.subjectId, xpDelta)
 
             val currentStats = container.database.userStatsDao().getUserStats() ?: UserStatsEntity()
             val newTotalXp = (currentStats.totalXp + xpDelta).coerceAtLeast(0)
@@ -82,7 +83,9 @@ object SessionEditHelper {
                     updatedAt = System.currentTimeMillis()
                 )
             )
+            true
         }
+        if (!updated) return
 
         container.achievementEvaluator.checkAndUnlock()
         StudyHabitWidgetProvider.updateAllWidgets(context)

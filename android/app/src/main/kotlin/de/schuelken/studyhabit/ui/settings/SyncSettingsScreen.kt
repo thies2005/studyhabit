@@ -84,6 +84,7 @@ fun SyncSettingsScreen(
     val folderSyncEnabled by container.preferences.folderSyncEnabled.collectAsState()
     val folderLastSyncedMs by container.preferences.folderLastSyncedAtFlow.collectAsState()
     val folderLastSummary by container.preferences.folderLastSummary.collectAsState()
+    val manualFileSummary by container.folderSyncService.manualFileSummary.collectAsState()
 
     val userEmail = container.tokenStorage.getUserEmail()
     val isLoggedIn = !container.tokenStorage.getToken().isNullOrBlank()
@@ -92,7 +93,8 @@ fun SyncSettingsScreen(
     var showEraseDialog by remember { mutableStateOf(false) }
     var showLogoutDialog by remember { mutableStateOf(false) }
     var isErasing by remember { mutableStateOf(false) }
-    var isFolderSyncing by remember { mutableStateOf(false) }
+    val folderStatus by container.folderSyncService.syncStatus.collectAsState()
+    val isFolderSyncing = folderStatus == SyncStatus.SYNCING
 
     val lastSyncedStr = if (lastSyncedMs > 0) {
         Instant.ofEpochMilli(lastSyncedMs)
@@ -110,7 +112,9 @@ fun SyncSettingsScreen(
         contract = ActivityResultContracts.OpenDocumentTree()
     ) { uri ->
         uri?.let {
-            container.folderSyncService.bindSyncFolder(it)
+            scope.launch {
+                if (container.folderSyncService.bindSyncFolder(it)) container.scheduleFolderSync()
+            }
         }
     }
 
@@ -336,7 +340,7 @@ fun SyncSettingsScreen(
                 }
             }
 
-            // Safe to Synced Folder Section (iCloud Drive / Google Drive / File Manager)
+            // Device-to-device sync through the selected Android folder
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
@@ -349,20 +353,22 @@ fun SyncSettingsScreen(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Synced Folder (File Manager)",
+                                text = "Folder Sync",
                                 style = MaterialTheme.typography.titleMedium
                             )
                             Text(
-                                text = "Local / iCloud / Google Drive bidirectional sync",
+                                text = "Choose the same Google Drive folder on each device. Update StudyHabit on every device before syncing.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         Switch(
                             checked = folderSyncEnabled,
+                            enabled = !folderSyncUri.isNullOrBlank(),
                             onCheckedChange = { enabled ->
                                 container.preferences.setFolderSyncEnabled(enabled)
                                 if (enabled && !folderSyncUri.isNullOrBlank()) {
+                                    container.scheduleFolderSync()
                                     scope.launch { container.folderSyncService.syncWithFolder() }
                                 }
                             }
@@ -400,12 +406,7 @@ fun SyncSettingsScreen(
                         Button(
                             onClick = {
                                 scope.launch {
-                                    isFolderSyncing = true
-                                    try {
-                                        container.folderSyncService.syncWithFolder()
-                                    } finally {
-                                        isFolderSyncing = false
-                                    }
+                                    container.folderSyncService.syncWithFolder()
                                 }
                             },
                             enabled = folderSyncEnabled && !folderSyncUri.isNullOrBlank() && !isFolderSyncing,
@@ -437,7 +438,7 @@ fun SyncSettingsScreen(
                             Spacer(modifier = Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Last synced: $folderLastSyncedStr",
+                                    text = "Last folder check: $folderLastSyncedStr",
                                     style = MaterialTheme.typography.bodyMedium
                                 )
                                 Text(
@@ -451,12 +452,18 @@ fun SyncSettingsScreen(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
+                    Text(
+                        text = "Use these buttons to exchange a copy manually. Save to a separate file so you don’t replace an existing backup.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         OutlinedButton(
-                            onClick = { saveFileLauncher.launch("studyhabit_sync.json") },
+                            onClick = { saveFileLauncher.launch("studyhabit_backup_${System.currentTimeMillis()}.json") },
                             modifier = Modifier.weight(1f)
                         ) {
                             Icon(Icons.Default.Save, contentDescription = null)
@@ -472,6 +479,9 @@ fun SyncSettingsScreen(
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("Merge File...")
                         }
+                    }
+                    manualFileSummary?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
