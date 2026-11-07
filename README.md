@@ -1,103 +1,75 @@
-# StudyHabit
+<h1 align="center">StudyHabit</h1>
 
-A full-featured study tracking application with gamification, Pomodoro timer, and multi-platform support. Currently shipped targets are **Android** and **Windows desktop**, plus a React **web dashboard**. Track your study sessions, manage subjects and topics, earn XP, and visualize your progress with charts and achievements.
+<p align="center"><strong>Make time to focus. See your progress.</strong><br>Study sessions, subjects, and achievements in one place.</p>
 
-## Features
+<p align="center">
+  <a href="#get-started">Get started</a> ·
+  <a href="#a-look-inside">Screenshots</a> ·
+  <a href="#self-host-the-dashboard">Deployment</a> ·
+  <a href="docs/releases/README.md">Releases</a>
+</p>
 
-- **Pomodoro Timer** — Configurable work/break intervals with a background foreground service on Android (desktop keeps time while the window is open)
-- **Subject & Hierarchy Management** — Organize studies with projects, subjects, topics, and chapters (flat, 2-level, or 3-level hierarchy)
-- **XP & Leveling System** — Earn XP for completing sessions, rating confidence, adding sources, and maintaining streaks. Progress from Novice to Grandmaster
-- **Streak Tracking** — Daily streaks with configurable grace period and freeze tokens
-- **15 Achievements** — Unlock badges for streaks, Pomodoro milestones, hours studied, and more
-- **PDF Viewer** — Built-in PDF reader with progress tracking and auto-save
-- **Source Management** — Attach PDFs, URLs, and video URLs to any subject/topic/chapter
-- **Statistics Dashboard** — Weekly bar charts, subject distribution pie charts, 12-week activity heatmap, subject breakdown
-- **Data Export/Import** — Full JSON export with merge or replace import modes
-- **Material 3 Design** — Dynamic theming with 12 seed colors, dark mode, glassmorphism navigation
-- **Offline-First** — Local SQLite database via Drift, works without server
-- **Web Dashboard** — React-based dashboard for viewing stats, achievements, and subjects in the browser
-- **REST API** — Express + Prisma + PostgreSQL backend with JWT authentication
+StudyHabit helps you organize subjects and learning materials, run focused study sessions, and track your progress with streaks, XP, and achievements. The current Android app is built with Kotlin and Jetpack Compose. A React web dashboard and Express API provide the optional server components; older Flutter sources, including the historical Windows desktop target, are retained under `archive/flutter-legacy/`.
 
-## Architecture
+**Android 8.0+ · Material 3 · Local study tracking · Light and dark themes**
 
-```
-studyhabit/
-├── lib/                    # Flutter mobile app (Dart)
-│   ├── core/
-│   │   ├── database/       # Drift SQLite (10 tables)
-│   │   ├── models/         # Freezed domain models
-│   │   ├── providers/      # Riverpod 3 providers
-│   │   ├── services/       # XP, streak, achievement, sync
-│   │   ├── router/         # go_router navigation
-│   │   └── theme/          # Material 3 theming
-│   ├── features/           # Feature modules
-│   │   ├── home/           # Dashboard with streak, XP, sessions
-│   │   ├── projects/       # Project switching, creation
-│   │   ├── subjects/       # Subject CRUD, hierarchy, detail
-│   │   ├── pomodoro/       # Timer, session review, PDF viewer
-│   │   ├── stats/          # Charts, heatmap, breakdown table
-│   │   ├── achievements/   # Badge grid, level card
-│   │   └── settings/       # Theme, Pomodoro, export/import
-│   └── shared/widgets/     # Reusable components
-├── web/                    # React web dashboard (TypeScript)
-│   ├── src/
-│   │   ├── pages/          # Dashboard, Subjects, Stats, Achievements, Settings
-│   │   ├── components/     # Layout, StatsCharts, AchievementGrid
-│   │   ├── api/            # Axios client, React hooks
-│   │   └── hooks/          # useAuth
-│   ├── Dockerfile          # Multi-stage → nginx
-│   └── nginx.conf          # SPA routing
-├── backend/                # Express REST API (TypeScript)
-│   ├── src/
-│   │   ├── routes/         # Auth, projects, subjects, sessions, sources, stats, achievements
-│   │   ├── services/       # Auth (JWT), XP, sync
-│   │   └── middleware/     # Auth verification, validation, error handling
-│   ├── prisma/schema.prisma
-│   └── Dockerfile          # Multi-stage → Node.js
-├── docker-compose.yml      # PostgreSQL + API + Web
-└── .env.example            # Environment variables
+## What you can do
+
+| | Features |
+|---|---|
+| **Focus on a session** | Use a configurable Pomodoro timer and review your study sessions. |
+| **Organize your learning** | Group subjects, topics, chapters, and source material. |
+| **Build a habit** | Track streaks, earn XP, and unlock achievements. |
+| **See your progress** | Explore weekly focus charts, subject breakdowns, and activity history. |
+| **Keep your data** | Use export/import and optional synchronization; check the app settings for available sync options. |
+
+## A look inside
+
+Existing Android captures with fictional study data, shown in light and dark themes.
+
+<table>
+  <tr>
+    <td align="center" width="33%"><img src="docs/screenshots/android-dashboard.png" width="220" alt="StudyHabit dashboard with streak, level, study goal, and recent sessions"><br><strong>Your day</strong></td>
+    <td align="center" width="33%"><img src="docs/screenshots/android-subjects.png" width="220" alt="StudyHabit subject list with progress indicators"><br><strong>Your subjects</strong></td>
+    <td align="center" width="33%"><img src="docs/screenshots/android-stats.png" width="220" alt="StudyHabit statistics with weekly focus chart and activity heatmap"><br><strong>Your progress</strong></td>
+  </tr>
+</table>
+
+<details>
+<summary>More screenshots: achievements</summary>
+
+<img src="docs/screenshots/android-badges.png" width="220" alt="StudyHabit achievements and badges in a dark theme">
+
+</details>
+
+## Get started
+
+Install an Android build from the [project releases](https://github.com/thies2005/studyhabit/releases), or build the native app locally. Create your subjects, choose a focus interval, and complete a session to start tracking progress.
+
+### Build the Android app
+
+Use JDK 17 and Android SDK 35. From `android/`:
+
+```sh
+./gradlew assembleDebug
+./gradlew testDebugUnitTest lintDebug
 ```
 
-## Tech Stack
+The debug APK is written to `app/build/outputs/apk/debug/`. Release signing is explicitly enabled with `-Pstudyhabit.release.signing.enabled=true` and requires the existing private `android/app/key.properties`. See [release channels and signing](docs/releases/README.md).
 
-| Component | Technology |
-|-----------|-----------|
-| Mobile App | Flutter 3.35+, Dart 3.9+ |
-| State Management | Riverpod 3 (code-gen) |
-| Local Database | Drift 2.x (SQLite) |
-| Navigation | go_router 17 |
-| Charts | fl_chart |
-| PDF Viewer | Syncfusion PDF Viewer |
-| Web Dashboard | React 19, Vite 6, Tailwind CSS 3 |
-| Web Charts | Recharts 3 |
-| Backend API | Express 5, TypeScript 5 |
-| ORM | Prisma 6 |
-| Database | PostgreSQL 16 |
-| Auth | JWT (bcryptjs + jsonwebtoken) |
-| Deployment | Docker, Docker Compose, Coolify |
+## Project layout
 
-## Quick Start
+| Path | Purpose |
+|---|---|
+| `android/` | Current native Android app: Kotlin, Compose, Room, and local services |
+| `web/` | React and Vite dashboard |
+| `backend/` | Express, Prisma, and PostgreSQL API |
+| `archive/` | Historical Flutter implementation |
+| `docs/` | Release policy and project documentation |
 
-### Mobile App (Flutter)
+## Self-host the dashboard
 
-```bash
-# Prerequisites: Flutter 3.35+, Android Studio / Xcode
-
-# Install dependencies
-flutter pub get
-
-# Generate code (Freezed, Drift, Riverpod)
-flutter pub run build_runner build --delete-conflicting-outputs
-
-# Run on connected device/emulator
-flutter run
-
-# Build release APK
-flutter build apk --release
-# Output: build/app/outputs/flutter-apk/app-release.apk
-```
-
-### Web Dashboard (Development)
+### Web dashboard development
 
 ```bash
 cd web
@@ -110,7 +82,7 @@ npm run dev
 # Open http://localhost:5173
 ```
 
-### Backend API (Development)
+### Backend API development
 
 ```bash
 cd backend
@@ -120,7 +92,7 @@ npm install
 
 # Set up environment
 cp ../.env.example .env
-# Edit .env with your values
+# Edit .env and set DATABASE_URL for your local Postgres instance
 
 # Run Prisma migrations
 npx prisma migrate dev
@@ -130,9 +102,9 @@ npm run dev
 # API runs on http://localhost:3001
 ```
 
-## Deployment
+## Deploy the server
 
-### Docker Compose (Standalone)
+### Docker Compose
 
 ```bash
 # Copy env template and configure
@@ -145,14 +117,14 @@ docker compose up -d --build
 # Services:
 #   - Web dashboard:  http://localhost:3000
 #   - API:             http://localhost:3001
-#   - PostgreSQL:      localhost:5432 (internal only)
+#   - PostgreSQL:      db:5432 (Compose network only)
 ```
 
 ### Coolify
 
-See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed Coolify deployment instructions.
+Deploy the repository’s `docker-compose.yml` as a Compose stack. Set `DB_PASSWORD`, `JWT_SECRET`, `CORS_ORIGIN`, and the dashboard’s `API_URL` for your environment before building. Configure HTTPS through your reverse proxy; keep the database private.
 
-## XP & Gamification
+## XP and achievements
 
 | Action | XP |
 |--------|-----|
@@ -165,7 +137,7 @@ See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed Coolify deployment instruction
 
 **Level Thresholds:** Novice (0) → Apprentice (500) → Scholar (1500) → Adept (3500) → Expert (7000) → Master → Grandmaster
 
-## API Endpoints
+## API reference
 
 Base URL: `/api/v1`
 
@@ -188,10 +160,10 @@ Base URL: `/api/v1`
 | GET | `/achievements` | List achievements |
 | POST | `/achievements/:key/unlock` | Unlock achievement |
 
-## Offline Mode
+## Local data and sync
 
-The Flutter app is fully functional offline. All data is stored locally in SQLite. The server sync feature is optional and can be enabled in Settings.
+The current Android app stores study data locally using Room. Server and folder synchronization options are available in the app; the archived Flutter implementation has its own historical sync behavior.
 
 ## License
 
-MIT
+StudyHabit is licensed under **GPL-3.0-or-later**. See [LICENSE](LICENSE) and the [release policy](docs/releases/README.md). Existing third-party notices and licenses still apply.

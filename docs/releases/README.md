@@ -1,4 +1,10 @@
-# Android release channels
+<h1 align="center">Android release channels</h1>
+
+<p align="center"><strong>Project reference</strong><br>Setup, usage, and maintenance guidance.</p>
+
+<p align="center">
+  <a href="../../README.md">Project overview</a>
+</p>
 
 StudyHabit is licensed under **GPL-3.0-or-later** (SPDX identifier); see the
 root `LICENSE` for the GPLv3 terms. This declaration permits GPL version 3 or
