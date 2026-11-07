@@ -32,3 +32,15 @@ flutter test integration_test # Skip only if integration_test does not exist
 
 - Run any additional server, web, or workflow test commands present in the repository.
 - Use Conventional Commits for commit messages, such as `fix: correct login validation` or `feat: add study reminder`.
+
+## Android publication
+
+- Use the `github-release-publishing` skill and `docs/releases/README.md` for release work.
+- Stable tags/releases require an explicit user instruction to release. Routine commits,
+  pushes, and pipeline setup authorize development builds only.
+- `android-release.yml` is the only Android publisher. Do not restore automatic
+  version-bump commits or add a competing publisher to backend/web CI.
+- Preserve literal source versions for metadata validators; account for the final
+  release commit in the documented version-code allocation. Never move stable tags.
+- The app is native Kotlin in `android/`; archived Flutter checks do not validate it.
+  Run `./gradlew testDebugUnitTest lintDebug` there and the release policy Python tests.

@@ -9,10 +9,26 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+// Release signing is opt-in. CI and normal local builds deliberately produce unsigned artifacts;
+// GitHub release builds explicitly enable signing after preparing a temporary key.properties.
+val releaseSigningEnabled = providers.gradleProperty("studyhabit.release.signing.enabled")
+    .orElse("false")
+    .get()
+    .toBooleanStrict()
 val keystorePropertiesFile = rootProject.file("app/key.properties")
 val keystoreProperties = Properties()
-if (keystorePropertiesFile.exists()) {
+if (releaseSigningEnabled) {
+    if (!keystorePropertiesFile.exists()) {
+        throw GradleException(
+            "studyhabit.release.signing.enabled=true requires android/app/key.properties; refusing to sign with the debug key"
+        )
+    }
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+    listOf("keyAlias", "keyPassword", "storeFile", "storePassword").forEach { key ->
+        if (keystoreProperties.getProperty(key).isNullOrBlank()) {
+            throw GradleException("android/app/key.properties is missing $key")
+        }
+    }
 }
 
 android {
@@ -25,12 +41,15 @@ android {
         targetSdk = 35
         versionCode = 85
         versionName = "2.0.13"
+        // Keep literal defaults above for source builds and release metadata validators.
+        System.getenv("ANDROID_VERSION_CODE")?.let { versionCode = it.toInt() }
+        System.getenv("ANDROID_VERSION_NAME")?.let { versionName = it }
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     signingConfigs {
-        if (keystorePropertiesFile.exists()) {
+        if (releaseSigningEnabled) {
             create("release") {
                 keyAlias = keystoreProperties["keyAlias"] as String
                 keyPassword = keystoreProperties["keyPassword"] as String
@@ -45,10 +64,8 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            signingConfig = if (keystorePropertiesFile.exists()) {
-                signingConfigs.getByName("release")
-            } else {
-                signingConfigs.getByName("debug")
+            if (releaseSigningEnabled) {
+                signingConfig = signingConfigs.getByName("release")
             }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

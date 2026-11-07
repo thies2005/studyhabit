@@ -9,3 +9,11 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+
+# Release credentials and temporary signing material
+key.properties
+*.keystore
+*.jks
+*.p12
+*.pk8
+*.pem

@@ -1,0 +1,1 @@
+Native Android release with offline study tracking, Pomodoro timer, XP and streaks, achievements, AnkiDroid deck links, optional self-hosted sync, study blockers, folder backup, and a home-screen widget.

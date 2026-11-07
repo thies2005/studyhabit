@@ -124,3 +124,15 @@ Microsoft.Services.Store.winmd
 !**/pdfviewer/**
 plan*.md
 download.htm
+
+# Release credentials and temporary signing material (never commit these)
+/key.properties
+*.keystore
+*.jks
+*.p12
+*.pk8
+*.pem
+release-service-account.json
+/release-assets/
+/release-decision.json
+/android/.kotlin/

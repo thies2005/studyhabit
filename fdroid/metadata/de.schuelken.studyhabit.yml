@@ -1,0 +1,39 @@
+# DRAFT ONLY - do not submit to F-Droid while Disabled is true.
+Categories:
+  - Education
+  - Science
+License: GPL-3.0-or-later
+AuthorName: thies2005
+WebSite: https://github.com/thies2005/studyhabit
+SourceCode: https://github.com/thies2005/studyhabit.git
+IssueTracker: https://github.com/thies2005/studyhabit/issues
+Name: StudyHabit
+Summary: Offline study tracking with a Pomodoro timer and statistics
+Description: A native Android study planner with sessions, Pomodoro timing, XP, streaks, achievements, AnkiDroid links, optional self-hosted sync, optional blockers, and backup/import.
+Disabled: >-
+  Draft blocked: the build commit is a placeholder, and F-Droid maintainers
+  have not reviewed the recipe.
+RepoType: git
+Repo: https://github.com/thies2005/studyhabit.git
+Binaries: ''
+AutoUpdateMode: None
+UpdateCheckMode: None
+CurrentVersion: 2.0.13
+CurrentVersionCode: 85
+Builds:
+  - versionName: 2.0.13
+    versionCode: 85
+    commit: REPLACE_WITH_ACCEPTED_IMMUTABLE_RELEASE_TAG_COMMIT
+    subdir: android
+    gradle:
+      - yes
+    rm:
+      - backend
+      - web
+      - archive/flutter-legacy
+MaintainerNotes: |-
+  The disabled draft removes backend and web directories because the Android
+  source build does not need their npm artifacts. The legacy Flutter archive
+  is also removed from the build tree rather than hidden with scanignore. Do not
+  submit until transitive dependencies, the exact release recipe, and signing
+  compatibility have been verified.

@@ -1,0 +1,7 @@
+StudyHabit is a native Android study planner and focus timer. It works offline and can optionally connect to your own StudyHabit backend.
+
+Track sessions with a Pomodoro timer, manage projects, subjects, topics, chapters, and learning sources, and review weekly activity, subject distribution, XP, levels, streaks, milestones, and achievements. The app also links selected AnkiDroid decks to subjects, records card counts during study sessions, and provides a home-screen progress widget.
+
+Optional study blockers use an accessibility service only after you enable them. The service watches the foreground app during an active study session so it can show your blocking screen for apps you selected. It is not used for general device monitoring, analytics, advertising, or accessibility assistance.
+
+Folder backup and restore can export or import your local database through Android's document picker. Server sync is optional: use the URL and credentials from your own self-hosted StudyHabit deployment. AnkiDroid integration requires AnkiDroid and its database permission.
