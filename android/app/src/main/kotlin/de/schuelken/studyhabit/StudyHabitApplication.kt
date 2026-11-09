@@ -29,28 +29,35 @@ class StudyHabitApplication : Application() {
             container.database.sessionDao().cleanupOrphanedSessions(
                 System.currentTimeMillis() - (2 * 3600_000L)
             )
-            container.streakManager.evaluateCurrentStreak()
         }
 
         ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStart(owner: LifecycleOwner) {
                 appScope.launch {
-                    if (container.preferences.folderSyncEnabled.value &&
+                    container.ankiDroidService.syncLinkedDecks(syncPastDays = true)
+
+                    val folderSynced = if (container.preferences.folderSyncEnabled.value &&
                         !container.preferences.folderSyncUri.value.isNullOrBlank()
                     ) {
-                        if (container.folderSyncService.syncWithFolder()) {
-                            container.streakManager.evaluateCurrentStreak()
-                            container.achievementEvaluator.checkAndUnlock()
-                        }
+                        container.folderSyncService.syncWithFolder()
+                    } else {
+                        false
                     }
-                }
-                appScope.launch {
-                    container.ankiDroidService.syncLinkedDecks()
-                    if (!container.tokenStorage.getToken().isNullOrBlank() &&
+
+                    val serverSynced = if (!container.tokenStorage.getToken().isNullOrBlank() &&
                         container.preferences.serverUrl.value.isNotBlank()
                     ) {
                         container.syncEngine.syncNow()
+                    } else {
+                        false
                     }
+
+                    if (folderSynced || serverSynced) {
+                        container.ankiDroidService.syncLinkedDecks(syncPastDays = false)
+                    }
+
+                    container.streakManager.evaluateCurrentStreak()
+                    container.achievementEvaluator.checkAndUnlock()
                 }
             }
 

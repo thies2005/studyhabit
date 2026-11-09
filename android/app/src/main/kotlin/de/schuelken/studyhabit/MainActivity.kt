@@ -12,10 +12,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.rememberNavController
 import de.schuelken.studyhabit.core.theme.AppTheme
 import de.schuelken.studyhabit.ui.navigation.AppNavHost
 import de.schuelken.studyhabit.ui.widget.StudyHabitWidgetProvider
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
@@ -56,6 +59,14 @@ class MainActivity : ComponentActivity() {
                     )
                 }
             }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        val app = application as StudyHabitApplication
+        lifecycleScope.launch(Dispatchers.IO) {
+            app.container.ankiDroidService.syncLinkedDecks(syncPastDays = false)
         }
     }
 

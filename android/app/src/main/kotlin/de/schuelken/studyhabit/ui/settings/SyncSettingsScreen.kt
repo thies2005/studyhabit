@@ -200,6 +200,7 @@ fun SyncSettingsScreen(
                     Button(
                         onClick = {
                             scope.launch {
+                                container.ankiDroidService.syncLinkedDecks(syncPastDays = true)
                                 container.syncEngine.syncNow()
                             }
                         },
@@ -406,6 +407,7 @@ fun SyncSettingsScreen(
                         Button(
                             onClick = {
                                 scope.launch {
+                                    container.ankiDroidService.syncLinkedDecks(syncPastDays = true)
                                     container.folderSyncService.syncWithFolder()
                                 }
                             },

@@ -125,7 +125,7 @@ fun SubjectDetailScreen(
     val skillLabels by container.database.skillLabelDao().getSkillLabelsForSubjectFlow(subjectId).collectAsState(initial = emptyList())
 
     LaunchedEffect(subjectId) {
-        container.ankiDroidService.syncLinkedDecks(subjectId)
+        container.ankiDroidService.syncLinkedDecks(subjectId = subjectId, syncPastDays = true)
     }
 
     var selectedTab by remember { mutableIntStateOf(0) }
@@ -266,7 +266,7 @@ fun SubjectDetailScreen(
                     onAddSourceClick = { showAddSourceDialog = true },
                     onSyncAnkiDecks = {
                         scope.launch {
-                            container.ankiDroidService.syncLinkedDecks(subjectId)
+                            container.ankiDroidService.syncLinkedDecks(subjectId = subjectId, syncPastDays = true)
                         }
                     },
                     onOpenSource = { src ->
@@ -371,6 +371,12 @@ fun SubjectDetailScreen(
             onSave = { src ->
                 scope.launch {
                     container.database.sourceDao().upsert(src)
+                    if (src.type.equals("anki", ignoreCase = true)) {
+                        container.ankiDroidService.syncLinkedDecks(
+                            subjectId = currentSubj.id,
+                            syncPastDays = true
+                        )
+                    }
                     container.triggerDataChangedSync()
                     showAddSourceDialog = false
                 }

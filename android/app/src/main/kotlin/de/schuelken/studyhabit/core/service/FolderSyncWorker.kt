@@ -20,6 +20,7 @@ class FolderSyncWorker(context: Context, parameters: WorkerParameters) :
     override suspend fun doWork(): Result {
         val container = (applicationContext as StudyHabitApplication).container
         val preferences = container.preferences
+        container.ankiDroidService.syncLinkedDecks(syncPastDays = false, notifyDataChanged = false)
         if (!preferences.folderSyncEnabled.value || preferences.folderSyncUri.value.isNullOrBlank()) {
             return Result.success()
         }

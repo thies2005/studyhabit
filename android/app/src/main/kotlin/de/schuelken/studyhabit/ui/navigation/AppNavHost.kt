@@ -108,12 +108,17 @@ fun AppNavHost(
         syncStatus = syncStatus,
         onSyncClick = {
             scope.launch {
+                val syncedAnki = container.ankiDroidService.syncLinkedDecks(syncPastDays = true)
                 val hasServer = !container.tokenStorage.getToken().isNullOrBlank() && container.preferences.serverUrl.value.isNotBlank()
                 val hasFolder = container.preferences.folderSyncEnabled.value && !container.preferences.folderSyncUri.value.isNullOrBlank()
-                when {
-                    hasFolder -> container.folderSyncService.syncWithFolder()
-                    hasServer -> container.syncEngine.syncNow()
-                    else -> navController.navigate("sync_settings")
+                if (hasFolder) {
+                    container.folderSyncService.syncWithFolder()
+                }
+                if (hasServer) {
+                    container.syncEngine.syncNow()
+                }
+                if (!hasFolder && !hasServer && syncedAnki == 0) {
+                    navController.navigate("sync_settings")
                 }
             }
         },
