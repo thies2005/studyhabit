@@ -1,0 +1,1 @@
+Single-file in-place Folder Sync (eliminating Google Drive history bloat), keeps blocked-app lists strictly local, hardens token/cloud sync security, adds an App Blocker disclosure dialog and Usage Access + Overlay fallback, and polishes large-text UI, sync error feedback, and timer contrast.

@@ -39,8 +39,8 @@ android {
         applicationId = "de.schuelken.studyhabit"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1000423
-        versionName = "1.0.0"
+        versionCode = 1000433
+        versionName = "1.0.1"
         // Keep literal defaults above for source builds and release metadata validators.
         System.getenv("ANDROID_VERSION_CODE")?.let { versionCode = it.toInt() }
         System.getenv("ANDROID_VERSION_NAME")?.let { versionName = it }
