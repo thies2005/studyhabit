@@ -128,7 +128,8 @@ fun SettingsScreen(
             try {
                 withContext(Dispatchers.IO) {
                     val file = container.exportImportService.exportToJson()
-                    val stream = context.contentResolver.openOutputStream(uri, "wt")
+                    val stream = runCatching { context.contentResolver.openOutputStream(uri, "wt") }.getOrNull()
+                        ?: context.contentResolver.openOutputStream(uri, "w")
                         ?: error("Could not open the chosen location.")
                     stream.use { output -> file.inputStream().use { it.copyTo(output) } }
                 }

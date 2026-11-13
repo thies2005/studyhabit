@@ -37,6 +37,11 @@ class TokenAuthenticator(
     private val preferences: AppPreferences,
     private val json: Json,
 ) : Authenticator {
+    private val refreshClient = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(20, TimeUnit.SECONDS)
+        .build()
+
     @Synchronized
     override fun authenticate(route: Route?, response: Response): Request? {
         val path = response.request.url.encodedPath
@@ -80,13 +85,8 @@ class TokenAuthenticator(
             .post(refreshBody)
             .build()
 
-        val directClient = OkHttpClient.Builder()
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(20, TimeUnit.SECONDS)
-            .build()
-
         return try {
-            directClient.newCall(refreshReq).execute().use { refreshRes ->
+            refreshClient.newCall(refreshReq).execute().use { refreshRes ->
                 if (refreshRes.isSuccessful) {
                     val bodyString = refreshRes.body?.string() ?: return null
                     val refreshResp = json.decodeFromString(
@@ -102,7 +102,9 @@ class TokenAuthenticator(
                         .header("Authorization", "Bearer $newAccessToken")
                         .build()
                 } else {
-                    tokenStorage.clear()
+                    if (refreshRes.code == 401 || refreshRes.code == 403) {
+                        tokenStorage.clear()
+                    }
                     null
                 }
             }

@@ -602,8 +602,21 @@ class TimerForegroundService : Service() {
                         }
                     }
                 }
+                checkUsageStatsBlocker(_timerState.value)
             }
         }
+    }
+
+    private fun checkUsageStatsBlocker(state: TimerState) {
+        if (!state.isRunning || state.isPaused) return
+        if (preferences.blockOnlyDuringFocusPhase && state.phase != TimerPhase.WORK) return
+        if (!preferences.appBlockerEnabled) return
+        if (preferences.blockedAppPackages.isEmpty()) return
+        if (StudyBlockerAccessibilityService.isAccessibilityServiceEnabled(this)) return
+        if (!StudyBlockerAccessibilityService.hasUsageStatsPermission(this)) return
+
+        val fgPackage = StudyBlockerAccessibilityService.getForegroundPackageFromUsageStats(this) ?: return
+        StudyBlockerAccessibilityService.blockIfNeeded(this, fgPackage, preferences, state)
     }
 
     private fun persistState(state: TimerState) {

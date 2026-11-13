@@ -5,7 +5,7 @@ import { ZodError } from 'zod';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { prisma } from '../db.js';
-import { AuthService } from '../services/authService.js';
+import { AuthService, RefreshTokenError } from '../services/authService.js';
 import { authMiddleware } from '../middleware/auth.js';
 
 const router = Router();
@@ -18,14 +18,14 @@ const sensitiveLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-const registerSchema = z.object({
-  email: z.string().email(),
+export const registerSchema = z.object({
+  email: z.string().trim().toLowerCase().email().max(255),
   password: z.string().min(8).max(128),
   deviceName: z.string().max(100).optional(),
 });
 
-const loginSchema = z.object({
-  email: z.string().email(),
+export const loginSchema = z.object({
+  email: z.string().trim().toLowerCase().email().max(255),
   password: z.string().max(128),
   deviceName: z.string().max(100).optional(),
 });
@@ -35,16 +35,22 @@ const refreshSchema = z.object({
   deviceName: z.string().max(100).optional(),
 });
 
-const changePasswordSchema = z.object({
-  currentPassword: z.string().min(1),
-  newPassword: z.string().min(8),
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1).max(128),
+  newPassword: z.string().min(8).max(128),
+});
+
+export const deleteAccountSchema = z.object({
+  password: z.string().min(1).max(128),
 });
 
 router.post('/register', async (req, res, next) => {
   try {
     const { email, password, deviceName } = registerSchema.parse(req.body);
 
-    const existing = await prisma.user.findUnique({ where: { email } });
+    const existing = await prisma.user.findFirst({
+      where: { email: { equals: email, mode: 'insensitive' } },
+    });
     if (existing) {
       // Perform dummy bcrypt hash to match timing and prevent timing side-channel attacks
       await bcrypt.hash('dummy', 12);
@@ -115,13 +121,6 @@ router.post('/refresh', async (req, res, next) => {
       return res.status(401).json({ error: 'Invalid or expired refresh token' });
     }
 
-    if (result.deviceMismatch) {
-      return res.status(401).json({
-        error: 'Device changed since login',
-        reason: 'device_mismatch',
-      });
-    }
-
     const tokens = await AuthService.rotateRefreshToken(refreshToken, result.userId, {
       deviceName,
       ipAddress: req.ip,
@@ -131,6 +130,9 @@ router.post('/refresh', async (req, res, next) => {
   } catch (error: unknown) {
     if (error instanceof ZodError) {
       return res.status(400).json({ error: 'Validation error', details: error.errors });
+    }
+    if (error instanceof RefreshTokenError) {
+      return res.status(401).json({ error: error.message });
     }
     next(error);
   }
@@ -184,7 +186,7 @@ router.get('/me', authMiddleware, async (req, res, next) => {
   }
 });
 
-router.patch('/password', sensitiveLimiter, authMiddleware, async (req, res, next) => {
+router.patch('/password', authMiddleware, sensitiveLimiter, async (req, res, next) => {
   try {
     const { currentPassword, newPassword } = changePasswordSchema.parse(req.body);
 
@@ -215,12 +217,9 @@ router.patch('/password', sensitiveLimiter, authMiddleware, async (req, res, nex
   }
 });
 
-router.delete('/account', sensitiveLimiter, authMiddleware, async (req, res, next) => {
+router.delete('/account', authMiddleware, sensitiveLimiter, async (req, res, next) => {
   try {
-    const { password } = req.body;
-    if (!password) {
-      return res.status(400).json({ error: 'Password required to delete account' });
-    }
+    const { password } = deleteAccountSchema.parse(req.body);
 
     const user = await prisma.user.findUnique({
       where: { id: req.user.userId },
@@ -229,7 +228,6 @@ router.delete('/account', sensitiveLimiter, authMiddleware, async (req, res, nex
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const bcrypt = await import('bcryptjs');
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) {
       return res.status(401).json({ error: 'Incorrect password' });
@@ -238,6 +236,9 @@ router.delete('/account', sensitiveLimiter, authMiddleware, async (req, res, nex
     await AuthService.deleteAccount(req.user.userId);
     res.json({ data: { message: 'Account deleted successfully' } });
   } catch (error: unknown) {
+    if (error instanceof ZodError) {
+      return res.status(400).json({ error: 'Validation error', details: error.errors });
+    }
     next(error);
   }
 });

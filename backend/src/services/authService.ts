@@ -1,9 +1,17 @@
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../db.js';
 import { config } from '../config.js';
 import { TokenPair, DeviceInfo } from '../types/index.js';
+
+export class RefreshTokenError extends Error {
+  constructor(message = 'Invalid or expired refresh token') {
+    super(message);
+    this.name = 'RefreshTokenError';
+  }
+}
 
 export class AuthService {
   static parseDuration(duration: string): number {
@@ -41,29 +49,32 @@ export class AuthService {
   static async storeRefreshToken(
     userId: string,
     refreshToken: string,
-    device?: DeviceInfo
+    device?: DeviceInfo,
+    tx?: Prisma.TransactionClient
   ): Promise<void> {
+    const client = tx ?? prisma;
     const tokenHash = this.hashToken(refreshToken);
-    const expiresAt = new Date(Date.now() + this.parseDuration(config.JWT_REFRESH_EXPIRY));
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + this.parseDuration(config.JWT_REFRESH_EXPIRY));
 
-    const activeTokens = await prisma.refreshToken.count({
-      where: { userId, revokedAt: null, expiresAt: { gt: new Date() } },
+    const activeTokens = await client.refreshToken.count({
+      where: { userId, revokedAt: null, expiresAt: { gt: now } },
     });
 
     if (activeTokens >= config.MAX_DEVICES_PER_USER) {
-      const oldest = await prisma.refreshToken.findFirst({
-        where: { userId, revokedAt: null },
+      const oldest = await client.refreshToken.findFirst({
+        where: { userId, revokedAt: null, expiresAt: { gt: now } },
         orderBy: { createdAt: 'asc' },
       });
       if (oldest) {
-        await prisma.refreshToken.update({
+        await client.refreshToken.update({
           where: { id: oldest.id },
-          data: { revokedAt: new Date() },
+          data: { revokedAt: now },
         });
       }
     }
 
-    await prisma.refreshToken.create({
+    await client.refreshToken.create({
       data: {
         userId,
         tokenHash,
@@ -77,9 +88,9 @@ export class AuthService {
 
   static async verifyRefreshToken(
     refreshToken: string,
-    currentIp?: string,
-    currentDevice?: string
-  ): Promise<{ userId: string; deviceMismatch: boolean } | null> {
+    _currentIp?: string,
+    _currentDevice?: string
+  ): Promise<{ userId: string } | null> {
     const tokenHash = this.hashToken(refreshToken);
 
     const record = await prisma.refreshToken.findUnique({
@@ -100,13 +111,7 @@ export class AuthService {
       return null;
     }
 
-    const tokenAge = Date.now() - record.createdAt.getTime();
-    const deviceMismatch =
-      currentIp && record.ipAddress && currentIp !== record.ipAddress
-        ? tokenAge < 5 * 60 * 1000
-        : false;
-
-    return { userId: record.userId, deviceMismatch };
+    return { userId: record.userId };
   }
 
   static async rotateRefreshToken(
@@ -116,13 +121,53 @@ export class AuthService {
   ): Promise<TokenPair> {
     const oldHash = this.hashToken(oldRefreshToken);
 
-    await prisma.refreshToken.updateMany({
-      where: { tokenHash: oldHash },
-      data: { revokedAt: new Date() },
+    const tokens = await prisma.$transaction(async (tx) => {
+      const now = new Date();
+      const revoked = await tx.refreshToken.updateMany({
+        where: { tokenHash: oldHash, revokedAt: null, expiresAt: { gt: now } },
+        data: { revokedAt: now },
+      });
+
+      if (revoked.count === 0) {
+        const existing = await tx.refreshToken.findUnique({
+          where: { tokenHash: oldHash },
+        });
+        if (existing?.revokedAt) {
+          console.warn(
+            `[SECURITY] Refresh token reuse detected for user ${existing.userId}. Revoking all sessions.`
+          );
+          await tx.refreshToken.updateMany({
+            where: { userId: existing.userId, revokedAt: null },
+            data: { revokedAt: now },
+          });
+        } else if (existing && existing.expiresAt <= now) {
+          await tx.refreshToken.updateMany({
+            where: { id: existing.id, revokedAt: null },
+            data: { revokedAt: now },
+          });
+        }
+        return null;
+      }
+
+      const previous = await tx.refreshToken.findUnique({
+        where: { tokenHash: oldHash },
+        select: { deviceName: true, deviceInfo: true },
+      });
+
+      const nextTokens = this.generateTokens(userId);
+      const mergedDevice: DeviceInfo = {
+        ...device,
+        deviceName: device?.deviceName ?? previous?.deviceName ?? undefined,
+        deviceInfo: device?.deviceInfo ?? previous?.deviceInfo ?? undefined,
+      };
+
+      await this.storeRefreshToken(userId, nextTokens.refreshToken, mergedDevice, tx);
+      return nextTokens;
     });
 
-    const tokens = this.generateTokens(userId);
-    await this.storeRefreshToken(userId, tokens.refreshToken, device);
+    if (!tokens) {
+      throw new RefreshTokenError();
+    }
 
     return tokens;
   }
@@ -179,11 +224,22 @@ export class AuthService {
   }
 
   static async register(email: string, password: string) {
-    return prisma.$transaction(async (tx: any) => {
+    const normalizedEmail = email.trim().toLowerCase();
+    return prisma.$transaction(async (tx) => {
+      const existing = await tx.user.findFirst({
+        where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
+      });
+      if (existing) {
+        throw new Prisma.PrismaClientKnownRequestError(
+          'An account with this email already exists',
+          { code: 'P2002', clientVersion: Prisma.prismaVersion.client }
+        );
+      }
+
       const passwordHash = await bcrypt.hash(password, 12);
 
       const user = await tx.user.create({
-        data: { email, passwordHash },
+        data: { email: normalizedEmail, passwordHash },
       });
 
       await tx.userStats.create({
@@ -208,7 +264,10 @@ export class AuthService {
   }
 
   static async login(email: string, password: string) {
-    const user = await prisma.user.findUnique({ where: { email } });
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = await prisma.user.findFirst({
+      where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
+    });
     if (!user) {
       // Dummy bcrypt compare so unknown-email and wrong-password take the same
       // path (and return the same 401). Wrapped in try/catch as defense in
@@ -239,13 +298,21 @@ export class AuthService {
     if (!valid) return { success: false, error: 'Current password is incorrect' };
 
     const newHash = await bcrypt.hash(newPassword, 12);
-    // Revoke all refresh tokens so other devices/sessions must re-authenticate.
-    // Outstanding access JWTs remain valid only until their short (15m) expiry.
-    const revoked = await this.revokeAllUserTokens(userId);
+    // Revoke all refresh tokens atomically with password update so other
+    // devices/sessions must re-authenticate. Outstanding access JWTs remain
+    // valid only until their short (15m) expiry.
+    const revoked = await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: userId },
+        data: { passwordHash: newHash },
+      });
 
-    await prisma.user.update({
-      where: { id: userId },
-      data: { passwordHash: newHash },
+      const result = await tx.refreshToken.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+
+      return result.count;
     });
 
     return { success: true, revokedSessions: revoked };

@@ -6,7 +6,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -16,6 +19,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.navArgument
 import de.schuelken.studyhabit.core.database.ProjectEntity
 import de.schuelken.studyhabit.core.di.AppContainer
+import de.schuelken.studyhabit.core.model.SyncStatus
 import de.schuelken.studyhabit.core.model.TimerType
 import de.schuelken.studyhabit.core.service.TimerForegroundService
 import de.schuelken.studyhabit.ui.achievements.AchievementsScreen
@@ -33,7 +37,9 @@ import de.schuelken.studyhabit.ui.subjects.SubjectsScreen
 import de.schuelken.studyhabit.ui.timer.FreeTimerScreen
 import de.schuelken.studyhabit.ui.timer.PdfViewerScreen
 import de.schuelken.studyhabit.ui.timer.PomodoroScreen
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.UUID
 
 @Composable
@@ -56,7 +62,22 @@ fun AppNavHost(
     val folderSyncStatus by container.folderSyncService.syncStatus.collectAsState()
     val folderSyncEnabled by container.preferences.folderSyncEnabled.collectAsState()
     val folderSyncUri by container.preferences.folderSyncUri.collectAsState()
-    val syncStatus = if (folderSyncEnabled && !folderSyncUri.isNullOrBlank()) folderSyncStatus else serverSyncStatus
+    val serverUrl by container.preferences.serverUrl.collectAsState()
+    var ankiSyncStatus by remember { mutableStateOf(SyncStatus.IDLE) }
+
+    val hasFolder = folderSyncEnabled && !folderSyncUri.isNullOrBlank()
+    val hasServer = !container.tokenStorage.getToken().isNullOrBlank() && serverUrl.isNotBlank()
+    val activeStatuses = listOf(
+        if (hasFolder) folderSyncStatus else SyncStatus.IDLE,
+        if (hasServer) serverSyncStatus else SyncStatus.IDLE,
+        ankiSyncStatus
+    )
+    val syncStatus = when {
+        SyncStatus.SYNCING in activeStatuses -> SyncStatus.SYNCING
+        SyncStatus.ERROR in activeStatuses -> SyncStatus.ERROR
+        SyncStatus.SYNCED in activeStatuses -> SyncStatus.SYNCED
+        else -> SyncStatus.IDLE
+    }
 
     val timerState by TimerForegroundService.timerState.collectAsState()
 
@@ -108,17 +129,29 @@ fun AppNavHost(
         syncStatus = syncStatus,
         onSyncClick = {
             scope.launch {
+                val hasLinkedAnkiDecks = withContext(Dispatchers.IO) {
+                    container.database.sourceDao().getAllSources().any {
+                        it.type.equals("anki", ignoreCase = true) && !it.isDeleted
+                    }
+                }
+                val hasServerNow = !container.tokenStorage.getToken().isNullOrBlank() && container.preferences.serverUrl.value.isNotBlank()
+                val hasFolderNow = container.preferences.folderSyncEnabled.value && !container.preferences.folderSyncUri.value.isNullOrBlank()
+                if (!hasFolderNow && !hasServerNow && !hasLinkedAnkiDecks) {
+                    navController.navigate("sync_settings")
+                    return@launch
+                }
+                if (hasLinkedAnkiDecks) {
+                    ankiSyncStatus = SyncStatus.SYNCING
+                }
                 val syncedAnki = container.ankiDroidService.syncLinkedDecks(syncPastDays = true)
-                val hasServer = !container.tokenStorage.getToken().isNullOrBlank() && container.preferences.serverUrl.value.isNotBlank()
-                val hasFolder = container.preferences.folderSyncEnabled.value && !container.preferences.folderSyncUri.value.isNullOrBlank()
-                if (hasFolder) {
+                if (hasLinkedAnkiDecks) {
+                    ankiSyncStatus = if (syncedAnki > 0) SyncStatus.SYNCED else SyncStatus.IDLE
+                }
+                if (hasFolderNow) {
                     container.folderSyncService.syncWithFolder()
                 }
-                if (hasServer) {
+                if (hasServerNow) {
                     container.syncEngine.syncNow()
-                }
-                if (!hasFolder && !hasServer && syncedAnki == 0) {
-                    navController.navigate("sync_settings")
                 }
             }
         },

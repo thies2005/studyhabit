@@ -1,11 +1,5 @@
 package de.schuelken.studyhabit.ui.timer
 
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -43,7 +37,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
@@ -62,22 +55,12 @@ fun PomodoroScreen(
     val timerState by TimerForegroundService.timerState.collectAsState()
     var showReviewSheet by remember { mutableStateOf(false) }
 
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 1.0f,
-        targetValue = 1.04f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulse_scale"
-    )
-
     val remaining = timerState.remainingSeconds
     val total = if (timerState.totalSeconds > 0) timerState.totalSeconds else 1
     val progress = (remaining.toFloat() / total.toFloat()).coerceIn(0f, 1f)
 
     val primaryColor = MaterialTheme.colorScheme.primary
+    val tertiaryColor = MaterialTheme.colorScheme.tertiary
     val trackColor = MaterialTheme.colorScheme.surfaceVariant
 
     FocusTimerLayout(
@@ -142,7 +125,7 @@ fun PomodoroScreen(
                 // Active progress arc
                 val sweepAngle = progress * 360f
                 drawArc(
-                    color = if (timerState.isOvertime) Color(0xFFFFB599) else primaryColor,
+                    color = if (timerState.isOvertime) tertiaryColor else primaryColor,
                     startAngle = -90f,
                     sweepAngle = sweepAngle,
                     useCenter = false,

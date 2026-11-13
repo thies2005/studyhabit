@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
 import de.schuelken.studyhabit.MainActivity
+import de.schuelken.studyhabit.StudyHabitApplication
 import de.schuelken.studyhabit.core.model.TimerType
 import de.schuelken.studyhabit.core.service.StudyBlockerAccessibilityService
 import de.schuelken.studyhabit.core.service.TimerForegroundService
@@ -66,9 +67,22 @@ class BlockedAppActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         blockedPackage = intent.getStringExtra(EXTRA_BLOCKED_PACKAGE) ?: ""
+        val preferences = (application as StudyHabitApplication).container.preferences
 
         setContent {
-            AppTheme {
+            val themeMode by preferences.themeMode.collectAsState()
+            val seedColorIndex by preferences.seedColorIndex.collectAsState()
+            val themeStyleIndex by preferences.themeStyleIndex.collectAsState()
+            val useDynamicColor by preferences.useDynamicColor.collectAsState()
+            val fontScale by preferences.fontScale.collectAsState()
+
+            AppTheme(
+                themeMode = themeMode,
+                seedColorIndex = seedColorIndex,
+                themeStyleIndex = themeStyleIndex,
+                useDynamicColor = useDynamicColor,
+                fontScale = fontScale
+            ) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background

@@ -6,11 +6,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -58,6 +60,7 @@ import de.schuelken.studyhabit.core.database.SubjectEntity
 import de.schuelken.studyhabit.core.database.UserStatsEntity
 import de.schuelken.studyhabit.core.di.AppContainer
 import de.schuelken.studyhabit.core.model.TimerType
+import de.schuelken.studyhabit.core.service.LevelProgress
 import de.schuelken.studyhabit.core.service.TimerForegroundService
 import de.schuelken.studyhabit.core.service.XpCalculator
 import de.schuelken.studyhabit.ui.timer.StartSessionSheet
@@ -204,74 +207,40 @@ fun HomeScreen(
                 }
             }
             item {
-                // Streak & Level Overview Row
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    // Streak Card
-                    Card(
-                        modifier = Modifier.weight(1f),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                // Streak & Level Overview
+                if (largeText) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.LocalFireDepartment,
-                                    contentDescription = "Streak",
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(text = "Streak", style = MaterialTheme.typography.labelLarge)
-                            }
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "${stats?.currentStreak ?: 0} ${if (stats?.currentStreak == 1) "day" else "days"}",
-                                style = MaterialTheme.typography.headlineMedium
-                            )
-                            if ((stats?.freezeTokens ?: 0) > 0) {
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Default.AcUnit,
-                                        contentDescription = "Freeze tokens",
-                                        modifier = Modifier.width(14.dp),
-                                        tint = MaterialTheme.colorScheme.tertiary
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = "${stats?.freezeTokens} freeze",
-                                        style = MaterialTheme.typography.labelSmall
-                                    )
-                                }
-                            }
-                        }
+                        StreakOverviewCard(
+                            stats = stats,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        LevelOverviewCard(
+                            levelProgress = levelProgress,
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
-
-                    // Level Card
-                    Card(
-                        modifier = Modifier.weight(1f),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                } else {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(IntrinsicSize.Max),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text(text = "Level ${levelProgress.currentLevel}", style = MaterialTheme.typography.labelLarge)
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = levelProgress.levelName,
-                                style = MaterialTheme.typography.titleLarge
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            LinearProgressIndicator(
-                                progress = { levelProgress.progressPercent / 100f },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "${levelProgress.xpToNextLevel} XP to Lvl ${levelProgress.currentLevel + 1}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                        StreakOverviewCard(
+                            stats = stats,
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                        )
+                        LevelOverviewCard(
+                            levelProgress = levelProgress,
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                        )
                     }
                 }
             }
@@ -461,6 +430,81 @@ fun HomeScreen(
                 editingSession = null
             }
         )
+    }
+}
+
+@Composable
+private fun StreakOverviewCard(
+    stats: UserStatsEntity?,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.LocalFireDepartment,
+                    contentDescription = "Streak",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(text = "Streak", style = MaterialTheme.typography.labelLarge)
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "${stats?.currentStreak ?: 0} ${if (stats?.currentStreak == 1) "day" else "days"}",
+                style = MaterialTheme.typography.headlineMedium
+            )
+            if ((stats?.freezeTokens ?: 0) > 0) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.AcUnit,
+                        contentDescription = "Freeze tokens",
+                        modifier = Modifier.width(14.dp),
+                        tint = MaterialTheme.colorScheme.tertiary
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "${stats?.freezeTokens} freeze",
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LevelOverviewCard(
+    levelProgress: LevelProgress,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(text = "Level ${levelProgress.currentLevel}", style = MaterialTheme.typography.labelLarge)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = levelProgress.levelName,
+                style = MaterialTheme.typography.titleLarge
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            LinearProgressIndicator(
+                progress = { levelProgress.progressPercent / 100f },
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "${levelProgress.xpToNextLevel} XP to Lvl ${levelProgress.currentLevel + 1}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 

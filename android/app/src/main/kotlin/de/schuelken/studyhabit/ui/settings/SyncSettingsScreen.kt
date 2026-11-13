@@ -11,6 +11,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -32,6 +33,7 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -48,6 +50,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -57,10 +60,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.documentfile.provider.DocumentFile
 import de.schuelken.studyhabit.core.di.AppContainer
 import de.schuelken.studyhabit.core.model.SyncStatus
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -89,12 +100,37 @@ fun SyncSettingsScreen(
     val userEmail = container.tokenStorage.getUserEmail()
     val isLoggedIn = !container.tokenStorage.getToken().isNullOrBlank()
 
+    val context = LocalContext.current
+    val largeText = LocalDensity.current.fontScale >= 1.3f
     var customUrl by remember(serverUrl) { mutableStateOf(serverUrl) }
+    var urlError by remember { mutableStateOf<String?>(null) }
     var showEraseDialog by remember { mutableStateOf(false) }
     var showLogoutDialog by remember { mutableStateOf(false) }
     var isErasing by remember { mutableStateOf(false) }
+    var eraseError by remember { mutableStateOf<String?>(null) }
+    var eraseFeedback by remember { mutableStateOf<String?>(null) }
     val folderStatus by container.folderSyncService.syncStatus.collectAsState()
     val isFolderSyncing = folderStatus == SyncStatus.SYNCING
+
+    var folderDisplayName by remember(folderSyncUri) {
+        mutableStateOf(
+            folderSyncUri?.let { raw ->
+                val decoded = runCatching { Uri.decode(raw) }.getOrDefault(raw)
+                decoded.substringAfterLast('/').substringAfterLast(':').ifBlank { decoded }
+            }
+        )
+    }
+    LaunchedEffect(folderSyncUri) {
+        val raw = folderSyncUri ?: return@LaunchedEffect
+        val docName = withContext(Dispatchers.IO) {
+            runCatching {
+                DocumentFile.fromTreeUri(context, Uri.parse(raw))?.name
+            }.getOrNull()
+        }
+        if (!docName.isNullOrBlank()) {
+            folderDisplayName = docName
+        }
+    }
 
     val lastSyncedStr = if (lastSyncedMs > 0) {
         Instant.ofEpochMilli(lastSyncedMs)
@@ -306,12 +342,41 @@ fun SyncSettingsScreen(
                     Spacer(modifier = Modifier.height(12.dp))
                     OutlinedTextField(
                         value = customUrl,
-                        onValueChange = { customUrl = it },
+                        onValueChange = {
+                            customUrl = it
+                            urlError = null
+                        },
                         label = { Text("Server Base URL") },
                         placeholder = { Text("https://your-server.example.com") },
+                        isError = urlError != null,
+                        supportingText = urlError?.let { err -> { Text(err) } },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
+                    if (customUrl.trim().startsWith("http://", ignoreCase = true)) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Warning,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Warning: http:// sends data and credentials unencrypted. Use https:// for remote servers; http:// is only intended for trusted local/LAN servers.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
+                        }
+                    }
                     Spacer(modifier = Modifier.height(12.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -319,9 +384,24 @@ fun SyncSettingsScreen(
                     ) {
                         Button(
                             onClick = {
-                                container.preferences.setServerUrl(customUrl)
+                                val trimmed = customUrl.trim().removeSuffix("/")
+                                if (trimmed.isEmpty()) {
+                                    urlError = null
+                                    container.preferences.setServerUrl("")
+                                } else {
+                                    val lower = trimmed.lowercase()
+                                    val validScheme = lower.startsWith("https://") || lower.startsWith("http://")
+                                    val parsed = trimmed.toHttpUrlOrNull()
+                                    if (!validScheme || parsed == null) {
+                                        urlError = "Enter a valid URL starting with https:// or http://"
+                                    } else {
+                                        urlError = null
+                                        container.preferences.setServerUrl(trimmed)
+                                        customUrl = trimmed
+                                    }
+                                }
                             },
-                            enabled = customUrl.trim() != serverUrl,
+                            enabled = customUrl.trim().removeSuffix("/") != serverUrl,
                             modifier = Modifier.weight(1f)
                         ) {
                             Text("Save Server URL")
@@ -329,6 +409,7 @@ fun SyncSettingsScreen(
                         OutlinedButton(
                             onClick = {
                                 customUrl = ""
+                                urlError = null
                                 container.preferences.setServerUrl("")
                             },
                             enabled = customUrl.isNotBlank() || serverUrl.isNotBlank()
@@ -378,12 +459,8 @@ fun SyncSettingsScreen(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    val displayUri = folderSyncUri?.let {
-                        runCatching { Uri.decode(it) }.getOrDefault(it)
-                    } ?: "No folder selected"
-
                     Text(
-                        text = "Folder: $displayUri",
+                        text = "Folder: ${folderDisplayName ?: "No folder selected"}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(vertical = 4.dp)
@@ -391,19 +468,18 @@ fun SyncSettingsScreen(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
+                    val selectFolderButton: @Composable (Modifier) -> Unit = { btnModifier ->
                         Button(
                             onClick = { folderPickerLauncher.launch(null) },
-                            modifier = Modifier.weight(1f)
+                            modifier = btnModifier,
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
                         ) {
                             Icon(Icons.Default.FolderOpen, contentDescription = null)
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Select Folder")
+                            Text("Select Folder", maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
-
+                    }
+                    val syncFolderButton: @Composable (Modifier) -> Unit = { btnModifier ->
                         Button(
                             onClick = {
                                 scope.launch {
@@ -412,11 +488,30 @@ fun SyncSettingsScreen(
                                 }
                             },
                             enabled = folderSyncEnabled && !folderSyncUri.isNullOrBlank() && !isFolderSyncing,
-                            modifier = Modifier.weight(1f)
+                            modifier = btnModifier,
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
                         ) {
                             Icon(Icons.Default.Sync, contentDescription = null)
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text(if (isFolderSyncing) "Syncing..." else "Sync Folder Now")
+                            Text(
+                                if (isFolderSyncing) "Syncing..." else "Sync Folder Now",
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                    if (largeText) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            selectFolderButton(Modifier.fillMaxWidth())
+                            syncFolderButton(Modifier.fillMaxWidth())
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            selectFolderButton(Modifier.weight(1f))
+                            syncFolderButton(Modifier.weight(1f))
                         }
                     }
 
@@ -460,26 +555,40 @@ fun SyncSettingsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
+                    val saveFileButton: @Composable (Modifier) -> Unit = { btnModifier ->
                         OutlinedButton(
                             onClick = { saveFileLauncher.launch("studyhabit_backup_${System.currentTimeMillis()}.json") },
-                            modifier = Modifier.weight(1f)
+                            modifier = btnModifier,
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
                         ) {
                             Icon(Icons.Default.Save, contentDescription = null)
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Save File...")
+                            Text("Save File...", maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
-
+                    }
+                    val mergeFileButton: @Composable (Modifier) -> Unit = { btnModifier ->
                         OutlinedButton(
                             onClick = { mergeFileLauncher.launch(arrayOf("application/json", "*/*")) },
-                            modifier = Modifier.weight(1f)
+                            modifier = btnModifier,
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
                         ) {
                             Icon(Icons.Default.FileOpen, contentDescription = null)
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Merge File...")
+                            Text("Merge File...", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                    if (largeText) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            saveFileButton(Modifier.fillMaxWidth())
+                            mergeFileButton(Modifier.fillMaxWidth())
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            saveFileButton(Modifier.weight(1f))
+                            mergeFileButton(Modifier.weight(1f))
                         }
                     }
                     manualFileSummary?.let {
@@ -492,7 +601,11 @@ fun SyncSettingsScreen(
             if (isLoggedIn) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Button(
-                    onClick = { showEraseDialog = true },
+                    onClick = {
+                        eraseError = null
+                        eraseFeedback = null
+                        showEraseDialog = true
+                    },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -500,27 +613,50 @@ fun SyncSettingsScreen(
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Erase Cloud Data")
                 }
+                eraseFeedback?.let { feedback ->
+                    Text(
+                        text = feedback,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
         }
     }
 
     if (showEraseDialog) {
         AlertDialog(
-            onDismissRequest = { showEraseDialog = false },
+            onDismissRequest = { if (!isErasing) showEraseDialog = false },
             title = { Text("Erase All Cloud Data?") },
             text = {
-                Text("This permanently deletes all your study projects, subjects, sessions, and stats stored in the cloud. This action cannot be undone.")
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("This permanently deletes all your study projects, subjects, sessions, and stats stored in the cloud. This action cannot be undone.")
+                    eraseError?.let { err ->
+                        Text(
+                            text = err,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
             },
             confirmButton = {
                 Button(
                     onClick = {
                         isErasing = true
+                        eraseError = null
                         scope.launch {
                             try {
                                 container.api.eraseData()
+                                container.preferences.lastSyncedAt = 0L
+                                container.preferences.setLastSyncSummary("")
+                                container.preferences.setLastSyncError(null)
+                                eraseFeedback = "All cloud data has been erased."
                                 showEraseDialog = false
+                            } catch (e: CancellationException) {
+                                throw e
                             } catch (e: Exception) {
-                                // Handled
+                                eraseError = "Erase failed: ${e.message ?: "Unable to reach server"}"
                             } finally {
                                 isErasing = false
                             }
@@ -529,11 +665,14 @@ fun SyncSettingsScreen(
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                     enabled = !isErasing
                 ) {
-                    Text("Erase Everything")
+                    Text(if (isErasing) "Erasing..." else "Erase Everything")
                 }
             },
             dismissButton = {
-                Button(onClick = { showEraseDialog = false }) {
+                OutlinedButton(
+                    onClick = { showEraseDialog = false },
+                    enabled = !isErasing
+                ) {
                     Text("Cancel")
                 }
             }

@@ -11,6 +11,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.longOrNull
 
 class AppPreferences(private val prefs: SharedPreferences) {
     constructor(context: Context) : this(
@@ -71,6 +72,7 @@ class AppPreferences(private val prefs: SharedPreferences) {
         const val PREF_APP_BLOCKER_ENABLED = "blocker.enabled"
         const val PREF_BLOCK_ONLY_FOCUS = "blocker.onlyFocusPhase"
         const val PREF_BLOCKED_APPS = "blocker.packages"
+        const val PREF_BLOCKER_DISCLOSURE_ACCEPTED = "blocker.disclosureAccepted"
 
         private val floatKeys = setOf(PREF_FONT_SCALE, PREF_GRACE_PERIOD)
         private val intKeys = setOf(
@@ -85,7 +87,8 @@ class AppPreferences(private val prefs: SharedPreferences) {
             PREF_DYNAMIC_COLOR, PREF_AUTO_START_BREAKS, PREF_AUTO_START_WORK,
             PREF_VIBRATION, PREF_CONTINUOUS_FOCUS, PREF_NOTIFICATIONS_ENABLED,
             PREF_STUDY_REMINDER_ENABLED, PREF_HAS_MIGRATED_OFFLINE,
-            PREF_FOLDER_SYNC_ENABLED, PREF_APP_BLOCKER_ENABLED, PREF_BLOCK_ONLY_FOCUS
+            PREF_FOLDER_SYNC_ENABLED, PREF_APP_BLOCKER_ENABLED, PREF_BLOCK_ONLY_FOCUS,
+            PREF_BLOCKER_DISCLOSURE_ACCEPTED
         )
         private val longKeys = setOf(
             PREF_LAST_SYNCED, PREF_SETTINGS_UPDATED_AT, PREF_FOLDER_LAST_SYNCED
@@ -96,8 +99,33 @@ class AppPreferences(private val prefs: SharedPreferences) {
             k.startsWith("pomodoro.") ||
             k.startsWith("notifications.") ||
             k.startsWith("streak.") ||
-            k.startsWith("goal.") ||
-            k.startsWith("blocker.")
+            k.startsWith("goal.")
+
+        private fun clampFloatSetting(key: String, value: Double): Float = when (key) {
+            PREF_FONT_SCALE -> value.coerceIn(0.85, 1.30).toFloat()
+            PREF_GRACE_PERIOD -> value.coerceIn(0.0, 12.0).toFloat()
+            else -> value.toFloat()
+        }
+
+        private fun clampIntSetting(key: String, value: Long): Int = when (key) {
+            PREF_WORK_DURATION -> value.coerceIn(5L, 120L).toInt()
+            PREF_SHORT_BREAK -> value.coerceIn(1L, 30L).toInt()
+            PREF_LONG_BREAK -> value.coerceIn(1L, 60L).toInt()
+            PREF_LONG_BREAK_EVERY -> value.coerceIn(1L, 12L).toInt()
+            PREF_STUDY_REMINDER_MINUTES -> value.coerceIn(1L, 720L).toInt()
+            PREF_DAILY_GOAL_MINUTES,
+            PREF_DAILY_GOAL_MONDAY,
+            PREF_DAILY_GOAL_TUESDAY,
+            PREF_DAILY_GOAL_WEDNESDAY,
+            PREF_DAILY_GOAL_THURSDAY,
+            PREF_DAILY_GOAL_FRIDAY,
+            PREF_DAILY_GOAL_SATURDAY,
+            PREF_DAILY_GOAL_SUNDAY -> value.coerceIn(5L, 720L).toInt()
+            PREF_SEED_COLOR_INDEX -> value.coerceIn(0L, 11L).toInt()
+            PREF_THEME_STYLE -> value.coerceIn(0L, 6L).toInt()
+            PREF_THEME_MODE -> value.coerceIn(0L, ThemeMode.entries.lastIndex.toLong()).toInt()
+            else -> value.coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong()).toInt()
+        }
     }
 
     private fun healAndMigratePreferences() {
@@ -106,9 +134,9 @@ class AppPreferences(private val prefs: SharedPreferences) {
         var changed = false
         for ((k, v) in all) {
             when (k) {
-                in floatKeys -> if (v !is Float) {
+                in floatKeys -> if (v !is Float || !v.isFinite()) {
                     val f = (v as? Number)?.toFloat() ?: v?.toString()?.toFloatOrNull()
-                    if (f != null) { editor.putFloat(k, f); changed = true }
+                    if (f != null && f.isFinite()) { editor.putFloat(k, clampFloatSetting(k, f.toDouble())); changed = true }
                     else { editor.remove(k); changed = true }
                 }
                 in intKeys -> if (v !is Int) {
@@ -141,8 +169,10 @@ class AppPreferences(private val prefs: SharedPreferences) {
         }
     }
 
-    fun getFloatSafe(key: String, default: Float): Float =
-        (prefs.all[key] as? Number)?.toFloat() ?: default
+    fun getFloatSafe(key: String, default: Float): Float {
+        val raw = (prefs.all[key] as? Number)?.toFloat() ?: return default
+        return if (raw.isFinite()) raw else default
+    }
 
     fun getIntSafe(key: String, default: Int): Int =
         (prefs.all[key] as? Number)?.toInt() ?: default
@@ -237,7 +267,7 @@ class AppPreferences(private val prefs: SharedPreferences) {
     }
 
     fun setFontScale(scale: Float) {
-        val clamped = scale.coerceIn(0.85f, 1.3f)
+        val clamped = if (scale.isFinite()) scale.coerceIn(0.85f, 1.30f) else 1.0f
         prefs.edit().putFloat(PREF_FONT_SCALE, clamped).apply()
         _fontScale.value = clamped
         markSettingsUpdated()
@@ -291,37 +321,38 @@ class AppPreferences(private val prefs: SharedPreferences) {
     }
 
     var gracePeriodHours: Double
-        get() = getFloatSafe(PREF_GRACE_PERIOD, 2.0f).toDouble()
+        get() = getFloatSafe(PREF_GRACE_PERIOD, 2.0f).toDouble().coerceIn(0.0, 12.0)
         set(value) {
-            prefs.edit().putFloat(PREF_GRACE_PERIOD, value.toFloat()).apply()
+            val clamped = if (value.isFinite()) value.coerceIn(0.0, 12.0) else 2.0
+            prefs.edit().putFloat(PREF_GRACE_PERIOD, clamped.toFloat()).apply()
             markSettingsUpdated()
         }
 
     var workDuration: Int
-        get() = getIntSafe(PREF_WORK_DURATION, 25)
+        get() = getIntSafe(PREF_WORK_DURATION, 25).coerceIn(5, 120)
         set(value) {
-            prefs.edit().putInt(PREF_WORK_DURATION, value).apply()
+            prefs.edit().putInt(PREF_WORK_DURATION, value.coerceIn(5, 120)).apply()
             markSettingsUpdated()
         }
 
     var shortBreakDuration: Int
-        get() = getIntSafe(PREF_SHORT_BREAK, 5)
+        get() = getIntSafe(PREF_SHORT_BREAK, 5).coerceIn(1, 30)
         set(value) {
-            prefs.edit().putInt(PREF_SHORT_BREAK, value).apply()
+            prefs.edit().putInt(PREF_SHORT_BREAK, value.coerceIn(1, 30)).apply()
             markSettingsUpdated()
         }
 
     var longBreakDuration: Int
-        get() = getIntSafe(PREF_LONG_BREAK, 15)
+        get() = getIntSafe(PREF_LONG_BREAK, 15).coerceIn(1, 60)
         set(value) {
-            prefs.edit().putInt(PREF_LONG_BREAK, value).apply()
+            prefs.edit().putInt(PREF_LONG_BREAK, value.coerceIn(1, 60)).apply()
             markSettingsUpdated()
         }
 
     var longBreakEvery: Int
-        get() = getIntSafe(PREF_LONG_BREAK_EVERY, 4)
+        get() = getIntSafe(PREF_LONG_BREAK_EVERY, 4).coerceIn(1, 12)
         set(value) {
-            prefs.edit().putInt(PREF_LONG_BREAK_EVERY, value).apply()
+            prefs.edit().putInt(PREF_LONG_BREAK_EVERY, value.coerceIn(1, 12)).apply()
             markSettingsUpdated()
         }
 
@@ -368,16 +399,16 @@ class AppPreferences(private val prefs: SharedPreferences) {
         }
 
     var studyReminderMinutes: Int
-        get() = getIntSafe(PREF_STUDY_REMINDER_MINUTES, 30)
+        get() = getIntSafe(PREF_STUDY_REMINDER_MINUTES, 30).coerceIn(1, 720)
         set(value) {
-            prefs.edit().putInt(PREF_STUDY_REMINDER_MINUTES, value).apply()
+            prefs.edit().putInt(PREF_STUDY_REMINDER_MINUTES, value.coerceIn(1, 720)).apply()
             markSettingsUpdated()
         }
 
     var dailyGoalMinutes: Int
-        get() = getIntSafe(PREF_DAILY_GOAL_MINUTES, 60)
+        get() = getIntSafe(PREF_DAILY_GOAL_MINUTES, 60).coerceIn(5, 720)
         set(value) {
-            prefs.edit().putInt(PREF_DAILY_GOAL_MINUTES, value).apply()
+            prefs.edit().putInt(PREF_DAILY_GOAL_MINUTES, value.coerceIn(5, 720)).apply()
             markSettingsUpdated()
         }
 
@@ -392,7 +423,7 @@ class AppPreferences(private val prefs: SharedPreferences) {
             7 -> PREF_DAILY_GOAL_SUNDAY
             else -> PREF_DAILY_GOAL_MINUTES
         }
-        return getIntSafe(key, dailyGoalMinutes)
+        return getIntSafe(key, dailyGoalMinutes).coerceIn(5, 720)
     }
 
     fun setWeekdayGoalMinutes(weekday: Int, minutes: Int) {
@@ -406,7 +437,7 @@ class AppPreferences(private val prefs: SharedPreferences) {
             7 -> PREF_DAILY_GOAL_SUNDAY
             else -> PREF_DAILY_GOAL_MINUTES
         }
-        prefs.edit().putInt(key, minutes).apply()
+        prefs.edit().putInt(key, minutes.coerceIn(5, 720)).apply()
         markSettingsUpdated()
     }
 
@@ -475,9 +506,15 @@ class AppPreferences(private val prefs: SharedPreferences) {
         get() = getLongSafe(PREF_FOLDER_LAST_SYNCED, 0L)
 
     var appBlockerEnabled: Boolean
-        get() = getBooleanSafe(PREF_APP_BLOCKER_ENABLED, true)
+        get() = getBooleanSafe(PREF_APP_BLOCKER_ENABLED, false)
         set(value) {
             prefs.edit().putBoolean(PREF_APP_BLOCKER_ENABLED, value).apply()
+        }
+
+    var blockerDisclosureAccepted: Boolean
+        get() = getBooleanSafe(PREF_BLOCKER_DISCLOSURE_ACCEPTED, false)
+        set(value) {
+            prefs.edit().putBoolean(PREF_BLOCKER_DISCLOSURE_ACCEPTED, value).apply()
         }
 
     var blockOnlyDuringFocusPhase: Boolean
@@ -514,19 +551,29 @@ class AppPreferences(private val prefs: SharedPreferences) {
             if (element is JsonPrimitive) {
                 when (key) {
                     in floatKeys -> {
-                        val v = element.doubleOrNull?.toFloat() ?: element.content.toFloatOrNull()
-                        if (v != null) editor.putFloat(key, v)
+                        val raw = element.doubleOrNull ?: element.content.toDoubleOrNull()
+                        if (raw != null && raw.isFinite()) {
+                            val clamped = clampFloatSetting(key, raw)
+                            if (clamped.isFinite()) editor.putFloat(key, clamped)
+                        }
                     }
                     in intKeys -> {
-                        val v = element.intOrNull ?: element.doubleOrNull?.toInt() ?: element.content.toIntOrNull()
-                        if (v != null) editor.putInt(key, v)
+                        val rawLong = element.longOrNull
+                            ?: element.content.toLongOrNull()
+                            ?: element.doubleOrNull?.takeIf { it.isFinite() }?.toLong()
+                            ?: element.content.toDoubleOrNull()?.takeIf { it.isFinite() }?.toLong()
+                        if (rawLong != null) {
+                            editor.putInt(key, clampIntSetting(key, rawLong))
+                        }
                     }
                     in booleanKeys -> {
                         val v = element.booleanOrNull ?: element.content.toBooleanStrictOrNull()
                         if (v != null) editor.putBoolean(key, v)
                     }
                     in longKeys -> {
-                        val v = element.doubleOrNull?.toLong() ?: element.content.toLongOrNull()
+                        val v = element.longOrNull
+                            ?: element.doubleOrNull?.takeIf { it.isFinite() }?.toLong()
+                            ?: element.content.toLongOrNull()
                         if (v != null) editor.putLong(key, v)
                     }
                     else -> {

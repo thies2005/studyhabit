@@ -11,6 +11,13 @@ import { z } from 'zod';
 import { AchievementService } from './achievementService.js';
 import { isAllowedSettingsKey } from '../routes/settings.js';
 
+const validTimestampSchema = z
+  .string()
+  .or(z.date())
+  .refine((v) => !Number.isNaN(new Date(v).getTime()), {
+    message: 'Invalid timestamp',
+  });
+
 // Define Zod schemas for each entity type to validate and strip unknown fields
 const projectSchema = z.object({
   id: z.string().uuid(),
@@ -23,11 +30,11 @@ const projectSchema = z.object({
   defaultLongBreakDuration: z.number().min(0),
   defaultLongBreakEvery: z.number().min(0),
   studyReminderMinutes: z.number().min(0),
-  createdAt: z.string().or(z.date()),
-  lastOpenedAt: z.string().or(z.date()),
+  createdAt: validTimestampSchema,
+  lastOpenedAt: validTimestampSchema,
   isArchived: z.boolean(),
   isDeleted: z.boolean().optional(),
-  updatedAt: z.string().or(z.date()),
+  updatedAt: validTimestampSchema,
 });
 
 const subjectSchema = z.object({
@@ -43,9 +50,9 @@ const subjectSchema = z.object({
   targetHours: z.number().min(0).nullable().optional(),
   targetWeeklyHours: z.number().min(0).nullable().optional(),
   xpTotal: z.number().min(0),
-  createdAt: z.string().or(z.date()),
+  createdAt: validTimestampSchema,
   isDeleted: z.boolean().optional(),
-  updatedAt: z.string().or(z.date()),
+  updatedAt: validTimestampSchema,
 });
 
 const topicSchema = z.object({
@@ -53,9 +60,9 @@ const topicSchema = z.object({
   subjectId: z.string().uuid(),
   name: z.string().min(1).max(255),
   order: z.number().min(0),
-  createdAt: z.string().or(z.date()).optional(),
+  createdAt: validTimestampSchema.optional(),
   isDeleted: z.boolean().optional(),
-  updatedAt: z.string().or(z.date()),
+  updatedAt: validTimestampSchema,
 });
 
 const chapterSchema = z.object({
@@ -63,9 +70,9 @@ const chapterSchema = z.object({
   topicId: z.string().uuid(),
   name: z.string().min(1).max(255),
   order: z.number().min(0),
-  createdAt: z.string().or(z.date()).optional(),
+  createdAt: validTimestampSchema.optional(),
   isDeleted: z.boolean().optional(),
-  updatedAt: z.string().or(z.date()),
+  updatedAt: validTimestampSchema,
 });
 
 const sessionSchema = z.object({
@@ -73,8 +80,8 @@ const sessionSchema = z.object({
   subjectId: z.string().uuid(),
   topicId: z.string().uuid().nullable().optional(),
   chapterId: z.string().uuid().nullable().optional(),
-  startedAt: z.string().or(z.date()),
-  endedAt: z.string().or(z.date()).nullable().optional(),
+  startedAt: validTimestampSchema,
+  endedAt: validTimestampSchema.nullable().optional(),
   plannedDurationMinutes: z.number().min(0),
   actualDurationMinutes: z.number().min(0),
   pomodorosCompleted: z.number().min(0),
@@ -85,9 +92,9 @@ const sessionSchema = z.object({
   startPage: z.number().min(0).nullable().optional(),
   endPage: z.number().min(0).nullable().optional(),
   isFreeTimer: z.boolean(),
-  createdAt: z.string().or(z.date()).optional(),
+  createdAt: validTimestampSchema.optional(),
   isDeleted: z.boolean().optional(),
-  updatedAt: z.string().or(z.date()),
+  updatedAt: validTimestampSchema,
 });
 
 const sourceSchema = z.object({
@@ -106,9 +113,9 @@ const sourceSchema = z.object({
   totalPages: z.number().min(0).nullable().optional(),
   progressPercent: z.number().min(0).max(100).nullable().optional(),
   notes: z.string().max(5000).nullable().optional(),
-  addedAt: z.string().or(z.date()),
+  addedAt: validTimestampSchema,
   isDeleted: z.boolean().optional(),
-  updatedAt: z.string().or(z.date()),
+  updatedAt: validTimestampSchema,
 });
 
 const skillLabelSchema = z.object({
@@ -118,17 +125,17 @@ const skillLabelSchema = z.object({
   chapterId: z.string().uuid().nullable().optional(),
   label: z.enum(['beginner', 'intermediate', 'advanced', 'expert']),
   isDeleted: z.boolean().optional(),
-  updatedAt: z.string().or(z.date()),
+  updatedAt: validTimestampSchema,
 });
 
 const achievementSchema = z.object({
   id: z.string().uuid().optional(),
   key: z.string().max(100),
-  unlockedAt: z.string().or(z.date()).nullable().optional(),
+  unlockedAt: validTimestampSchema.nullable().optional(),
   progress: z.number().transform((v) => Math.min(1, Math.max(0, v))),
-  createdAt: z.string().or(z.date()).optional(),
+  createdAt: validTimestampSchema.optional(),
   isDeleted: z.boolean().optional(),
-  updatedAt: z.string().or(z.date()),
+  updatedAt: validTimestampSchema,
 });
 
 const userStatsSchema = z.object({
@@ -138,12 +145,12 @@ const userStatsSchema = z.object({
   currentLevel: z.number().min(1),
   currentStreak: z.number().min(0),
   longestStreak: z.number().min(0),
-  lastStudyDate: z.string().or(z.date()).nullable().optional(),
+  lastStudyDate: validTimestampSchema.nullable().optional(),
   totalStudyMinutes: z.number().min(0),
   freezeTokens: z.number().min(0),
-  createdAt: z.string().or(z.date()).optional(),
+  createdAt: validTimestampSchema.optional(),
   isDeleted: z.boolean().optional(),
-  updatedAt: z.string().or(z.date()),
+  updatedAt: validTimestampSchema,
 });
 
 const subjectMilestoneSchema = z.object({
@@ -152,10 +159,10 @@ const subjectMilestoneSchema = z.object({
   title: z.string().min(1).max(255),
   isCompleted: z.boolean(),
   sortOrder: z.number().min(0),
-  completedAt: z.string().or(z.date()).nullable().optional(),
-  createdAt: z.string().or(z.date()).optional(),
+  completedAt: validTimestampSchema.nullable().optional(),
+  createdAt: validTimestampSchema.optional(),
   isDeleted: z.boolean().optional(),
-  updatedAt: z.string().or(z.date()),
+  updatedAt: validTimestampSchema,
 });
 
 const userSettingsSchema = z.object({
@@ -171,8 +178,33 @@ const userSettingsSchema = z.object({
       message: 'Settings contains invalid or forbidden key',
     }),
   isDeleted: z.boolean().optional(),
-  updatedAt: z.string().or(z.date()),
+  updatedAt: validTimestampSchema,
 });
+
+export function stripLegacyBlockerSettings(rawUserSettings: unknown): unknown {
+  if (!rawUserSettings || typeof rawUserSettings !== 'object' || Array.isArray(rawUserSettings)) {
+    return rawUserSettings;
+  }
+  const obj = rawUserSettings as Record<string, unknown>;
+  if (!obj.settings || typeof obj.settings !== 'object' || Array.isArray(obj.settings)) {
+    return rawUserSettings;
+  }
+  const cleanedSettings: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj.settings as Record<string, unknown>)) {
+    if (!key.startsWith('blocker.')) {
+      Object.defineProperty(cleanedSettings, key, {
+        value,
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
+    }
+  }
+  return {
+    ...obj,
+    settings: cleanedSettings,
+  };
+}
 
 interface ConflictResult {
   accepted: boolean;
@@ -335,6 +367,11 @@ export class SyncService {
       for (const c of userChapters) {
         chapterToTopicId.set(c.id, c.topicId);
       }
+
+      const userSources = allSubjectIds.size > 0
+        ? await tx.source.findMany({ where: { subjectId: { in: Array.from(allSubjectIds) } }, select: { id: true } })
+        : [];
+      const allSourceIds = new Set(userSources.map(s => s.id));
 
       if (payload.projects?.length) {
         let a = 0;
@@ -514,57 +551,6 @@ export class SyncService {
         conflicts.chapters = c;
       }
 
-      if (payload.sessions?.length) {
-        let a = 0;
-        let c = 0;
-        for (const item of payload.sessions) {
-          try {
-            const validated = sessionSchema.parse(item);
-
-            if (!allSubjectIds.has(validated.subjectId)) {
-              errors.push({ entity: 'session', id: validated.id, error: 'forbidden' });
-              continue;
-            }
-            if (validated.topicId && (!allTopicIds.has(validated.topicId) || topicToSubjectId.get(validated.topicId) !== validated.subjectId)) {
-              errors.push({ entity: 'session', id: validated.id, error: 'forbidden' });
-              continue;
-            }
-            if (validated.chapterId && (!allChapterIds.has(validated.chapterId) || chapterToTopicId.get(validated.chapterId) !== validated.topicId)) {
-              errors.push({ entity: 'session', id: validated.id, error: 'forbidden' });
-              continue;
-            }
-
-            const existing = await tx.studySession.findUnique({
-              where: { id: validated.id },
-            });
-
-            if (existing && !allSubjectIds.has(existing.subjectId)) {
-              errors.push({ entity: 'session', id: validated.id, error: 'forbidden' });
-              continue;
-            }
-
-            const result = lastWriteWins(validated, existing);
-            if (!result.accepted) {
-              c++;
-              continue;
-            }
-
-            const dataToSave = { ...validated, updatedAt: new Date(validated.updatedAt) };
-            await tx.studySession.upsert({
-              where: { id: validated.id },
-              create: dataToSave,
-              update: dataToSave,
-            });
-            a++;
-          } catch (e: any) {
-            console.error('[SyncService] Session validation failed:', e.message, item);
-            errors.push({ entity: 'session', id: (item as any)?.id || 'unknown', error: e.message });
-          }
-        }
-        applied.sessions = a;
-        conflicts.sessions = c;
-      }
-
       if (payload.sources?.length) {
         let a = 0;
         let c = 0;
@@ -606,6 +592,7 @@ export class SyncService {
               create: dataToSave,
               update: dataToSave,
             });
+            allSourceIds.add(validated.id);
             a++;
           } catch (e: any) {
             console.error('[SyncService] Source validation failed:', e.message, item);
@@ -614,6 +601,61 @@ export class SyncService {
         }
         applied.sources = a;
         conflicts.sources = c;
+      }
+
+      if (payload.sessions?.length) {
+        let a = 0;
+        let c = 0;
+        for (const item of payload.sessions) {
+          try {
+            const validated = sessionSchema.parse(item);
+
+            if (!allSubjectIds.has(validated.subjectId)) {
+              errors.push({ entity: 'session', id: validated.id, error: 'forbidden' });
+              continue;
+            }
+            if (validated.topicId && (!allTopicIds.has(validated.topicId) || topicToSubjectId.get(validated.topicId) !== validated.subjectId)) {
+              errors.push({ entity: 'session', id: validated.id, error: 'forbidden' });
+              continue;
+            }
+            if (validated.chapterId && (!allChapterIds.has(validated.chapterId) || chapterToTopicId.get(validated.chapterId) !== validated.topicId)) {
+              errors.push({ entity: 'session', id: validated.id, error: 'forbidden' });
+              continue;
+            }
+            if (validated.sourceId && !allSourceIds.has(validated.sourceId)) {
+              errors.push({ entity: 'session', id: validated.id, error: 'forbidden' });
+              continue;
+            }
+
+            const existing = await tx.studySession.findUnique({
+              where: { id: validated.id },
+            });
+
+            if (existing && !allSubjectIds.has(existing.subjectId)) {
+              errors.push({ entity: 'session', id: validated.id, error: 'forbidden' });
+              continue;
+            }
+
+            const result = lastWriteWins(validated, existing);
+            if (!result.accepted) {
+              c++;
+              continue;
+            }
+
+            const dataToSave = { ...validated, updatedAt: new Date(validated.updatedAt) };
+            await tx.studySession.upsert({
+              where: { id: validated.id },
+              create: dataToSave,
+              update: dataToSave,
+            });
+            a++;
+          } catch (e: any) {
+            console.error('[SyncService] Session validation failed:', e.message, item);
+            errors.push({ entity: 'session', id: (item as any)?.id || 'unknown', error: e.message });
+          }
+        }
+        applied.sessions = a;
+        conflicts.sessions = c;
       }
 
       if (payload.skillLabels?.length) {
@@ -770,7 +812,9 @@ export class SyncService {
 
       if (payload.userSettings) {
         try {
-          const validated = userSettingsSchema.parse(payload.userSettings);
+          const validated = userSettingsSchema.parse(
+            stripLegacyBlockerSettings(payload.userSettings)
+          );
           const existing = await tx.userSettings.findUnique({
             where: { userId },
           });

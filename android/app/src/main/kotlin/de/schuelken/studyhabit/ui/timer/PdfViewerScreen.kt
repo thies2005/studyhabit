@@ -188,7 +188,7 @@ fun PdfViewerScreen(
         }
     }
 
-    // Debounced page progress save and sync
+    // Debounced page progress save (sync triggers once when closing the PDF to avoid spamming cloud files)
     LaunchedEffect(currentPage) {
         delay(3000)
         if (source != null && pageCount > 0) {
@@ -199,7 +199,6 @@ fun PdfViewerScreen(
                 progressPercent,
                 System.currentTimeMillis()
             )
-            container.triggerDataChangedSync()
         }
     }
 

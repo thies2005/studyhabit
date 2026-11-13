@@ -48,7 +48,7 @@ class FolderSyncWorker(context: Context, parameters: WorkerParameters) :
             // Foreground sync and periodic work cover edits arriving during this attempt.
             val request = OneTimeWorkRequestBuilder<FolderSyncWorker>()
                 .setConstraints(connected)
-                .setInitialDelay(10, TimeUnit.SECONDS)
+                .setInitialDelay(25, TimeUnit.SECONDS)
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
                 .build()
             WorkManager.getInstance(context).enqueueUniqueWork(SOON, ExistingWorkPolicy.KEEP, request)

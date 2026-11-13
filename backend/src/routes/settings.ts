@@ -8,8 +8,8 @@ const router = Router();
 // at most 200 top-level keys, and a 64 KB JSON payload, so a single save can't
 // store ~1 MB of arbitrary data (the express.json limit). Values may be any
 // JSON type the client needs.
-const MAX_SETTINGS_KEYS = 200;
-const MAX_SETTINGS_BYTES = 64 * 1024;
+export const MAX_SETTINGS_KEYS = 200;
+export const MAX_SETTINGS_BYTES = 64 * 1024;
 
 const ALLOWED_PREFIXES = ['theme.', 'pomodoro.', 'notifications.', 'streak.', 'goal.'];
 const ALLOWED_EXACT = new Set(['active_timer_type', 'pomodoro_state_json', 'free_timer_state_json']);
@@ -21,20 +21,21 @@ export function isAllowedSettingsKey(key: string): boolean {
   return ALLOWED_PREFIXES.some((prefix) => key.startsWith(prefix));
 }
 
-const settingsSchema = z
+export const settingsSizeSchema = z
   .record(z.unknown())
   .refine((obj) => Object.keys(obj).length <= MAX_SETTINGS_KEYS, {
     message: `Settings may have at most ${MAX_SETTINGS_KEYS} keys`,
   })
   .refine((obj) => Buffer.byteLength(JSON.stringify(obj)) <= MAX_SETTINGS_BYTES, {
     message: `Settings payload must be at most ${MAX_SETTINGS_BYTES} bytes`,
-  })
-  .refine(
-    (obj) => Object.keys(obj).every(isAllowedSettingsKey),
-    {
-      message: 'Settings contains invalid or forbidden key',
-    }
-  );
+  });
+
+export const settingsSchema = settingsSizeSchema.refine(
+  (obj) => Object.keys(obj).every(isAllowedSettingsKey),
+  {
+    message: 'Settings contains invalid or forbidden key',
+  }
+);
 
 router.get('/', async (req, res, next) => {
   try {
@@ -53,10 +54,10 @@ router.post('/', async (req, res, next) => {
     const existing = await prisma.userSettings.findUnique({
       where: { userId: req.user.userId },
     });
-    const merged = {
+    const merged = settingsSizeSchema.parse({
       ...((existing?.settings as Record<string, unknown>) ?? {}),
       ...incoming,
-    };
+    });
     const updated = await prisma.userSettings.upsert({
       where: { userId: req.user.userId },
       create: { userId: req.user.userId, settings: merged as any, updatedAt: new Date() },

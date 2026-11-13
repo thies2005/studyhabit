@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -34,6 +35,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import de.schuelken.studyhabit.core.database.AchievementEntity
@@ -55,6 +59,7 @@ fun AchievementsScreen(container: AppContainer) {
     var selectedBadge by remember { mutableStateOf<Pair<AchievementMetadata, AchievementEntity?>?>(null) }
 
     val levelProgress = XpCalculator.getLevelProgress(stats?.totalXp ?: 0)
+    val largeText = LocalDensity.current.fontScale >= 1.3f
 
     val currentCategory = categories[selectedCategoryIndex]
     val displayedBadges = if (currentCategory == "All") {
@@ -107,13 +112,13 @@ fun AchievementsScreen(container: AppContainer) {
         }
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Category Tabs
-        ScrollableTabRow(selectedTabIndex = selectedCategoryIndex, edgePadding = 0.dp) {
+        // Category Tabs (7 categories: always keep horizontally scrollable so labels never truncate)
+        ScrollableTabRow(selectedTabIndex = selectedCategoryIndex, edgePadding = 8.dp) {
             categories.forEachIndexed { index, cat ->
                 Tab(
                     selected = selectedCategoryIndex == index,
                     onClick = { selectedCategoryIndex = index },
-                    text = { Text(cat) }
+                    text = { Text(cat, maxLines = 1, softWrap = false) }
                 )
             }
         }
@@ -121,12 +126,13 @@ fun AchievementsScreen(container: AppContainer) {
 
         // Badges Grid
         LazyVerticalGrid(
-            columns = GridCells.Fixed(3),
+            columns = GridCells.Adaptive(minSize = if (largeText) 140.dp else 104.dp),
+            contentPadding = PaddingValues(bottom = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxSize()
         ) {
-            items(displayedBadges) { meta ->
+            items(displayedBadges, key = { it.key }) { meta ->
                 val entity = achievementMap[meta.key]
                 val isUnlocked = (entity?.progress ?: 0.0) >= 1.0 || entity?.unlockedAt != null
                 val progress = (entity?.progress ?: 0.0).toFloat().coerceIn(0f, 1f)
@@ -151,7 +157,9 @@ fun AchievementsScreen(container: AppContainer) {
                         Text(
                             text = meta.title,
                             style = MaterialTheme.typography.labelMedium,
-                            maxLines = 1
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         LinearProgressIndicator(

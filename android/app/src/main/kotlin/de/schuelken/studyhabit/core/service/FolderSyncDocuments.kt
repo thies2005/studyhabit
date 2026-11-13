@@ -33,8 +33,9 @@ internal class FolderSyncDocuments(private val resolver: ContentResolver, privat
             DocumentsContract.Document.COLUMN_MIME_TYPE,
         )
         return resolver.query(children, columns, null, null, null)?.use { cursor ->
-            if (cursor.extras.getBoolean(DocumentsContract.EXTRA_LOADING) ||
-                !cursor.extras.getString(DocumentsContract.EXTRA_ERROR).isNullOrBlank()
+            val extras = cursor.extras
+            if (extras?.getBoolean(DocumentsContract.EXTRA_LOADING) == true ||
+                !extras?.getString(DocumentsContract.EXTRA_ERROR).isNullOrBlank()
             ) {
                 throw IOException("Folder contents are still loading or unavailable")
             }
@@ -54,15 +55,44 @@ internal class FolderSyncDocuments(private val resolver: ContentResolver, privat
         it.bufferedReader(Charsets.UTF_8).readText()
     } ?: throw FileNotFoundException("Could not open sync data for reading")
 
-    fun publish(name: String, contents: String) {
+    fun delete(uri: Uri): Boolean = runCatching {
+        DocumentsContract.deleteDocument(resolver, uri)
+    }.getOrDefault(false)
+
+    fun publish(name: String, contents: String, existingEntries: List<Entry> = emptyList()) {
+        val matching = existingEntries.filter { it.name == name }
+        val payload = contents.toByteArray(Charsets.UTF_8)
+        if (matching.isNotEmpty()) {
+            val primary = matching.first()
+            val updatedInPlace = runCatching {
+                resolver.openOutputStream(primary.uri, "wt")?.use { it.write(payload) }
+                    ?: throw IOException("Could not open the sync snapshot for updating")
+                verifySnapshot(primary.uri, name, contents)
+                true
+            }.getOrDefault(false)
+            if (updatedInPlace) {
+                matching.drop(1).forEach { delete(it.uri) }
+                return
+            }
+            // Some SAF providers do not support in-place "wt" overwrite; replace cleanly without leaving duplicates.
+            matching.forEach { delete(it.uri) }
+        }
         val uri = DocumentsContract.createDocument(resolver, root, "application/json", name)
             ?: throw IOException("Could not create a sync snapshot in the selected folder")
-        // New, unique document: no seeking/truncation and no risk to an existing publication.
-        resolver.openOutputStream(uri, "w")?.use { it.write(contents.toByteArray(Charsets.UTF_8)) }
-            ?: throw IOException("Could not open the new sync snapshot for writing")
-        if (read(uri) != contents) throw IOException("The file provider has not verified the new snapshot")
+        try {
+            resolver.openOutputStream(uri, "w")?.use { it.write(payload) }
+                ?: throw IOException("Could not open the new sync snapshot for writing")
+            verifySnapshot(uri, name, contents)
+        } catch (t: Throwable) {
+            delete(uri)
+            throw t
+        }
+    }
+
+    private fun verifySnapshot(uri: Uri, expectedName: String, expectedContents: String) {
+        if (read(uri) != expectedContents) throw IOException("The file provider has not verified the sync snapshot")
         val actualName = resolver.query(uri, arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME), null, null, null)
             ?.use { if (it.moveToFirst()) it.getString(0) else null }
-        if (actualName != name) throw IOException("The file provider changed the sync snapshot name")
+        if (actualName != expectedName) throw IOException("The file provider changed the sync snapshot name")
     }
 }

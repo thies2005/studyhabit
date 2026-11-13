@@ -2,17 +2,17 @@ package de.schuelken.studyhabit.ui.settings
 
 import android.content.Intent
 import android.content.pm.ApplicationInfo
-import de.schuelken.studyhabit.core.service.BlockerPresets
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.material3.OutlinedButton
 import android.graphics.drawable.Drawable
+import android.net.Uri
 import android.provider.Settings
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,9 +27,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.PauseCircle
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -37,10 +40,12 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -60,9 +65,16 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import de.schuelken.studyhabit.core.di.AppContainer
+import de.schuelken.studyhabit.core.service.BlockerPresets
 import de.schuelken.studyhabit.core.service.StudyBlockerAccessibilityService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+
+private enum class BlockerSettingsTarget {
+    ACCESSIBILITY,
+    USAGE_ACCESS,
+    OVERLAY
+}
 
 data class InstalledAppItem(
     val packageName: String,
@@ -84,11 +96,67 @@ fun AppBlockerScreen(
     var isAccessibilityEnabled by remember {
         mutableStateOf(StudyBlockerAccessibilityService.isAccessibilityServiceEnabled(context))
     }
+    var hasUsageStats by remember {
+        mutableStateOf(StudyBlockerAccessibilityService.hasUsageStatsPermission(context))
+    }
+    var canDrawOverlays by remember {
+        mutableStateOf(Settings.canDrawOverlays(context))
+    }
+    var disclosureAccepted by remember {
+        mutableStateOf(container.preferences.blockerDisclosureAccepted)
+    }
+    var pendingSettingsTarget by remember { mutableStateOf<BlockerSettingsTarget?>(null) }
+
+    fun openSystemSettings(target: BlockerSettingsTarget) {
+        when (target) {
+            BlockerSettingsTarget.ACCESSIBILITY -> {
+                runCatching { context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+            }
+            BlockerSettingsTarget.USAGE_ACCESS -> {
+                val withPkg = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).apply {
+                    data = Uri.fromParts("package", context.packageName, null)
+                }
+                val opened = runCatching { context.startActivity(withPkg) }.isSuccess
+                if (!opened) {
+                    runCatching { context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) }
+                        .onFailure {
+                            runCatching {
+                                context.startActivity(
+                                    Intent(
+                                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                        Uri.fromParts("package", context.packageName, null)
+                                    )
+                                )
+                            }
+                        }
+                }
+            }
+            BlockerSettingsTarget.OVERLAY -> {
+                val overlayIntent = Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.fromParts("package", context.packageName, null)
+                )
+                runCatching { context.startActivity(overlayIntent) }.onFailure {
+                    runCatching { context.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)) }
+                }
+            }
+        }
+    }
+
+    fun requestBlockerSettings(target: BlockerSettingsTarget) {
+        if (disclosureAccepted) {
+            openSystemSettings(target)
+        } else {
+            pendingSettingsTarget = target
+        }
+    }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 isAccessibilityEnabled = StudyBlockerAccessibilityService.isAccessibilityServiceEnabled(context)
+                hasUsageStats = StudyBlockerAccessibilityService.hasUsageStatsPermission(context)
+                canDrawOverlays = Settings.canDrawOverlays(context)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -163,8 +231,9 @@ fun AppBlockerScreen(
         ) {
             item {
                 Spacer(modifier = Modifier.height(4.dp))
-                // Accessibility Service Status
-                if (!isAccessibilityEnabled) {
+                // Blocker Protection & Permission Status
+                val hasPermission = isAccessibilityEnabled || hasUsageStats
+                if (!hasPermission) {
                     Card(
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.errorContainer
@@ -180,33 +249,45 @@ fun AppBlockerScreen(
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "Accessibility Permission Required",
+                                    text = "Blocker Permission Required",
                                     style = MaterialTheme.typography.titleMedium,
                                     color = MaterialTheme.colorScheme.onErrorContainer
                                 )
                             }
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "StudyHabit needs accessibility permission to detect when blocked distracting apps are opened during study sessions.",
+                                text = "Grant Accessibility Service (instant blocking) or Usage Access (focus-timer fallback) so StudyHabit can detect when you open a blocked app during study sessions.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onErrorContainer
                             )
                             Spacer(modifier = Modifier.height(12.dp))
                             Button(
-                                onClick = {
-                                    val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-                                    context.startActivity(intent)
-                                },
+                                onClick = { requestBlockerSettings(BlockerSettingsTarget.ACCESSIBILITY) },
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text("Enable in Settings")
+                                Text("Enable Accessibility Service")
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedButton(
+                                onClick = { requestBlockerSettings(BlockerSettingsTarget.USAGE_ACCESS) },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                                ),
+                                border = BorderStroke(
+                                    1.dp,
+                                    MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.6f)
+                                )
+                            ) {
+                                Text("Enable Usage Access (Fallback)")
                             }
                         }
                     }
-                } else {
+                } else if (!blockerEnabled) {
+                    val modeLabel = if (isAccessibilityEnabled) "Accessibility Service" else "Usage Access fallback"
                     Card(
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer
                         ),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -217,22 +298,80 @@ fun AppBlockerScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
-                                imageVector = Icons.Default.CheckCircle,
+                                imageVector = Icons.Default.PauseCircle,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer
                             )
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text(
-                                    text = "App Blocker Active",
+                                    text = "App Blocker Paused",
                                     style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
                                 )
                                 Text(
-                                    text = "Accessibility service is running and protecting your focus.",
+                                    text = "$modeLabel is granted, but Focus App Blocker is currently turned off below.",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.85f)
                                 )
+                            }
+                        }
+                    }
+                } else {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text(
+                                        text = "App Blocker Active",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                    Text(
+                                        text = when {
+                                            isAccessibilityEnabled ->
+                                                "Accessibility service is running and protecting your focus."
+                                            canDrawOverlays ->
+                                                "Usage Access + Display Over Other Apps are active during focus sessions."
+                                            else ->
+                                                "Usage Access is granted, but Display Over Other Apps is needed on Android 10+ to show the lock screen."
+                                        },
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                                    )
+                                }
+                            }
+                            if (!isAccessibilityEnabled && !canDrawOverlays) {
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Button(
+                                    onClick = { requestBlockerSettings(BlockerSettingsTarget.OVERLAY) },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("Allow Display Over Other Apps")
+                                }
+                            }
+                            if (!isAccessibilityEnabled) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                OutlinedButton(
+                                    onClick = { requestBlockerSettings(BlockerSettingsTarget.ACCESSIBILITY) },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("Switch to Accessibility Service")
+                                }
                             }
                         }
                     }
@@ -430,5 +569,45 @@ fun AppBlockerScreen(
                 Spacer(modifier = Modifier.height(32.dp))
             }
         }
+    }
+
+    pendingSettingsTarget?.let { target ->
+        AlertDialog(
+            onDismissRequest = { pendingSettingsTarget = null },
+            title = { Text("App Blocker Disclosure & Consent") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "What is observed: StudyHabit observes only the package name of the active foreground app. Screen contents, personal messages, and keystrokes are never read or recorded.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = "Why it is needed: Foreground app detection is used solely to block distracting apps that you choose during your active study sessions.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = "Local-only processing: Your blocked-app list and app-usage checks stay strictly on this device and are never synced, uploaded, or shared off-device.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        container.preferences.blockerDisclosureAccepted = true
+                        disclosureAccepted = true
+                        pendingSettingsTarget = null
+                        openSystemSettings(target)
+                    }
+                ) {
+                    Text("Agree & Continue")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingSettingsTarget = null }) {
+                    Text("Decline")
+                }
+            }
+        )
     }
 }

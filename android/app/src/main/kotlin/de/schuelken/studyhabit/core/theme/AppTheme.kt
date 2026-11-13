@@ -82,7 +82,7 @@ fun AppTheme(
     val currentDensity = LocalDensity.current
     val customDensity = Density(
         density = currentDensity.density,
-        fontScale = currentDensity.fontScale * fontScale
+        fontScale = (currentDensity.fontScale * fontScale).coerceIn(0.85f, 1.85f)
     )
 
     CompositionLocalProvider(LocalDensity provides customDensity) {

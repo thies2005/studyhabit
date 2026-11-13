@@ -6,24 +6,32 @@ import { Prisma } from '@prisma/client';
 
 const userSyncLocks = new Map<string, Promise<void>>();
 
-function withUserLock<T>(userId: string, fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+export function withUserLock<T>(
+  userId: string,
+  fn: (tx: Prisma.TransactionClient) => Promise<T>,
+  runInTransaction: <R>(cb: (tx: Prisma.TransactionClient) => Promise<R>) => Promise<R> = (cb) =>
+    prisma.$transaction(async (tx) => {
+      // Stable 64-bit bigint advisory lock derived from the userId to eliminate collisions.
+      const keyResult = await tx.$queryRaw<[{ k: bigint }]>`SELECT ('x' || substr(md5(${userId}::text), 1, 16))::bit(64)::bigint AS k`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(${keyResult[0].k})`;
+      return cb(tx);
+    }, { timeout: 30000 })
+): Promise<T> {
   const existing = userSyncLocks.get(userId) ?? Promise.resolve();
   const newLock = existing
-    .then(() =>
-      prisma.$transaction(async (tx) => {
-        // Stable 64-bit bigint advisory lock derived from the userId to eliminate collisions.
-        const keyResult = await tx.$queryRaw<[{ k: bigint }]>`SELECT ('x' || substr(md5(${userId}::text), 1, 16))::bit(64)::bigint AS k`;
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(${keyResult[0].k})`;
-        return fn(tx);
-      }, { timeout: 30000 })
-    )
-    .finally(() => {
-      // Clean up only if we're still the latest lock
-      if (userSyncLocks.get(userId) === newLock) {
-        userSyncLocks.delete(userId);
-      }
-    });
-  userSyncLocks.set(userId, newLock.then(() => {}));
+    .catch(() => {})
+    .then(() => runInTransaction(fn));
+  const lockEntry = newLock.then(
+    () => {},
+    () => {}
+  );
+  userSyncLocks.set(userId, lockEntry);
+  lockEntry.finally(() => {
+    // Clean up only if we're still the latest lock
+    if (userSyncLocks.get(userId) === lockEntry) {
+      userSyncLocks.delete(userId);
+    }
+  });
   return newLock;
 }
 
@@ -36,21 +44,21 @@ function parseSince(raw: string | undefined): string | null {
   return raw;
 }
 
-const pushSchema = z.object({
-  projects: z.array(z.record(z.unknown())).max(1000).optional(),
-  subjects: z.array(z.record(z.unknown())).max(1000).optional(),
-  topics: z.array(z.record(z.unknown())).max(1000).optional(),
-  chapters: z.array(z.record(z.unknown())).max(1000).optional(),
-  sessions: z.array(z.record(z.unknown())).max(1000).optional(),
-  sources: z.array(z.record(z.unknown())).max(1000).optional(),
-  skillLabels: z.array(z.record(z.unknown())).max(1000).optional(),
-  achievements: z.array(z.record(z.unknown())).max(1000).optional(),
-  userStats: z.record(z.unknown()).optional(),
-  subjectMilestones: z.array(z.record(z.unknown())).max(1000).optional(),
+export const pushSchema = z.object({
+  projects: z.array(z.record(z.unknown())).max(1000).nullable().optional(),
+  subjects: z.array(z.record(z.unknown())).max(1000).nullable().optional(),
+  topics: z.array(z.record(z.unknown())).max(1000).nullable().optional(),
+  chapters: z.array(z.record(z.unknown())).max(1000).nullable().optional(),
+  sessions: z.array(z.record(z.unknown())).max(1000).nullable().optional(),
+  sources: z.array(z.record(z.unknown())).max(1000).nullable().optional(),
+  skillLabels: z.array(z.record(z.unknown())).max(1000).nullable().optional(),
+  achievements: z.array(z.record(z.unknown())).max(1000).nullable().optional(),
+  userStats: z.record(z.unknown()).nullable().optional(),
+  subjectMilestones: z.array(z.record(z.unknown())).max(1000).nullable().optional(),
   userSettings: z.object({
     settings: z.record(z.unknown()),
     updatedAt: z.string().or(z.date()),
-  }).optional(),
+  }).nullable().optional(),
 });
 
 router.post('/push', async (req, res, next) => {

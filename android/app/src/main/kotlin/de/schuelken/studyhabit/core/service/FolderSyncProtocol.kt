@@ -1,5 +1,6 @@
 package de.schuelken.studyhabit.core.service
 
+import de.schuelken.studyhabit.core.database.AchievementEntity
 import de.schuelken.studyhabit.core.database.StudySessionEntity
 import de.schuelken.studyhabit.core.database.UserStatsEntity
 import kotlinx.serialization.Serializable
@@ -10,15 +11,25 @@ import java.security.MessageDigest
 /** Complete publications are immutable; a visible filename alone does not commit a publication. */
 internal object FolderSyncProtocol {
     private val json = Json { encodeDefaults = true }
-    private val publicationName = Regex("studyhabit_device_[0-9a-f-]{36}_[0-9a-f-]{36}\\.json")
+    private val deviceFilePattern = Regex("studyhabit_device_[0-9a-f-]{36}\\.json")
+    private val legacyPublicationPattern = Regex("studyhabit_device_[0-9a-f-]{36}_[0-9a-f-]{36}\\.json")
 
     @Serializable
     private data class Publication(val protocol: Int, val checksum: String, val payload: String)
 
+    fun deviceFileName(deviceId: String): String = "studyhabit_device_${deviceId}.json"
+
     fun fileName(deviceId: String, publicationId: String): String =
         "studyhabit_device_${deviceId}_${publicationId}.json"
 
-    fun isPublication(name: String): Boolean = publicationName.matches(name)
+    fun isPublication(name: String): Boolean =
+        deviceFilePattern.matches(name) || legacyPublicationPattern.matches(name)
+
+    fun isOwnLegacyPublication(name: String, deviceId: String): Boolean =
+        legacyPublicationPattern.matches(name) && name.startsWith("studyhabit_device_${deviceId}_")
+
+    fun sameSnapshot(left: ExportDocument, right: ExportDocument): Boolean =
+        left.copy(exportedAt = "") == right.copy(exportedAt = "")
 
     fun encode(document: ExportDocument): String {
         val payload = json.encodeToString(document)
@@ -79,6 +90,56 @@ internal object FolderSyncProtocol {
             }
         }
         for (entry in remoteById.values) updates.add(entry to null)
+        return MergePlan(pushed, updates)
+    }
+
+    fun mergeAchievements(
+        remote: List<AchievementEntity>,
+        local: List<AchievementEntity>,
+    ): MergePlan<AchievementEntity> {
+        val localByKey = local.associateBy { it.key }
+        val remoteByKey = remote.groupBy { it.key }
+        val allKeys = (localByKey.keys + remoteByKey.keys).toSortedSet()
+
+        var pushed = 0
+        val updates = mutableListOf<Pair<AchievementEntity, AchievementEntity?>>()
+
+        for (key in allKeys) {
+            val localEntry = localByKey[key]
+            val remoteEntries = remoteByKey[key].orEmpty()
+            val allEntries = listOfNotNull(localEntry) + remoteEntries
+
+            val mergedProgress = allEntries.maxOf { it.progress.takeIf(Double::isFinite) ?: 0.0 }
+            val mergedUnlockedAt = allEntries.mapNotNull { it.unlockedAt }.minOrNull()
+            val mergedUpdatedAt = allEntries.maxOf { it.updatedAt }
+            val merged = AchievementEntity(
+                key = key,
+                unlockedAt = mergedUnlockedAt,
+                progress = mergedProgress,
+                updatedAt = mergedUpdatedAt,
+            )
+
+            if (remoteEntries.isEmpty()) {
+                if (localEntry != null) pushed++
+            } else if (localEntry != null) {
+                val bestRemoteProgress = remoteEntries.maxOf { it.progress.takeIf(Double::isFinite) ?: 0.0 }
+                val bestRemoteUnlockedAt = remoteEntries.mapNotNull { it.unlockedAt }.minOrNull()
+                val localProgress = localEntry.progress.takeIf(Double::isFinite) ?: 0.0
+                val localAheadOnProgress = localProgress > bestRemoteProgress
+                val localAheadOnUnlock = localEntry.unlockedAt != null &&
+                    (bestRemoteUnlockedAt == null || localEntry.unlockedAt < bestRemoteUnlockedAt)
+                if (localAheadOnProgress || localAheadOnUnlock) {
+                    pushed++
+                }
+            }
+
+            val localChanged = localEntry == null ||
+                mergedProgress > (localEntry.progress.takeIf(Double::isFinite) ?: 0.0) ||
+                mergedUnlockedAt != localEntry.unlockedAt
+            if (localChanged) {
+                updates.add(merged to localEntry)
+            }
+        }
         return MergePlan(pushed, updates)
     }
 

@@ -54,7 +54,7 @@ class FolderSyncService(
     private var debounceJob: Job? = null
 
     @Synchronized
-    fun scheduleDebouncedSync(delayMs: Long = 3_000L) {
+    fun scheduleDebouncedSync(delayMs: Long = 15_000L) {
         if (selectedFolder() == null) return
         debounceJob?.cancel()
         debounceJob = scope.launch {
@@ -117,19 +117,47 @@ class FolderSyncService(
         return id
     }
 
-    private data class ReadResult(val snapshots: List<ExportDocument>, val incomplete: Int, val hasPublication: Boolean)
+    private data class ReadResult(
+        val entries: List<FolderSyncDocuments.Entry>,
+        val snapshots: List<ExportDocument>,
+        val incomplete: Int,
+        val hasPublication: Boolean,
+        val hasOwnDeviceFile: Boolean,
+        val ownDocument: ExportDocument?,
+        val ownLegacyFiles: List<FolderSyncDocuments.Entry>,
+        val duplicateOwnFiles: List<FolderSyncDocuments.Entry>,
+    )
 
-    private fun readSnapshots(folder: FolderSyncDocuments): ReadResult {
+    private fun readSnapshots(folder: FolderSyncDocuments, ownId: String): ReadResult {
         val entries = folder.list()
+        val ownFileName = FolderSyncProtocol.deviceFileName(ownId)
         val snapshots = mutableListOf<ExportDocument>()
+        val ownLegacyFiles = mutableListOf<FolderSyncDocuments.Entry>()
+        var hasOwnDeviceFile = false
+        var ownDocument: ExportDocument? = null
+        var primaryOwnEntry: FolderSyncDocuments.Entry? = null
         var incomplete = 0
+        var lastIoError: IOException? = null
         // All complete publications participate. A later upload can never hide another writer's work.
         entries.filter { FolderSyncProtocol.isPublication(it.name) }.forEach { entry ->
             try {
                 val contents = folder.read(entry.uri)
-                snapshots.add(FolderSyncProtocol.portable(FolderSyncProtocol.decode(contents)))
+                val decoded = FolderSyncProtocol.portable(FolderSyncProtocol.decode(contents))
+                snapshots.add(decoded)
+                if (entry.name == ownFileName) {
+                    hasOwnDeviceFile = true
+                    if (ownDocument == null) {
+                        ownDocument = decoded
+                        primaryOwnEntry = entry
+                    }
+                } else if (FolderSyncProtocol.isOwnLegacyPublication(entry.name, ownId)) {
+                    ownLegacyFiles.add(entry)
+                }
             } catch (_: FileNotFoundException) {
                 incomplete++
+            } catch (e: IOException) {
+                incomplete++
+                lastIoError = e
             } catch (_: IllegalArgumentException) {
                 incomplete++
             }
@@ -140,6 +168,8 @@ class FolderSyncService(
             try {
                 FolderSyncProtocol.portable(BackupCodec.decode(folder.read(it.uri)))
             } catch (_: FileNotFoundException) {
+                null
+            } catch (_: IOException) {
                 null
             } catch (_: IllegalArgumentException) {
                 null
@@ -154,7 +184,24 @@ class FolderSyncService(
         }
         val hasPublication = snapshots.isNotEmpty()
         snapshots.addAll(old)
-        return ReadResult(snapshots, incomplete, hasPublication)
+        if (snapshots.isEmpty() && lastIoError != null) {
+            throw lastIoError!!
+        }
+        val duplicateOwnFiles = if (primaryOwnEntry != null) {
+            entries.filter { it.name == ownFileName && it.uri != primaryOwnEntry!!.uri }
+        } else {
+            emptyList()
+        }
+        return ReadResult(
+            entries = entries,
+            snapshots = snapshots,
+            incomplete = incomplete,
+            hasPublication = hasPublication,
+            hasOwnDeviceFile = hasOwnDeviceFile,
+            ownDocument = ownDocument,
+            ownLegacyFiles = ownLegacyFiles,
+            duplicateOwnFiles = duplicateOwnFiles,
+        )
     }
 
     suspend fun syncWithFolder(): Boolean = syncMutex.withLock {
@@ -164,8 +211,9 @@ class FolderSyncService(
             try {
                 val uri = Uri.parse(selected)
                 if (!hasAccess(uri)) throw IOException("Folder access was lost. Select the folder again.")
+                val ownId = writerId()
                 val folder = FolderSyncDocuments(context.contentResolver, uri)
-                val remote = readSnapshots(folder)
+                val remote = readSnapshots(folder, ownId)
                 currentCoroutineContext().ensureActive()
                 if (selectedFolder() != selected) {
                     _syncStatus.value = SyncStatus.IDLE
@@ -177,11 +225,24 @@ class FolderSyncService(
                     _syncStatus.value = SyncStatus.IDLE
                     return@withContext false
                 }
-                val shouldPublish = result.pushed > 0 || !remote.hasPublication
+                val targetDoc = FolderSyncProtocol.portable(result.document)
+                val contentChanged = remote.ownDocument == null ||
+                    !FolderSyncProtocol.sameSnapshot(remote.ownDocument, targetDoc)
+                val needsConsolidation = remote.ownLegacyFiles.isNotEmpty() && !remote.hasOwnDeviceFile
+                val shouldPublish = (result.pushed > 0 || !remote.hasPublication || needsConsolidation) &&
+                    (contentChanged || !remote.hasOwnDeviceFile)
                 if (shouldPublish) {
                     currentCoroutineContext().ensureActive()
-                    val contents = FolderSyncProtocol.encode(FolderSyncProtocol.portable(result.document))
-                    folder.publish(FolderSyncProtocol.fileName(writerId(), UUID.randomUUID().toString()), contents)
+                    val contents = FolderSyncProtocol.encode(targetDoc)
+                    folder.publish(FolderSyncProtocol.deviceFileName(ownId), contents, remote.entries)
+                } else if (remote.duplicateOwnFiles.isNotEmpty() && selectedFolder() == selected) {
+                    remote.duplicateOwnFiles.forEach { folder.delete(it.uri) }
+                }
+                if ((shouldPublish || (remote.hasOwnDeviceFile && !contentChanged)) &&
+                    remote.ownLegacyFiles.isNotEmpty() &&
+                    selectedFolder() == selected
+                ) {
+                    remote.ownLegacyFiles.forEach { folder.delete(it.uri) }
                 }
                 if (selectedFolder() != selected) {
                     _syncStatus.value = SyncStatus.IDLE
@@ -231,8 +292,11 @@ class FolderSyncService(
     }
 
     private fun writeManualDocument(uri: Uri, contents: String) {
-        context.contentResolver.openOutputStream(uri, "wt")?.use { it.write(contents.toByteArray(Charsets.UTF_8)) }
+        val bytes = contents.toByteArray(Charsets.UTF_8)
+        val stream = runCatching { context.contentResolver.openOutputStream(uri, "wt") }.getOrNull()
+            ?: context.contentResolver.openOutputStream(uri, "w")
             ?: throw IOException("Could not open the selected document for writing")
+        stream.use { it.write(bytes) }
     }
 
     private suspend fun runManual(label: String, action: suspend () -> String): Boolean =
@@ -328,10 +392,14 @@ class FolderSyncService(
                 remoteSubjects.flatMap { it.milestones },
                 database.milestoneDao().getModifiedSince(-1L), { it.id }, { it.updatedAt }, { it.isDeleted },
             ) { incoming, _ -> database.milestoneDao().upsert(incoming) })
-            count(mergeEntities(
+            val achievementPlan = FolderSyncProtocol.mergeAchievements(
                 remote.flatMap { it.achievements },
-                database.achievementDao().getAllAchievements(), { it.key }, { it.updatedAt }, { false },
-            ) { incoming, _ -> database.achievementDao().upsert(incoming) })
+                database.achievementDao().getAllAchievements(),
+            )
+            for ((incoming, _) in achievementPlan.updates) {
+                database.achievementDao().upsert(incoming)
+            }
+            count(achievementPlan.pushed to achievementPlan.updates.size)
 
             val mergedSessions = database.sessionDao().getAllSessions()
             val subjectXp = mergedSessions.groupBy { it.subjectId }.mapValues { (_, sessions) ->
