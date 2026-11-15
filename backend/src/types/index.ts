@@ -1,5 +1,5 @@
 import { Request } from 'express';
-import { ZodIssue } from 'zod';
+import { ZodIssue } from 'zod/v3';
 
 declare global {
   namespace Express {

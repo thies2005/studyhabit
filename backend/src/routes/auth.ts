@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
-import { z } from 'zod';
-import { ZodError } from 'zod';
+import { z } from 'zod/v3';
+import { ZodError } from 'zod/v3';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { prisma } from '../db.js';

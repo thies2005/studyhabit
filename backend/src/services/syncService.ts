@@ -7,7 +7,7 @@ import {
   SyncSource,
   SyncSkillLabel,
 } from '../types/index.js';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { AchievementService } from './achievementService.js';
 import { isAllowedSettingsKey } from '../routes/settings.js';
 

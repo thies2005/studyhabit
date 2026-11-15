@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../db.js';
-import { z, ZodError } from 'zod';
+import { z, ZodError } from 'zod/v3';
 
 const router = Router();
 

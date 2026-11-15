@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { z, ZodError } from 'zod';
+import { z, ZodError } from 'zod/v3';
 import { SyncService } from '../services/syncService.js';
 import { prisma } from '../db.js';
 import { Prisma } from '@prisma/client';

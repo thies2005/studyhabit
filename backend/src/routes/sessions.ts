@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { prisma } from '../db.js';
 import { XpService } from '../services/xpService.js';
 import { AchievementService } from '../services/achievementService.js';

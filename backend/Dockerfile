@@ -4,6 +4,7 @@ COPY package*.json ./
 RUN npm ci
 
 FROM node:22-alpine AS build
+RUN apk upgrade --no-cache
 WORKDIR /app
 COPY . .
 COPY --from=deps /app/node_modules ./node_modules
@@ -17,7 +18,8 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 
 FROM node:22-alpine AS runner
-RUN apk add --no-cache wget
+RUN apk upgrade --no-cache && apk add --no-cache wget \
+    && npm install -g npm@latest && npm cache clean --force
 WORKDIR /app
 ENV NODE_ENV=production
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup

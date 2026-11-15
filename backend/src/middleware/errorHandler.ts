@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { Prisma } from '@prisma/client';
-import { ZodError } from 'zod';
+import { ZodError } from 'zod/v3';
 
 export const errorHandler = (
   err: Error,
